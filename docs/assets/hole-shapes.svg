@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="480" viewBox="0 0 1200 480" role="img" aria-label="Twelve supported Perfora hole shapes">
+<rect width="1200" height="480" rx="24" fill="#10263c"/>
+<text x="38" y="52" font-family="Arial,sans-serif" font-size="27" font-weight="700" fill="#ffffff">One tool. Twelve hole shapes.</text>
+<text x="38" y="82" font-family="Arial,sans-serif" font-size="16" fill="#b9ccdf">Sketch profiles · Perforated panels · Native Fusion features</text>
+<rect x="22" y="114" width="156" height="145" rx="15" fill="#19364f"/>
+<circle cx="100" cy="174" r="28" fill="#f4c453" stroke="#ffdf86" stroke-width="2"/>
+<text x="100" y="237" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" fill="#edf4fa">Circle</text>
+<rect x="222" y="114" width="156" height="145" rx="15" fill="#19364f"/>
+<polygon points="326.50,158.70 300.00,143.40 273.50,158.70 273.50,189.30 300.00,204.60 326.50,189.30" fill="#f4c453" stroke="#ffdf86" stroke-width="2"/>
+<text x="300" y="237" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" fill="#edf4fa">Hexagon</text>
+<rect x="422" y="114" width="156" height="145" rx="15" fill="#19364f"/>
+<polygon points="473.50,200.50 526.50,200.50 526.50,147.50 473.50,147.50" fill="#f4c453" stroke="#ffdf86" stroke-width="2"/>
+<text x="500" y="237" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" fill="#edf4fa">Square</text>
+<rect x="622" y="114" width="156" height="145" rx="15" fill="#19364f"/>
+<rect x="654" y="151" width="92" height="46" rx="23" fill="#f4c453" stroke="#ffdf86" stroke-width="2"/>
+<text x="700" y="237" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" fill="#edf4fa">Slot</text>
+<rect x="822" y="114" width="156" height="145" rx="15" fill="#19364f"/>
+<polygon points="873.50,196.95 926.50,196.95 900.00,151.05" fill="#f4c453" stroke="#ffdf86" stroke-width="2"/>
+<text x="900" y="237" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" fill="#edf4fa">Triangle</text>
+<rect x="1022" y="114" width="156" height="145" rx="15" fill="#19364f"/>
+<polygon points="1055.00,200.50 1145.00,200.50 1145.00,147.50 1055.00,147.50" fill="#f4c453" stroke="#ffdf86" stroke-width="2"/>
+<text x="1100" y="237" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" fill="#edf4fa">Rectangle</text>
+<rect x="22" y="292" width="156" height="145" rx="15" fill="#19364f"/>
+<polygon points="100.00,378.50 145.00,352.00 100.00,325.50 55.00,352.00" fill="#f4c453" stroke="#ffdf86" stroke-width="2"/>
+<text x="100" y="415" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" fill="#edf4fa">Diamond</text>
+<rect x="222" y="292" width="156" height="145" rx="15" fill="#19364f"/>
+<ellipse cx="300" cy="352" rx="46" ry="25" fill="#f4c453" stroke="#ffdf86" stroke-width="2"/>
+<text x="300" y="415" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" fill="#edf4fa">Ellipse</text>
+<rect x="422" y="292" width="156" height="145" rx="15" fill="#19364f"/>
+<polygon points="500.00,325.50 474.80,343.81 484.42,373.44 515.58,373.44 525.20,343.81" fill="#f4c453" stroke="#ffdf86" stroke-width="2"/>
+<text x="500" y="415" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" fill="#edf4fa">Pentagon</text>
+<rect x="622" y="292" width="156" height="145" rx="15" fill="#19364f"/>
+<polygon points="726.50,341.02 710.98,325.50 689.02,325.50 673.50,341.02 673.50,362.98 689.02,378.50 710.98,378.50 726.50,362.98" fill="#f4c453" stroke="#ffdf86" stroke-width="2"/>
+<text x="700" y="415" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" fill="#edf4fa">Octagon</text>
+<rect x="822" y="292" width="156" height="145" rx="15" fill="#19364f"/>
+<polygon points="891.50,378.50 908.50,378.50 908.50,360.50 926.50,360.50 926.50,343.50 908.50,343.50 908.50,325.50 891.50,325.50 891.50,343.50 873.50,343.50 873.50,360.50 891.50,360.50" fill="#f4c453" stroke="#ffdf86" stroke-width="2"/>
+<text x="900" y="415" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" fill="#edf4fa">Cross</text>
+<rect x="1022" y="292" width="156" height="145" rx="15" fill="#19364f"/>
+<polygon points="1100.00,325.50 1092.99,342.35 1074.80,343.81 1088.66,355.69 1084.42,373.44 1100.00,363.93 1115.58,373.44 1111.34,355.69 1125.20,343.81 1107.01,342.35" fill="#f4c453" stroke="#ffdf86" stroke-width="2"/>
+<text x="1100" y="415" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" fill="#edf4fa">Star</text>
+</svg>

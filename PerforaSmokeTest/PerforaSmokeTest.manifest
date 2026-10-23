@@ -1,0 +1,9 @@
+{
+  "autodeskProduct": "Fusion360",
+  "type": "script",
+  "id": "b519cd99-27f2-4f45-9797-2032cbfa9eee",
+  "author": "DiegoV",
+  "description": {"": "Native CAD smoke tests for Perfora, using a separate unsaved test document"},
+  "version": "0.1.2",
+  "supportedOS": "windows|mac"
+}
