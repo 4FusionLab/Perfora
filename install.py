@@ -44,7 +44,7 @@ def default_api_root():
         import os
         base = Path(os.environ['APPDATA']) / 'Autodesk'
     else:
-        raise SystemExit('Fusion поддерживает macOS и Windows. Для ZIP используйте --zip.')
+        raise SystemExit('Fusion supports macOS and Windows. Use --zip to build a distribution.')
     # Prefer the actual local API location; product-folder naming differs by release.
     candidates = [base / 'Autodesk Fusion/API', base / 'Autodesk Fusion 360/API']
     return next((p for p in candidates if p.exists()), candidates[0])
@@ -52,23 +52,27 @@ def default_api_root():
 
 def copy_directory(source, destination):
     if destination.is_symlink():
-        raise SystemExit('Отказ: целевой каталог является символической ссылкой: ' + str(destination))
+        raise SystemExit('Refusing to replace a symbolic-link destination: ' + str(destination))
     if destination.exists():
         backup = destination.with_name(destination.name + '.backup-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f'))
         # Backups outside AddIns/Scripts cannot be auto-discovered by Fusion.
         backup_root = destination.parent.parent / 'PerforaBackups'
         backup_root.mkdir(parents=True, exist_ok=True)
         shutil.move(str(destination), str(backup_root / backup.name))
-        print('Предыдущая версия:', backup_root / backup.name)
+        print('Previous installation:', backup_root / backup.name)
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copytree(source, destination, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
-    print('Установлено:', destination)
+    print('Installed:', destination)
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Установка Perfora для Fusion')
-    parser.add_argument('--api-root', type=Path, help='Каталог API Fusion')
-    parser.add_argument('--zip', action='store_true', help='Только собрать переносимый ZIP')
+    # Legacy Windows consoles must not fail after files have been installed.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(errors='backslashreplace')
+    parser = argparse.ArgumentParser(description='Install Perfora for Autodesk Fusion')
+    parser.add_argument('--api-root', type=Path, help='Fusion API directory')
+    parser.add_argument('--zip', action='store_true', help='Build a portable ZIP without installing')
     args = parser.parse_args()
     if args.zip:
         target = build_archive()
@@ -77,7 +81,7 @@ def main():
     api_root = args.api_root or default_api_root()
     copy_directory(ROOT / 'Perfora', api_root / 'AddIns/Perfora')
     copy_directory(ROOT / 'PerforaSmokeTest', api_root / 'Scripts/PerforaSmokeTest')
-    print('В Fusion: Utilities → Scripts and Add-Ins → Add-Ins → Perfora → Run.')
+    print('In Fusion: Utilities > Scripts and Add-Ins > Add-Ins > Perfora > Run.')
 
 
 if __name__ == '__main__':

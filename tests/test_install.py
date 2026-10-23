@@ -79,3 +79,14 @@ class DistributionTests(unittest.TestCase):
                 installer.copy_directory(source, destination)
             self.assertEqual(marker.read_text(), 'keep')
             self.assertTrue(destination.is_symlink())
+
+
+    def test_installer_survives_legacy_console_encoding(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            api = Path(temporary) / 'API-тест'
+            result = subprocess.run(
+                [sys.executable, str(ROOT / 'install.py'), '--api-root', str(api)],
+                env=dict(os.environ, PYTHONIOENCODING='cp1252'), capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr.decode('ascii', 'replace'))
+            self.assertTrue((api / 'AddIns/Perfora/Perfora.py').is_file())
+            self.assertTrue((api / 'Scripts/PerforaSmokeTest/PerforaSmokeTest.py').is_file())
