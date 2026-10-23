@@ -34,27 +34,37 @@ See [hole dimensions and geometry notes](docs/PERFORATIONS.md). The interface is
 
 ## Install
 
-**Requires Autodesk Fusion on macOS or Windows.** Python 3 is needed for the installer; the add-in runs using Fusion's own Python runtime. Linux is supported for tests and packaging only.
+**Requires Autodesk Fusion on macOS or Windows. No terminal or separate Python installation is needed for the recommended method.** Perfora runs using the Python runtime included with Fusion. Linux is supported for tests and packaging only.
 
-1. Download **[Perfora-0.1.5.zip](https://github.com/4FusionLab/Perfora/releases/download/v0.1.5/Perfora-0.1.5.zip)** from the [release page](https://github.com/4FusionLab/Perfora/releases/tag/v0.1.5) and extract it.
-2. Open a terminal in the extracted folder and run:
+### Recommended: add the folder in Fusion
 
-   ```sh
-   # macOS
-   python3 install.py
+1. Download **[Perfora-0.1.5.zip](https://github.com/4FusionLab/Perfora/releases/download/v0.1.5/Perfora-0.1.5.zip)** from the [release page](https://github.com/4FusionLab/Perfora/releases/tag/v0.1.5) and extract it to a permanent location.
+2. In Fusion, open **Utilities → Scripts and Add-Ins**.
+3. Click **+ → Script or add-in from device**.
+4. Select the inner **`Perfora`** folder containing **`Perfora.py`** and **`Perfora.manifest`**, not the top-level extracted folder.
+5. Select **Perfora** and click **Run**. Optionally enable **Run on Startup**.
 
-   # Windows
-   py -3 install.py
-   ```
+Fusion remembers a link to this folder. **Keep it in place: do not move or delete it after adding it.** The command appears in **Design → Solid → Create**, or press **S** and search for **Perfora**.
 
-3. In Fusion, open **Utilities → Scripts and Add-Ins → Add-Ins**, select **Perfora**, and click **Run**.
-4. Find **Perfora** in **Design → Solid → Create**, or press **S** and search.
+This folder-linking method is [supported by Autodesk](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/WritingDebugging_UM.htm).
 
-If Fusion does not list it, add the installed `Perfora` folder with the `+` button. The installer prints its location. Existing Perfora installations are backed up outside AddIns/Scripts; automatic startup is disabled.
+### Optional: installer with automatic backups
+
+If you already have Python 3 installed, you can instead open a terminal in the extracted folder and run:
+
+```sh
+# macOS
+python3 install.py
+
+# Windows
+py -3 install.py
+```
+
+The installer copies the add-in to Fusion's API directory and installs the optional CAD smoke-test script. Existing Perfora installations are backed up outside AddIns/Scripts; automatic startup is disabled. It prints the installed location. In Fusion, select **Perfora → Run** in Scripts and Add-Ins; add the printed `Perfora` folder with **+** if it is not listed.
 
 To specify the Fusion API directory: `python3 install.py --api-root "/path/to/Fusion/API"`.
 
-**Upgrading from Perforator:** stop and unregister the old add-in before running Perfora. The installer preserves the old directory. Do not run both versions together; command IDs and document attributes are intentionally compatible.
+**Upgrading from Perforator:** stop and unregister the old add-in before running Perfora. The old folder is not removed automatically. Do not run both versions together; command IDs and document attributes are intentionally compatible.
 
 ## Two starting points
 
