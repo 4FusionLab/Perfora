@@ -4,9 +4,9 @@
   "id": "6f1cbfba-a828-4b37-a356-d86cdd0dfc21",
   "author": "DiegoV",
   "description": {
-    "": "Perfora by 4FusionLab: precision hole patterns, perforated panels and native Extrude features"
+    "": "Perfora by 4FusionLab: precision hole patterns, perforated panels, native Extrude and parametric timeline features"
   },
-  "version": "0.1.5",
+  "version": "0.2.0",
   "runOnStartup": false,
   "supportedOS": "windows|mac"
 }

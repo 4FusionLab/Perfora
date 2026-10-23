@@ -61,11 +61,14 @@ class PerforaDialogRegression(adsk.core.CommandCreatedEventHandler):
                 assert session.inputs[size_id].tooltip == _dialog_entry.SIZE_HELP[shape]
             session.inputs['shape'].listItems.item(0).isSelected = True
             session.update_visibility()
-            assert isinstance(session.inputs['result'], adsk.core.ButtonRowCommandInput)
-            assert isinstance(session.inputs['layout'], adsk.core.ButtonRowCommandInput)
+            for identifier, options in (('result', _dialog_entry.RESULTS), ('layout', _dialog_entry.LAYOUTS)):
+                expected = (adsk.core.ButtonRowCommandInput if all(_dialog_entry.ui_resources.icon(k) for k, _ in options)
+                            else adsk.core.DropDownCommandInput)
+                assert isinstance(session.inputs[identifier], expected), identifier
             for identifier in ('result', 'layout', 'direction', 'extent1', 'operation', 'start_mode'):
                 for item in session.inputs[identifier].listItems:
-                    assert item.icon and Path(item.icon).is_dir(), (identifier, item.name)
+                    if item.icon:
+                        assert Path(item.icon).is_dir(), (identifier, item.name)
             for identifier, control in session.inputs.items():
                 assert not re.search('[А-Яа-яЁё]', control.name + control.tooltip), identifier
             for control in session.inputs.values():

@@ -22,6 +22,8 @@ original = app.activeDocument
 original_design = adsk.fusion.Design.cast(app.activeProduct)
 original_timeline = original_design.timeline.count
 original_volume = sum(b.volume for b in original_design.rootComponent.bRepBodies)
+result_mode = globals().get('result_mode', 'extrude')
+registered_command = globals().get('registered_command', False)
 doc = app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
 design = adsk.fusion.Design.cast(app.activeProduct)
 comp = design.rootComponent
@@ -100,6 +102,10 @@ class Activate(adsk.core.CommandEventHandler):
             s.inputs['distance1'].expression = '-2 mm'
             assert s.read()[2]['result'] == 'profiles' and not s.inputs['output_group'].isVisible
             s.inputs['distance1'].expression = '2 mm'
+            choose(s, 'operation', entry.OPERATIONS, 'cut')
+            choose(s, 'result', entry.RESULTS, 'feature')
+            assert s.read()[2]['result'] == 'feature' and s.inputs['output_group'].isVisible
+            assert not s.inputs['extent1'].isVisible and not s.inputs['taper1'].isVisible
             choose(s, 'result', entry.RESULTS, 'extrude')
             choose(s, 'shape', entry.SHAPES, 'voronoi')
             assert not s.inputs['corner_radius'].isVisible
@@ -119,7 +125,9 @@ class Activate(adsk.core.CommandEventHandler):
             s.inputs['preview'].value = True
             for key, control in s.inputs.items():
                 assert not re.search('[А-Яа-яЁё]', control.name + control.tooltip), key
-            report.update(passed=True, stage='ready', shapes=len(entry.SHAPES), operations=5, directions=3,
+            choose(s, 'result', entry.RESULTS, result_mode)
+            report.update(result_mode=result_mode, registered_command=registered_command,
+                          passed=True, stage='ready', shapes=len(entry.SHAPES), operations=5, directions=3,
                           native_icons=all(entry.ui_resources.icon(k) for k in ('cut','join','body','one','all')),
                           fields=len(s.inputs))
         except Exception:
@@ -130,7 +138,8 @@ class Activate(adsk.core.CommandEventHandler):
 class Created(adsk.core.CommandCreatedEventHandler):
     def notify(self, args):
         try:
-            s = entry.Session(args.command)
+            s = entry._sessions[-1] if registered_command else entry.Session(args.command)
+            assert s.command == args.command
             s.inputs['preview'].value = False
             lifetime.append(s)
             handler = Activate(s)
@@ -146,17 +155,25 @@ def finish(created=False):
         assert app.userInterface.activeCommand != definition.id, 'Confirm or cancel the test dialog first'
         assert report['passed'], report
         if created:
-            assert design.timeline.count == timeline + 2, (timeline, design.timeline.count)
-            assert body.volume < volume
-            feature = comp.features.extrudeFeatures.item(comp.features.extrudeFeatures.count - 1)
-            assert feature.healthState == adsk.fusion.FeatureHealthStates.HealthyFeatureHealthState
-            assert feature.name == 'Perforation (Cut)'
+            assert design.timeline.count == timeline + (2 if result_mode == 'extrude' else 1), (timeline, design.timeline.count)
+            if result_mode == 'profiles':
+                assert abs(body.volume - volume) < 1e-9
+                assert comp.sketches.item(comp.sketches.count - 1).profiles.count > 0
+                assert comp.features.extrudeFeatures.count == 1
+                assert comp.features.customFeatures.count == 0
+            else:
+                assert body.volume < volume
+                collection = comp.features.customFeatures if result_mode == 'feature' else comp.features.extrudeFeatures
+                feature = collection.item(collection.count - 1)
+                assert feature.healthState == adsk.fusion.FeatureHealthStates.HealthyFeatureHealthState
+                assert feature.name.startswith('Perfora') if result_mode == 'feature' else feature.name == 'Perforation (Cut)'
         else:
             assert design.timeline.count == timeline and abs(body.volume - volume) < 1e-9
         report.update(transaction='created' if created else 'cancelled', transaction_passed=True)
     except Exception:
         report.update(passed=False, transaction_error=traceback.format_exc())
     finally:
+        definition.commandCreated.remove(handler)
         doc.close(False)
         original.activate()
         report['original_unchanged'] = (original_design.timeline.count == original_timeline and
@@ -165,11 +182,15 @@ def finish(created=False):
     print('PERFORATE_UI_CONTRACT', report)
 
 
-definition = app.userInterface.commandDefinitions.itemById('DiegoV_Perforate_UITest')
-if definition:
-    definition.deleteMe()
-definition = app.userInterface.commandDefinitions.addButtonDefinition('DiegoV_Perforate_UITest', 'Perforate',
-    'Native UI transaction test', str(Path(entry.__file__).parent / 'resources/toolbar-v015'))
+if registered_command:
+    definition = app.userInterface.commandDefinitions.itemById('DiegoV_Perforator')
+    assert definition, 'Run the registered Perfora add-in first'
+else:
+    definition = app.userInterface.commandDefinitions.itemById('DiegoV_Perforate_UITest')
+    if definition:
+        definition.deleteMe()
+    definition = app.userInterface.commandDefinitions.addButtonDefinition('DiegoV_Perforate_UITest', 'Perforate',
+        'Native UI transaction test', str(Path(entry.__file__).parent / 'resources/toolbar-v015'))
 handler = Created()
 lifetime.append(handler)
 definition.commandCreated.add(handler)

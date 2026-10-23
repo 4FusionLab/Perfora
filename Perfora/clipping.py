@@ -157,11 +157,12 @@ def source_body(source, sketch, config, region):
     return sheet([polygon_curves(region.loops[0].points)])
 
 
-def inset_body(source, original, margin):
+def inset_body(source, original, margin, scratch=None):
     if margin <= 1e-9:
         return original
-    # Offset constraints live only in this scratch sketch, deleted immediately.
-    scratch = model.new_source_sketch(source)
+    # Custom features reuse an owned sketch: compute cannot create timeline nodes.
+    owned = scratch is None
+    scratch = scratch or model.new_source_sketch(source)
     try:
         wires = []
         for geometries, _ in body_loops(original):
@@ -204,7 +205,8 @@ def inset_body(source, original, margin):
                     raise ValueError('Edge Offset creates a degenerate or self-intersecting boundary.')
         return result
     finally:
-        scratch.deleteMe()
+        if owned:
+            scratch.deleteMe()
 
 
 @dataclass
@@ -213,6 +215,7 @@ class Layout:
     whole: list
     partial_loops: list
     panel_loops: list
+    partial_bodies: tuple = ()
 
     def outlines(self, region, panel):
         from .geometry import outline_coordinates
@@ -230,7 +233,7 @@ def layout(original, trimmed, region, settings):
     manager = adsk.fusion.TemporaryBRepManager.get()
     trim_region = body_region(trimmed)
     trim_segments = trim_region.segments
-    cells, whole, partial = [], [], []
+    cells, whole, partial, partial_bodies = [], [], [], []
     panel = manager.copy(original)
     for cell in generate(region, settings):
         if fits(cell, trim_region, trim_segments, 0):
@@ -245,11 +248,12 @@ def layout(original, trimmed, region, settings):
                     cut=rounded_body(cut,settings.corner_radius)
                 cells.append(cell)
                 partial.extend(body_loops(cut))
+                partial_bodies.append(cut)
                 if not manager.booleanOperation(panel, cut, adsk.fusion.BooleanTypes.DifferenceBooleanType):
                     raise ValueError('Fusion could not create the panel boundary.')
     if not cells:
         raise ValueError('No holes remain after applying Edge Offset.')
-    return Layout(cells, whole, partial, body_loops(panel))
+    return Layout(cells, whole, partial, body_loops(panel), tuple(partial_bodies))
 
 
 def draw(sketch, result, material):

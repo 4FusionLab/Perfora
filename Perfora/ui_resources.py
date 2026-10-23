@@ -33,6 +33,8 @@ _paths = {
 
 
 def icon(key):
+    if key == 'feature':
+        return str(Path(__file__).parent / 'resources/toolbar-f692fbb3')
     if key not in _paths:
         return ''
     root_name, relative = _paths[key]

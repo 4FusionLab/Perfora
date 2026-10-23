@@ -20,7 +20,7 @@ def build_archive(root=ROOT):
     files = []
     for directory in ('Perfora', 'PerforaSmokeTest', 'tests', 'docs', 'scripts'):
         files.extend(p for p in (root / directory).rglob('*')
-                     if p.is_file() and '__pycache__' not in p.parts
+                     if p.is_file() and '__pycache__' not in p.parts and '.vscode' not in p.parts
                      and p.suffix not in ('.pyc', '.pyo') and p.name != '.DS_Store')
     files.extend(root / name for name in (
         'README.md', 'README.ru.md', 'CONTRIBUTING.md', 'CHANGELOG.md',
@@ -61,7 +61,7 @@ def copy_directory(source, destination):
         shutil.move(str(destination), str(backup_root / backup.name))
         print('Previous installation:', backup_root / backup.name)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(source, destination, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+    shutil.copytree(source, destination, ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '.vscode'))
     print('Installed:', destination)
 
 

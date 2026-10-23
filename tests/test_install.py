@@ -34,6 +34,8 @@ class DistributionTests(unittest.TestCase):
             (source / 'Perfora/__pycache__').mkdir()
             (source / 'Perfora/__pycache__/private.pyc').write_bytes(b'private')
             (source / 'Perfora/.DS_Store').write_bytes(b'private')
+            (source / 'Perfora/.vscode').mkdir(exist_ok=True)
+            (source / 'Perfora/.vscode/private.json').write_text('private')
             archive = installer.build_archive(source)
             original = archive.read_bytes()
             os.utime(source / 'Perfora/geometry.py', (1700000000, 1700000000))
@@ -48,7 +50,7 @@ class DistributionTests(unittest.TestCase):
                                  'Perfora/resources/toolbar-f692fbb3/32x32.png',
                                  'PerforaSmokeTest/PerforaSmokeTest.py', 'LICENSE',
                                  'README.md', 'README.ru.md', 'perfora.png'} <= names)
-                self.assertFalse(any('__pycache__' in name or '.DS_Store' in name
+                self.assertFalse(any('__pycache__' in name or '.DS_Store' in name or '.vscode' in name
                                      or '\\' in name or name.startswith(('.git', 'test-results'))
                                      for name in names))
                 bundle.extractall(unpacked)
@@ -59,6 +61,7 @@ class DistributionTests(unittest.TestCase):
             self.assertEqual((api / 'AddIns/Perfora/geometry.py').read_bytes(),
                              (source / 'Perfora/geometry.py').read_bytes())
             self.assertTrue((api / 'Scripts/PerforaSmokeTest/PerforaSmokeTest.py').is_file())
+            self.assertFalse((api / 'AddIns/Perfora/.vscode').exists())
             self.assertEqual(len(list((api / 'PerforaBackups').iterdir())), 2)
             manifest = json.loads((api / 'AddIns/Perfora/Perfora.manifest').read_text())
             self.assertFalse(manifest['runOnStartup'])
@@ -90,3 +93,4 @@ class DistributionTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr.decode('ascii', 'replace'))
             self.assertTrue((api / 'AddIns/Perfora/Perfora.py').is_file())
             self.assertTrue((api / 'Scripts/PerforaSmokeTest/PerforaSmokeTest.py').is_file())
+            self.assertFalse((api / 'AddIns/Perfora/.vscode').exists())

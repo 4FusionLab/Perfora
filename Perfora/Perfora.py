@@ -9,7 +9,7 @@ import adsk.core
 import adsk.fusion
 
 from .geometry import Settings, LENGTH_SHAPES
-from . import model, ui_resources
+from . import model, ui_resources, feature as parametric
 from .preview import Renderer
 
 COMMAND_ID = 'DiegoV_Perforator'  # Stable ID for existing installations.
@@ -49,7 +49,7 @@ LENGTH_FIELDS = {
     'length_diagonal': ('Diagonal 2', ('diamond',)),
     'length_major': ('Major Axis', ('ellipse',))}
 AREA_FIELDS = {'width': ('Width', ('rectangle',)), 'area_diameter': ('Diameter', ('circle',))}
-RESULTS = [('profiles', 'Sketch'), ('extrude', 'Extrude')]
+RESULTS = [('profiles', 'Sketch'), ('extrude', 'Extrude'), ('feature', 'Feature')]
 MATERIALS = [('cells', 'Holes'), ('panel', 'Perforated Panel')]
 OPERATIONS = [('join', 'Join'), ('cut', 'Cut'), ('intersect', 'Intersect'),
               ('body', 'New Body'), ('component', 'New Component')]
@@ -66,8 +66,11 @@ def log_error():
 
 
 class Session:
-    def __init__(self, command):
+    def __init__(self, command, edited_feature=None):
         self.command = command
+        self.edited_feature = edited_feature
+        self.restore_marker = None
+        self._extrude_inputs = None
         self.inputs = {}
         self.handlers = []
         self.updating = False
@@ -79,7 +82,7 @@ class Session:
         command.isRepeatable = True
         root = command.commandInputs
         self.button_row(root, 'result', 'Type', RESULTS)
-        self.inputs['result'].listItems.item(1).isSelected = True
+        self.inputs['result'].listItems.item(2 if edited_feature else 1).isSelected = True
         self.selection(root, 'source', 'Profiles', ['PlanarFaces', 'Profiles', 'ConstructionPlanes'], 1, 1,
                        'Select a planar face, a closed sketch profile, or a construction plane.')
 
@@ -165,8 +168,49 @@ class Session:
         self.connect(command.executePreview, Execute(self, True))
         self.connect(command.execute, Execute(self, False))
         self.connect(command.destroy, Destroy(self))
+        if edited_feature:
+            self.restore_feature()
+            self.connect(command.activate, EditActivate(self))
+            self.inputs['result'].isEnabled = False
+            for key in ('source', 'operation', 'bodies'):
+                self.inputs[key].isEnabled = False
+            command.isRepeatable = False
         self.update_visibility()
         command.setDialogSize(320, 0)
+
+    def restore_feature(self):
+        custom = self.edited_feature
+        data = parametric.stored(custom)
+        settings, config = data['settings'], data['config']
+        d = self.inputs
+        self.updating = True
+        try:
+            for key, options in (('shape', SHAPES), ('material', MATERIALS),
+                                 ('operation', OPERATIONS), ('direction', DIRECTIONS),
+                                 ('boundary', [('rectangle', 'Rectangle'), ('circle', 'Circle')])):
+                chosen = settings[key] if key == 'shape' else config[key]
+                d[key].listItems.item(next(i for i, (k, _) in enumerate(options) if k == chosen)).isSelected = True
+            d['layout'].listItems.item(0 if settings['staggered'] else 1).isSelected = True
+            for key in ('clip_boundary',):
+                d[key].value = settings[key]
+            d['reverse'].value = config['reverse']
+            for key in ('star_points', 'seed', 'limit'):
+                d[key].value = int(custom.parameters.itemById(key).value)
+            d['irregularity'].value = round(custom.parameters.itemById('irregularity').value * 100)
+            d['round_corners'].value = custom.parameters.itemById('corner_radius').value > 0
+            for key in parametric.PARAMETERS:
+                if key in d and isinstance(d[key], adsk.core.ValueCommandInput):
+                    d[key].expression = custom.parameters.itemById(key).expression
+            d['star_ratio'].expression = '(' + custom.parameters.itemById('star_ratio').expression + ') * 100'
+            for key in SIZE_FIELDS:
+                d[key].expression = custom.parameters.itemById('size').expression
+            for key in LENGTH_FIELDS:
+                d[key].expression = custom.parameters.itemById('slot_length').expression
+            for key in AREA_FIELDS:
+                d[key].expression = custom.parameters.itemById('width').expression
+            d['start_mode'].listItems.item(1 if abs(custom.parameters.itemById('start').value) > 1e-12 else 0).isSelected = True
+        finally:
+            self.updating = False
 
     def connect(self, event, handler):
         event.add(handler)
@@ -270,7 +314,19 @@ class Session:
             visible('corner_radius', shape == 'voronoi' and d['round_corners'].value)
             visible('layout', shape != 'voronoi')
             visible('shape_angle', shape not in ('circle', 'voronoi'))
-            is_extrude = self.chosen('result', RESULTS) == 'extrude'
+            is_feature = self.chosen('result', RESULTS) == 'feature'
+            is_extrude = self.chosen('result', RESULTS) in ('extrude', 'feature')
+            if is_feature and self._extrude_inputs is None:
+                self._extrude_inputs = {side: (d['extent' + side].selectedItem.index,
+                    d['taper' + side].expression) for side in ('1', '2')}
+                for side in ('1', '2'):
+                    d['extent' + side].listItems.item(0).isSelected = True
+                    d['taper' + side].expression = '0 deg'
+            elif not is_feature and self._extrude_inputs is not None:
+                for side, (extent, taper) in self._extrude_inputs.items():
+                    d['extent' + side].listItems.item(extent).isSelected = True
+                    d['taper' + side].expression = taper
+                self._extrude_inputs = None
             direction = self.chosen('direction', DIRECTIONS)
             visible('output_group', is_extrude)
             visible('start', is_extrude and self.chosen('start_mode', STARTS) == 'offset')
@@ -282,11 +338,13 @@ class Session:
                 kind = self.chosen('extent' + side, EXTENTS)
                 symmetric = direction == 'symmetric' and side == '1'
                 side_visible = is_extrude and (side == '1' or direction == 'two')
-                visible('extent' + side, side_visible and not symmetric)
+                visible('extent' + side, side_visible and not symmetric and not is_feature)
+                visible('taper' + side, side_visible and not is_feature)
                 visible('distance' + side, side_visible and (symmetric or kind == 'distance'))
                 visible('target' + side, side_visible and not symmetric and kind == 'object')
                 visible('object_offset' + side, side_visible and not symmetric and kind == 'object')
-            uses_bodies = is_extrude and self.chosen('operation', OPERATIONS) in ('cut', 'intersect')
+            uses_bodies = is_extrude and (self.chosen('operation', OPERATIONS) in ('cut', 'intersect')
+                                       or (is_feature and self.chosen('operation', OPERATIONS) == 'join'))
             visible('bodies', uses_bodies)
             visible('preview_mode', d['preview'].value)
             if uses_bodies and isinstance(source, adsk.fusion.BRepFace) and not d['bodies'].selectionCount:
@@ -321,7 +379,7 @@ class Session:
         if isinstance(source, adsk.fusion.ConstructionPlane):
             required += [width_id] + (['height'] if boundary == 'rectangle' else [])
         result, direction = self.chosen('result', RESULTS), self.chosen('direction', DIRECTIONS)
-        if result == 'extrude':
+        if result in ('extrude', 'feature'):
             required += ['taper1']
             if self.chosen('start_mode', STARTS) == 'offset':
                 required.append('start')
@@ -372,15 +430,33 @@ class Session:
             config['extent' + side] = self.chosen('extent' + side, EXTENTS)
             control = d['target' + side]
             config['target' + side] = control.selection(0).entity if control.selectionCount else None
-        if result == 'extrude' and config['operation'] in ('cut', 'intersect'):
+        if result in ('extrude', 'feature') and (config['operation'] in ('cut', 'intersect')
+                or (result == 'feature' and config['operation'] == 'join')):
             if not config['bodies']:
                 raise ValueError('Select Objects for Cut or Intersect.')
             component = model.source_component(source)
             if any(model.native(body).parentComponent != component for body in config['bodies']):
                 raise ValueError('Profiles and Objects must belong to the same component.')
         for side in (('1', '2') if direction == 'two' else ('1',)):
-            if result == 'extrude' and abs(d['taper' + side].value) >= math.pi / 2:
+            if result in ('extrude', 'feature') and abs(d['taper' + side].value) >= math.pi / 2:
                 raise ValueError('Taper Angle must be between -90 deg and 90 deg.')
+        if result == 'feature':
+            parametric.validate(config)
+            expressions = {k: d[k].expression for k in parametric.PARAMETERS if k in d
+                           and isinstance(d[k], adsk.core.ValueCommandInput)}
+            expressions.update(size=d[size_id].expression,
+                               slot_length=d[length_id].expression if length_id else d[size_id].expression,
+                               width=d[width_id].expression,
+                               start=config['start'])
+            if shape == 'star':
+                expressions['star_ratio'] = '(' + d['star_ratio'].expression + ') / 100'
+            else:
+                expressions['star_ratio'] = '0.45'
+            if shape != 'cross':
+                expressions['arm_width'] = '1.5 mm'
+            if shape != 'voronoi' or not d['round_corners'].value:
+                expressions['corner_radius'] = '0 mm'
+            config['_expressions'] = expressions
         return source, settings, config
 
 
@@ -451,8 +527,16 @@ class Execute(adsk.core.CommandEventHandler):
                 self.session.status('%d holes. Fast preview.' % count)
                 return
             self.session.renderer.clear()
-            sketch, feature, count = model.build(source, settings, config)
-            message = '%d holes. %s' % (count, 'Sketch ready.' if feature is None else 'Extrude ready.')
+            if self.session.edited_feature:
+                count = parametric.update(self.session.edited_feature, settings, config)
+                feature = self.session.edited_feature
+                if self.session.restore_marker is not None:
+                    feature.parentComponent.parentDesign.timeline.markerPosition = self.session.restore_marker
+            elif config['result'] == 'feature':
+                sketch, feature, count = parametric.build(source, settings, config)
+            else:
+                sketch, feature, count = model.build(source, settings, config)
+            message = '%d holes. %s' % (count, 'Sketch ready.' if feature is None else ('Feature ready.' if config['result'] == 'feature' else 'Extrude ready.'))
             if feature and feature.healthState == adsk.fusion.FeatureHealthStates.WarningFeatureHealthState:
                 message += '\n' + feature.errorOrWarningMessage
             self.session.status(message)
@@ -478,9 +562,55 @@ class Destroy(adsk.core.CommandEventHandler):
 
     def notify(self, args):
         self.session.renderer.reset()
+        if self.session.edited_feature and self.session.restore_marker is not None:
+            self.session.edited_feature.parentComponent.parentDesign.timeline.markerPosition = self.session.restore_marker
         if self.session in _sessions:
             _sessions.remove(self.session)
         self.session.handlers.clear()
+
+
+class EditActivate(adsk.core.CommandEventHandler):
+    def __init__(self, session):
+        super().__init__()
+        self.session = session
+
+    def notify(self, args):
+        s = self.session
+        if s.restore_marker is not None:
+            return
+        try:
+            custom = s.edited_feature
+            timeline = custom.parentComponent.parentDesign.timeline
+            s.restore_marker = timeline.markerPosition
+            custom.timelineObject.rollTo(True)
+            args.command.beginStep()
+            s.updating = True
+            try:
+                s.inputs['source'].addSelection(parametric.source_entity(custom))
+                data = parametric.stored(custom)
+                for i in range(data['body_count']):
+                    s.inputs['bodies'].addSelection(custom.dependencies.itemById('body' + str(i)).entity)
+            finally:
+                s.updating = False
+            s.update_visibility()
+        except Exception as error:
+            log_error()
+            s.status(str(error))
+
+
+class EditCreated(adsk.core.CommandCreatedEventHandler):
+    def notify(self, args):
+        try:
+            ui = adsk.core.Application.get().userInterface
+            selected = [model.native(selection.entity) for selection in ui.activeSelections]
+            custom = next((f for f in selected if isinstance(f, adsk.fusion.CustomFeature)
+                           and f.definition.id == parametric.DEFINITION_ID), None)
+            if custom is None:
+                raise ValueError('Select a Perfora Feature in the timeline.')
+            _sessions.append(Session(args.command, custom))
+        except Exception as error:
+            log_error()
+            adsk.core.Application.get().userInterface.messageBox(str(error), 'Perfora')
 
 
 class Created(adsk.core.CommandCreatedEventHandler):
@@ -504,6 +634,14 @@ def run(context):
             resources = str(Path(__file__).parent / 'resources' / 'toolbar-f692fbb3')
             definition = ui.commandDefinitions.addButtonDefinition(
                 COMMAND_ID, 'Perfora', 'Create a hole pattern as sketch profiles or an Extrude feature.', resources)
+        edit = ui.commandDefinitions.itemById(parametric.EDIT_COMMAND_ID)
+        if not edit:
+            edit = ui.commandDefinitions.addButtonDefinition(parametric.EDIT_COMMAND_ID,
+                'Edit Perfora Feature', 'Edit the parametric Perfora pattern.')
+        parametric.register()
+        edit_handler = EditCreated()
+        edit.commandCreated.add(edit_handler)
+        _handlers.append(edit_handler)
         handler = Created()
         definition.commandCreated.add(handler)
         _handlers.append(handler)
@@ -530,6 +668,10 @@ def stop(context):
         definition = ui.commandDefinitions.itemById(COMMAND_ID)
         if definition:
             definition.deleteMe()
+        edit = ui.commandDefinitions.itemById(parametric.EDIT_COMMAND_ID)
+        if edit:
+            edit.deleteMe()
+        parametric.unregister()
         _handlers.clear()
     except Exception:
         log_error()
