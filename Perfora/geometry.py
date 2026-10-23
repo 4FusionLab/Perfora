@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Dependency-free 2D layout. Lengths use Fusion internal units (centimeters)."""
 from dataclasses import dataclass
+from functools import cached_property
 import math
 
 EPS = 1e-9
-POLYGON_SHAPES = ('hexagon', 'square', 'triangle', 'rectangle', 'diamond', 'pentagon', 'octagon', 'cross', 'star')
+POLYGON_SHAPES = ('hexagon', 'square', 'triangle', 'rectangle', 'diamond', 'pentagon', 'octagon', 'cross', 'star', 'voronoi')
 LENGTH_SHAPES = ('slot', 'rectangle', 'diamond', 'ellipse')
 SHAPE_IDS = ('circle', 'slot', 'ellipse') + POLYGON_SHAPES
 
@@ -116,6 +117,9 @@ class Settings:
     arm_width: float = 0.15
     star_ratio: float = 0.45
     star_points: int = 5
+    irregularity: float = 0.8
+    seed: int = 1
+    corner_radius: float = 0.0
 
     def validate(self):
         if self.shape not in SHAPE_IDS:
@@ -140,6 +144,13 @@ class Settings:
             if not (0.05 <= self.star_ratio < math.cos(math.pi / self.star_points)):
                 raise ValueError('Inner Radius must be at least 5%% and less than %.1f%% of the outer radius.' %
                                  (100 * math.cos(math.pi / self.star_points)))
+        if self.shape == 'voronoi':
+            if not math.isfinite(self.corner_radius) or self.corner_radius < 0:
+                raise ValueError('Corner Radius must be finite and nonnegative.')
+            if not math.isfinite(self.irregularity) or not 0 <= self.irregularity <= 1:
+                raise ValueError('Irregularity must be between 0% and 100%.')
+            if not isinstance(self.seed, int) or not 0 <= self.seed <= 2147483647:
+                raise ValueError('Seed must be an integer between 0 and 2147483647.')
         if not 1 <= self.limit <= 5000:
             raise ValueError('Maximum Holes must be between 1 and 5000.')
 
@@ -154,9 +165,17 @@ class Cell:
     arm_width: float = 0.15
     star_ratio: float = 0.45
     star_points: int = 5
+    polygon: tuple = ()  # Explicit world-plane vertices for non-repeating cells.
+    corner_radius: float = 0.0
+
+    @cached_property
+    def contour(self):
+        return rounded_polygon(self.vertices, self.corner_radius)
 
     @property
     def vertices(self):
+        if self.shape == 'voronoi':
+            return self.polygon
         if self.shape == 'hexagon':
             radius = self.size / math.sqrt(3)
             local = [(radius * math.cos(math.pi / 6 + i * math.pi / 3),
@@ -210,6 +229,214 @@ class Cell:
         return self.at((-half, 0)), self.at((half, 0))
 
 
+@dataclass(frozen=True)
+class ContourEdge:
+    """Exact line or CCW circular arc shared by CAD, clipping and display."""
+    start: tuple
+    end: tuple
+    center: tuple = None
+    sweep: float = 0.0
+
+    def at(self, fraction):
+        if self.center is None:
+            return tuple(a+(b-a)*fraction for a,b in zip(self.start,self.end))
+        x, y = rotate((self.start[0]-self.center[0], self.start[1]-self.center[1]), self.sweep*fraction)
+        return self.center[0]+x, self.center[1]+y
+
+    @property
+    def length(self):
+        return dist(self.start,self.end) if self.center is None else dist(self.start,self.center)*abs(self.sweep)
+
+    def tangent(self, end=False):
+        if self.center is None:
+            x,y=self.end[0]-self.start[0],self.end[1]-self.start[1]
+        else:
+            p=self.end if end else self.start
+            sign=1 if self.sweep>0 else -1
+            x,y=-(p[1]-self.center[1])*sign,(p[0]-self.center[0])*sign
+        length=math.hypot(x,y)
+        return x/length,y/length
+
+    def fraction(self, point):
+        if dist(point,self.start)<EPS:
+            return 0.
+        if dist(point,self.end)<EPS:
+            return 1.
+        if self.center is None:
+            dx,dy=self.end[0]-self.start[0],self.end[1]-self.start[1]
+            return ((point[0]-self.start[0])*dx+(point[1]-self.start[1])*dy)/(dx*dx+dy*dy)
+        start=math.atan2(self.start[1]-self.center[1],self.start[0]-self.center[0])
+        angle=math.atan2(point[1]-self.center[1],point[0]-self.center[0])
+        return ((angle-start)*(1 if self.sweep>0 else -1) % math.tau)/abs(self.sweep)
+
+    def samples(self, tolerance=0.0001):
+        if self.center is None:
+            return (self.start, self.end)
+        radius = dist(self.start, self.center)
+        step = 2*math.acos(max(-1, min(1, 1-tolerance/radius)))
+        count = min(256, max(2, math.ceil(abs(self.sweep)/max(step, 1e-6))))
+        return (self.start,) + tuple(self.at(i/count) for i in range(1, count)) + (self.end,)
+
+
+def rounded_polygon(points, requested_radius):
+    """Convex opening by a disk: inset, then expand with exact round joins.
+
+    Short bevels disappear when their fillets would overlap, instead of forcing
+    microscopic radii. The disk expansion stays inside the original polygon.
+    Reduce the radius only if the entire hole is too narrow to contain it.
+    """
+    if requested_radius <= EPS:
+        return tuple(ContourEdge(a, b) for a, b in edges(points))
+    origin=tuple(sum(p[i] for p in points)/len(points) for i in (0,1))
+    local=tuple((p[0]-origin[0],p[1]-origin[1]) for p in points)
+    planes=[]
+    for a,b in edges(local):
+        length=dist(a,b)
+        nx,ny=(b[1]-a[1])/length,(a[0]-b[0])/length
+        planes.append((nx,ny,nx*a[0]+ny*a[1]))
+
+    def inset(radius):
+        polygon=local
+        for nx,ny,bound in planes:
+            polygon=_clip_halfplane(polygon,nx,ny,bound-radius)
+            if len(polygon)<3:
+                return ()
+        area=sum(a[0]*b[1]-b[0]*a[1] for a,b in edges(polygon))
+        return polygon if area>EPS*EPS*4 else ()
+
+    radius=requested_radius
+    inner=inset(radius)
+    if not inner:
+        low=0.
+        high=min(radius,min(max(p[i] for p in local)-min(p[i] for p in local) for i in (0,1))/2)
+        for _ in range(40):
+            middle=(low+high)/2
+            if inset(middle):
+                low=middle
+            else:
+                high=middle
+        radius=low*.98
+        inner=inset(radius)
+    if not inner or radius<=EPS:
+        return tuple(ContourEdge(a,b) for a,b in edges(points))
+    # Discard collinear inset vertices before forming their outward round joins.
+    inner=tuple(p for i,p in enumerate(inner)
+                if abs(cross(inner[i-1],p,inner[(i+1)%len(inner)]))>
+                1e-10*dist(inner[i-1],p)*dist(p,inner[(i+1)%len(inner)]))
+    fillets=[]
+    for i,p in enumerate(inner):
+        before,after=inner[i-1],inner[(i+1)%len(inner)]
+        incoming,outgoing=dist(before,p),dist(p,after)
+        u=((p[1]-before[1])/incoming,(before[0]-p[0])/incoming)
+        v=((after[1]-p[1])/outgoing,(p[0]-after[0])/outgoing)
+        center=(p[0]+origin[0],p[1]+origin[1])
+        start=(center[0]+radius*u[0],center[1]+radius*u[1])
+        end=(center[0]+radius*v[0],center[1]+radius*v[1])
+        sweep=math.atan2(u[0]*v[1]-u[1]*v[0],u[0]*v[0]+u[1]*v[1])
+        fillets.append(ContourEdge(start,end,center,sweep))
+    result=[]
+    for i,arc in enumerate(fillets):
+        result.append(arc)
+        end=fillets[(i+1)%len(fillets)].start
+        if dist(arc.end,end)>EPS:
+            result.append(ContourEdge(arc.end,end))
+    return tuple(result)
+
+
+def _offset_curve(edge, radius):
+    if edge.center is None:
+        dx,dy=edge.tangent()
+        return None,(edge.start[0]-dy*radius,edge.start[1]+dx*radius),(dx,dy)
+    return dist(edge.start,edge.center)-(radius if edge.sweep>0 else -radius),edge.center,None
+
+
+def _curve_intersections(a,b):
+    """Intersections of infinite lines/circles used for exact planar fillets."""
+    ra,pa,da=a
+    rb,pb,db=b
+    if ra is None and rb is None:
+        divisor=da[0]*db[1]-da[1]*db[0]
+        if abs(divisor)<EPS:
+            return ()
+        dx,dy=pb[0]-pa[0],pb[1]-pa[1]
+        t=(dx*db[1]-dy*db[0])/divisor
+        return ((pa[0]+t*da[0],pa[1]+t*da[1]),)
+    if ra is not None and rb is None:
+        return _curve_intersections(b,a)
+    if ra is None:
+        if rb<=EPS:
+            return ()
+        dx,dy=pb[0]-pa[0],pb[1]-pa[1]
+        along=dx*da[0]+dy*da[1]
+        perpendicular=dx*da[1]-dy*da[0]
+        square=rb*rb-perpendicular*perpendicular
+        if square<0:
+            return ()
+        delta=math.sqrt(square)
+        return tuple((pa[0]+t*da[0],pa[1]+t*da[1]) for t in (along-delta,along+delta))
+    distance=dist(pa,pb)
+    if min(ra,rb,distance)<=EPS or distance>ra+rb or distance<abs(ra-rb):
+        return ()
+    along=(ra*ra-rb*rb+distance*distance)/(2*distance)
+    height=math.sqrt(max(0,ra*ra-along*along))
+    dx,dy=(pb[0]-pa[0])/distance,(pb[1]-pa[1])/distance
+    return tuple((pa[0]+along*dx-sign*height*dy,pa[1]+along*dy+sign*height*dx) for sign in (-1,1))
+
+
+def _fillet_contact(edge,center):
+    if edge.center is None:
+        return edge.at(edge.fraction(center))
+    scale=dist(edge.start,edge.center)/dist(center,edge.center)
+    return tuple(a+(b-a)*scale for a,b in zip(edge.center,center))
+
+
+def round_contour(contour, requested_radius):
+    """Round convex line/arc junctions after trimming; preserve existing arcs.
+
+    Limits belong to each individual corner. Tangent junctions and concave
+    source-boundary corners are preserved; no part of the hole is enlarged.
+    """
+    if requested_radius<=EPS or len(contour)<2:
+        return tuple(contour)
+    fillets=[]
+    for i,b in enumerate(contour):
+        a=contour[i-1]
+        u,v=a.tangent(True),b.tangent()
+        turn=math.atan2(u[0]*v[1]-u[1]*v[0],u[0]*v[0]+u[1]*v[1])
+        if turn<=1e-7:
+            fillets.append(None)
+            continue
+        radius=min(requested_radius,.45*min(a.length,b.length)/max(math.tan(turn/2),EPS))
+        chosen=None
+        for _ in range(32):
+            for center in sorted(_curve_intersections(_offset_curve(a,radius),_offset_curve(b,radius)),
+                                 key=lambda p: dist(p,b.start)):
+                start,end=_fillet_contact(a,center),_fillet_contact(b,center)
+                fa,fb=a.fraction(start),b.fraction(end)
+                sweep=(math.atan2(end[1]-center[1],end[0]-center[0])-
+                       math.atan2(start[1]-center[1],start[0]-center[0])) % math.tau
+                if .51<=fa<=1+EPS and -EPS<=fb<=.49 and EPS<sweep<math.pi+1e-7:
+                    chosen=ContourEdge(start,end,center,sweep)
+                    break
+            if chosen is not None:
+                break
+            radius/=2
+            if radius<EPS:
+                break
+        if chosen is None:
+            raise ValueError('A boundary corner is too small to round. Increase Cell Spacing or reduce Corner Radius.')
+        fillets.append(chosen)
+    result=[]
+    for i,edge in enumerate(contour):
+        before,after=fillets[i],fillets[(i+1)%len(contour)]
+        start,end=before.end if before else edge.start,after.start if after else edge.end
+        if before:
+            result.append(before)
+        sweep=edge.sweep*(edge.fraction(end)-edge.fraction(start)) if edge.center is not None else 0
+        result.append(ContourEdge(start,end,edge.center,sweep))
+    return tuple(result)
+
+
 def fits(cell, region, segments, margin):
     clearance = margin + region.tolerance + EPS
     if not region.contains(cell.center):
@@ -229,6 +456,8 @@ def fits(cell, region, segments, margin):
 def pitch(settings):
     """Conservative non-overlap; exact close packing for unrotated hexagons."""
     s = settings
+    if s.shape == 'voronoi':
+        return s.size, s.size
     if s.shape == 'circle':
         x = s.size + s.gap
         return x, x * (math.sqrt(3) / 2 if s.staggered else 1)
@@ -272,6 +501,8 @@ def overlaps(cell, region, segments):
 
 def generate(region, settings):
     settings.validate()
+    if settings.shape == 'voronoi':
+        return generate_voronoi(region, settings)
     outer = [rotate(p, -settings.grid_angle) for loop in region.loops if loop.outer for p in loop.points]
     if not outer:
         raise ValueError('The selected region has no outer boundary.')
@@ -312,6 +543,102 @@ def generate(region, settings):
     return result
 
 
+def _clip_halfplane(points, nx, ny, bound):
+    """Clip a convex CCW polygon to dot(normal, point) <= bound."""
+    result = []
+    for a, b in edges(points):
+        da, db = nx * a[0] + ny * a[1] - bound, nx * b[0] + ny * b[1] - bound
+        if da <= 0:
+            result.append(a)
+        if (da < 0 < db) or (db < 0 < da):
+            t = da / (da - db)
+            result.append((a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])))
+    clean = []
+    for p in result:
+        if not clean or dist(clean[-1], p) > EPS:
+            clean.append(p)
+    if len(clean) > 1 and dist(clean[0], clean[-1]) <= EPS:
+        clean.pop()
+    return tuple(clean)
+
+
+def _site_random(seed, row, col, axis):
+    # Stable indexed mixing: changing index ranges never re-seeds lattice sites.
+    value = (seed ^ (row * 0x9e3779b1) ^ (col * 0x85ebca77) ^ (axis * 0xc2b2ae3d)) & 0xffffffff
+    value = ((value ^ (value >> 16)) * 0x7feb352d) & 0xffffffff
+    value = ((value ^ (value >> 15)) * 0x846ca68b) & 0xffffffff
+    return ((value ^ (value >> 16)) / 4294967296.0 - 0.5) * 2
+
+
+def generate_voronoi(region, settings):
+    """Jittered-lattice Voronoi with a metric inset of half the minimum web.
+
+    Sites move at most .45 pitch on each axis. Every point is within
+    sqrt(2)*.95 pitch of a site; a cell therefore cannot reach further.
+    Competitors beyond twice this radius cannot affect it. The +/-4 lattice
+    neighbourhood includes every possible competitor (5 - .9 > 2*sqrt(2)*.95).
+    This bounds work per cell independently of total pattern density.
+    """
+    s = settings
+    outer = [rotate(p, -s.grid_angle) for loop in region.loops if loop.outer for p in loop.points]
+    if not outer:
+        raise ValueError('The selected region has no outer boundary.')
+    low_x, high_x = min(p[0] for p in outer), max(p[0] for p in outer)
+    low_y, high_y = min(p[1] for p in outer), max(p[1] for p in outer)
+    # Keep the same centred, periodic placement convention as regular patterns.
+    ox = (low_x + high_x) / 2 + math.remainder(s.offset_x, s.size)
+    oy = (low_y + high_y) / 2 + math.remainder(s.offset_y, s.size)
+    first_col, last_col = math.floor((low_x - ox) / s.size) - 2, math.ceil((high_x - ox) / s.size) + 2
+    first_row, last_row = math.floor((low_y - oy) / s.size) - 2, math.ceil((high_y - oy) / s.size) + 2
+    if (last_col - first_col + 1) * (last_row - first_row + 1) > 25000:
+        raise ValueError('The Voronoi pattern is too dense. Increase Cell Spacing.')
+    sites = {}
+
+    def site(row, col):
+        key = (row, col)
+        if key not in sites:
+            sites[key] = (col + .45 * s.irregularity * _site_random(s.seed, row, col, 0),
+                          row + .45 * s.irregularity * _site_random(s.seed, row, col, 1))
+        return sites[key]
+
+    result, segments = [], region.segments
+    for row in range(first_row, last_row + 1):
+        for col in range(first_col, last_col + 1):
+            x, y = site(row, col)
+            # Normalised local coordinates keep predicates independent of spacing.
+            polygon = ((-2., -2.), (2., -2.), (2., 2.), (-2., 2.))
+            neighbours = []
+            for dr in range(-4, 5):
+                for dc in range(-4, 5):
+                    if dr or dc:
+                        qx, qy = site(row + dr, col + dc)
+                        dx, dy = qx - x, qy - y
+                        distance = math.hypot(dx, dy)
+                        neighbours.append((distance, dx, dy))
+            # Nearby constraints shrink the working polygon first.
+            for distance, dx, dy in sorted(neighbours):
+                polygon = _clip_halfplane(polygon, dx / distance, dy / distance,
+                                          distance / 2 - s.gap / (2 * s.size))
+                if len(polygon) < 3:
+                    break
+            if len(polygon) < 3:
+                continue  # A large web can consume an entire cell.
+            if abs(sum(a[0]*b[1] - b[0]*a[1] for a, b in edges(polygon))) * s.size**2 < region.tolerance**2:
+                continue
+            vertices = tuple(rotate((ox + (x + px) * s.size, oy + (y + py) * s.size), s.grid_angle)
+                             for px, py in polygon)
+            center = tuple(sum(p[i] for p in vertices) / len(vertices) for i in (0, 1))
+            cell = Cell(center, 'voronoi', s.size, s.size, s.grid_angle, polygon=vertices,
+                        corner_radius=s.corner_radius)
+            if (overlaps(cell, region, segments) if s.clip_boundary else fits(cell, region, segments, s.margin)):
+                result.append(cell)
+                if len(result) > s.limit:
+                    raise ValueError('The hole count exceeds the limit of %d. Increase Cell Spacing or Maximum Holes.' % s.limit)
+    if not result:
+        raise ValueError('No Voronoi holes fit. Reduce Cell Spacing, Web Thickness, or Edge Offset.')
+    return result
+
+
 def rectangle_region(width, height):
     if width <= 0 or height <= 0:
         raise ValueError('Boundary Width and Height must be positive.')
@@ -342,7 +669,12 @@ def outline_coordinates(cells, region, panel=False):
         for loop in region.loops:
             add_loop(loop.points)
     for cell in cells:
-        if cell.shape in POLYGON_SHAPES:
+        if cell.shape == 'voronoi' and cell.corner_radius > 0:
+            for edge in cell.contour:
+                points = edge.samples()
+                for a, b in zip(points, points[1:]):
+                    coordinates.extend((a[0], a[1], 0.0, b[0], b[1], 0.0))
+        elif cell.shape in POLYGON_SHAPES:
             add_loop(cell.vertices)
         elif cell.shape == 'ellipse':
             add_loop(cell.ellipse_points(96))

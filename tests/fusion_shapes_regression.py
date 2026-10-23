@@ -44,7 +44,7 @@ def _case(name, action):
 try:
     _doc = _app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
     _design = adsk.fusion.Design.cast(_app.activeProduct)
-    for _shape in ('triangle', 'rectangle', 'diamond', 'ellipse', 'pentagon', 'octagon', 'cross', 'star'):
+    for _shape in ('triangle', 'rectangle', 'diamond', 'ellipse', 'pentagon', 'octagon', 'cross', 'star', 'voronoi'):
         def _check_shape(shape=_shape):
             comp = _smoke.component(_design, shape)
             s = _geometry.Settings(shape=shape, size=0.6, slot_length=1.1, gap=0.15, margin=0.2,
@@ -55,12 +55,15 @@ try:
                             pentagon=5*(s.size/2)**2*math.sin(math.tau/5)/2,
                             octagon=2*s.size**2*math.tan(math.pi/8),
                             cross=2*s.size*s.arm_width-s.arm_width**2,
-                            star=s.star_points*(s.size/2)**2*s.star_ratio*math.sin(math.pi/s.star_points))[shape]
+                            star=s.star_points*(s.size/2)**2*s.star_ratio*math.sin(math.pi/s.star_points)).get(shape)
             config = _smoke.config(result='profiles')
             renderer = _preview.Renderer()
             timeline = _design.timeline.count
             start = perf_counter()
             count = renderer.show(comp.xYConstructionPlane, s, config)
+            if shape == 'voronoi':
+                expected = sum(abs(sum(a[0]*b[1]-b[0]*a[1] for a,b in _geometry.edges(c.vertices)))/2
+                               for c in renderer.cells) / count
             first = perf_counter() - start
             assert _design.timeline.count == timeline and comp.sketches.count == 0
             for _ in range(100):
@@ -79,7 +82,7 @@ try:
             return dict(cells=count, cell_area_cm2=expected, volume_cm3=volume, preview_seconds=first)
         _case('profiles_volume_cache_' + _shape, _check_shape)
 
-    for _shape in ('triangle','ellipse','cross','star'):
+    for _shape in ('triangle','ellipse','cross','star','voronoi'):
         for _operation in ('cut','join','intersect','body','component'):
             def _operation_test(shape=_shape,operation=_operation):
                 comp = _smoke.component(_design, shape + ' ' + operation)

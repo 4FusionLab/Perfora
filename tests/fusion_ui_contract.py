@@ -101,14 +101,25 @@ class Activate(adsk.core.CommandEventHandler):
             assert s.read()[2]['result'] == 'profiles' and not s.inputs['output_group'].isVisible
             s.inputs['distance1'].expression = '2 mm'
             choose(s, 'result', entry.RESULTS, 'extrude')
-            choose(s, 'shape', entry.SHAPES, 'hexagon')
+            choose(s, 'shape', entry.SHAPES, 'voronoi')
+            assert not s.inputs['corner_radius'].isVisible
+            s.inputs['round_corners'].value = True
+            s.update_visibility()
+            assert s.inputs['corner_radius'].isVisible
+            assert abs(s.read()[1].corner_radius - .05) < 1e-9
+            s.inputs['round_corners'].value = False
+            s.inputs['corner_radius'].expression = '-1 mm'
+            assert s.read()[1].corner_radius == 0, 'Inactive rounding must not block the command'
+            s.inputs['corner_radius'].expression = '0.5 mm'
+            s.inputs['round_corners'].value = True
+            s.update_visibility()
             choose(s, 'operation', entry.OPERATIONS, 'cut')
             s.inputs['clip_boundary'].value = True
             s.inputs['margin'].expression = '2 mm'
             s.inputs['preview'].value = True
             for key, control in s.inputs.items():
                 assert not re.search('[А-Яа-яЁё]', control.name + control.tooltip), key
-            report.update(passed=True, stage='ready', shapes=12, operations=5, directions=3,
+            report.update(passed=True, stage='ready', shapes=len(entry.SHAPES), operations=5, directions=3,
                           native_icons=all(entry.ui_resources.icon(k) for k in ('cut','join','body','one','all')),
                           fields=len(s.inputs))
         except Exception:

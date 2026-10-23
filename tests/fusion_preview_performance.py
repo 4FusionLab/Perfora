@@ -39,8 +39,11 @@ try:
     _preview_config = dict(boundary='rectangle', width=12.0, height=25.0, material='cells', result='profiles')
     _renderer = _preview_module.Renderer()
     _preview_shapes = []
-    for _shape in ('circle', 'hexagon', 'square', 'slot'):
-        _settings = _preview_geometry.Settings(shape=_shape, size=0.5, gap=0.15, margin=0.3,
+    for _shape in ('circle', 'hexagon', 'square', 'slot', 'voronoi', 'voronoi_rounded', 'voronoi_rounded_trimmed'):
+        _settings = _preview_geometry.Settings(shape='voronoi' if _shape.startswith('voronoi') else _shape,
+                                              corner_radius=.05 if 'rounded' in _shape else 0,
+                                              clip_boundary='trimmed' in _shape,
+                                              size=0.5, gap=0.15, margin=0.3,
                                               slot_length=1.0, limit=1500)
         _start = perf_counter()
         _count = _renderer.show(_preview_comp.xYConstructionPlane, _settings, _preview_config)

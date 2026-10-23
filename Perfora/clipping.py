@@ -7,7 +7,8 @@ import adsk.core
 import adsk.fusion
 
 from . import model
-from .geometry import Loop, Region, POLYGON_SHAPES, edges, fits, generate, overlaps, point_segment_distance, stitch
+from .geometry import (Loop, Region, ContourEdge, POLYGON_SHAPES, dist, edges, fits, generate,
+                       overlaps, point_segment_distance, round_contour, stitch)
 
 
 def polygon_curves(points):
@@ -15,6 +16,8 @@ def polygon_curves(points):
 
 
 def cell_curves(cell):
+    if cell.shape == 'voronoi' and cell.corner_radius > 0:
+        return contour_curves(cell.contour)
     if cell.shape in POLYGON_SHAPES:
         return polygon_curves(cell.vertices)
     if cell.shape == 'ellipse':
@@ -49,6 +52,72 @@ def sheet(loops):
 def body_loops(body):
     return [(tuple(edge.geometry for edge in loop.edges), loop.isOuter)
             for face in body.faces for loop in face.loops]
+
+
+def contour_curves(contour):
+    result=[]
+    for edge in contour:
+        if edge.center is None:
+            curve=adsk.core.Line3D.create(model.point(edge.start),model.point(edge.end))
+        elif abs(abs(edge.sweep)-math.tau)<1e-8:
+            curve=adsk.core.Circle3D.createByCenter(model.point(edge.center),
+                adsk.core.Vector3D.create(0,0,1),dist(edge.start,edge.center))
+        else:
+            curve=adsk.core.Arc3D.createByThreePoints(model.point(edge.start),model.point(edge.at(.5)),model.point(edge.end))
+        result.append(curve)
+    return result
+
+
+def loop_contour(loop):
+    """Read connected, oriented analytic geometry, independent of face normal."""
+    result=[]
+    coedge=loop.coEdges.item(0)
+    for _ in range(loop.coEdges.count):
+        edge=coedge.edge
+        curve=edge.geometry
+        center=None
+        sweep=0.
+        if isinstance(curve,adsk.core.Line3D):
+            start,end=curve.startPoint,curve.endPoint
+        elif isinstance(curve,adsk.core.Arc3D):
+            start,end=curve.startPoint,curve.endPoint
+            center=tuple(curve.center.asArray()[:2])
+            sweep=(curve.endAngle-curve.startAngle)*(1 if curve.normal.z>0 else -1)
+        elif isinstance(curve,adsk.core.Circle3D):
+            center=tuple(curve.center.asArray()[:2])
+            start=end=adsk.core.Point3D.create(center[0]+curve.radius,center[1],0)
+            sweep=math.tau*(1 if curve.normal.z>0 else -1)
+        else:
+            return None  # Keep spline/elliptic source boundaries exact.
+        start,end=tuple(start.asArray()[:2]),tuple(end.asArray()[:2])
+        if coedge.isOpposedToEdge != edge.isParamReversed:
+            start,end,sweep=end,start,-sweep
+        result.append(ContourEdge(start,end,center,sweep))
+        coedge=coedge.next
+    area=sum(e.start[0]*e.end[1]-e.end[0]*e.start[1] +
+             (dist(e.start,e.center)**2*(e.sweep-math.sin(e.sweep)) if e.center is not None else 0)
+             for e in result)/2
+    if (area>0) != loop.isOuter:
+        result=[ContourEdge(e.end,e.start,e.center,-e.sweep) for e in reversed(result)]
+    if any(dist(e.end,result[(i+1)%len(result)].start)>model.TOLERANCE for i,e in enumerate(result)):
+        raise ValueError('Unable to order the trim boundary for corner rounding.')
+    return tuple(result)
+
+
+def rounded_body(body,radius):
+    loops=[]
+    for face in body.faces:
+        for loop in face.loops:
+            contour=loop_contour(loop) if loop.isOuter else None
+            loops.append(contour_curves(round_contour(contour,radius)) if contour is not None
+                         else [edge.geometry for edge in loop.edges])
+    result=sheet(loops)
+    manager=adsk.fusion.TemporaryBRepManager.get()
+    outside=manager.copy(result)
+    if (not manager.booleanOperation(outside,body,adsk.fusion.BooleanTypes.DifferenceBooleanType)
+            or outside.area>1e-8):
+        raise ValueError('Boundary corner rounding would reduce clearance. Reduce Corner Radius.')
+    return result
 
 
 def body_region(body):
@@ -172,6 +241,8 @@ def layout(original, trimmed, region, settings):
             if not manager.booleanOperation(cut, trimmed, adsk.fusion.BooleanTypes.IntersectionBooleanType):
                 raise ValueError('Fusion could not trim the hole to the boundary.')
             if cut.faces.count and cut.area > 1e-10:
+                if settings.shape=='voronoi' and settings.corner_radius>0:
+                    cut=rounded_body(cut,settings.corner_radius)
                 cells.append(cell)
                 partial.extend(body_loops(cut))
                 if not manager.booleanOperation(panel, cut, adsk.fusion.BooleanTypes.DifferenceBooleanType):

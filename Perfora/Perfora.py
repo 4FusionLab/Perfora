@@ -20,7 +20,7 @@ _sessions = []
 SHAPES = [('circle', 'Circle'), ('hexagon', 'Hexagon'), ('square', 'Square'), ('slot', 'Slot'),
           ('triangle', 'Triangle'), ('rectangle', 'Rectangle'), ('diamond', 'Diamond'),
           ('ellipse', 'Ellipse'), ('pentagon', 'Pentagon'), ('octagon', 'Octagon'),
-          ('cross', 'Cross'), ('star', 'Star')]
+          ('cross', 'Cross'), ('star', 'Star'), ('voronoi', 'Voronoi')]
 SIZE_HELP = {
     'circle': 'Diameter of the circular hole.',
     'hexagon': 'Distance between opposite flats of the hexagon.',
@@ -33,7 +33,8 @@ SIZE_HELP = {
     'pentagon': 'Diameter of the circumscribed circle of the regular pentagon.',
     'octagon': 'Distance between opposite flats of the regular octagon.',
     'cross': 'Overall width and height of the cross. Arm Width controls the width of each arm.',
-    'star': 'Outer diameter of the star. Inner Radius is a percentage of the outer radius.'}
+    'star': 'Outer diameter of the star. Inner Radius is a percentage of the outer radius.',
+    'voronoi': 'Nominal distance between Voronoi sites. Smaller spacing creates more holes. Web Thickness is independent.'}
 SIZE_FIELDS = {
     'size': ('Diameter', ('circle', 'pentagon', 'star')),
     'size_flats': ('Across Flats', ('hexagon', 'octagon')),
@@ -41,7 +42,8 @@ SIZE_FIELDS = {
     'size_width': ('Width', ('slot', 'rectangle')),
     'size_diagonal': ('Diagonal 1', ('diamond',)),
     'size_minor': ('Minor Axis', ('ellipse',)),
-    'size_overall': ('Overall Size', ('cross',))}
+    'size_overall': ('Overall Size', ('cross',)),
+    'cell_spacing': ('Cell Spacing', ('voronoi',))}
 LENGTH_FIELDS = {
     'slot_length': ('Length', ('slot', 'rectangle')),
     'length_diagonal': ('Diagonal 2', ('diamond',)),
@@ -96,6 +98,21 @@ class Session:
         self.number(pattern, 'arm_width', 'Arm Width', '1.5 mm')
         self.inputs['star_points'] = pattern.addIntegerSpinnerCommandInput('star_points', 'Points', 3, 12, 1, 5)
         self.number(pattern, 'star_ratio', 'Inner Radius (%)', '45', '')
+        self.inputs['irregularity'] = pattern.addIntegerSpinnerCommandInput(
+            'irregularity', 'Irregularity (%)', 0, 100, 5, 80)
+        self.inputs['irregularity'].tooltip = ('0% creates regular square cells. Higher values create more varied '
+            'Voronoi polygons while keeping the minimum Web Thickness.')
+        self.inputs['seed'] = pattern.addIntegerSpinnerCommandInput('seed', 'Seed', 0, 2147483647, 1, 1)
+        self.inputs['seed'].tooltip = 'The same Seed and settings reproduce the same pattern.'
+        self.inputs['new_pattern'] = pattern.addBoolValueInput('new_pattern', '', False, '', False)
+        self.inputs['new_pattern'].text = 'New Pattern'
+        self.inputs['new_pattern'].isFullWidth = True
+        self.inputs['new_pattern'].tooltip = 'Increment Seed to explore another pattern without changing its spacing.'
+        self.check(pattern, 'round_corners', 'Round Corners', False)
+        self.number(pattern, 'corner_radius', 'Corner Radius', '0.5 mm')
+        self.inputs['corner_radius'].tooltip = ('Maximum corner radius. Short bevels are absorbed; the radius is reduced only for narrow holes. '
+            'Rounding stays inside each hole and preserves the minimum Web Thickness. '
+            'New convex corners at line and circular-arc trim boundaries are also rounded.')
         self.number(pattern, 'gap', 'Web Thickness', '1.5 mm')
         self.inputs['gap'].tooltip = 'Minimum material thickness between adjacent holes.'
         self.number(pattern, 'margin', 'Edge Offset', '3 mm')
@@ -248,7 +265,11 @@ class Session:
             visible('arm_width', shape == 'cross')
             visible('star_points', shape == 'star')
             visible('star_ratio', shape == 'star')
-            visible('shape_angle', shape != 'circle')
+            for identifier in ('irregularity', 'seed', 'new_pattern', 'round_corners'):
+                visible(identifier, shape == 'voronoi')
+            visible('corner_radius', shape == 'voronoi' and d['round_corners'].value)
+            visible('layout', shape != 'voronoi')
+            visible('shape_angle', shape not in ('circle', 'voronoi'))
             is_extrude = self.chosen('result', RESULTS) == 'extrude'
             direction = self.chosen('direction', DIRECTIONS)
             visible('output_group', is_extrude)
@@ -285,7 +306,7 @@ class Session:
         size_id = self.dimension_id(SIZE_FIELDS, shape)
         length_id = self.dimension_id(LENGTH_FIELDS, shape)
         required = [size_id, 'gap', 'margin', 'grid_angle', 'offset_x', 'offset_y']
-        if shape != 'circle':
+        if shape not in ('circle', 'voronoi'):
             required.append('shape_angle')
         if shape in LENGTH_SHAPES:
             required.append(length_id)
@@ -293,6 +314,8 @@ class Session:
             required.append('arm_width')
         if shape == 'star':
             required.append('star_ratio')
+        if shape == 'voronoi' and d['round_corners'].value:
+            required.append('corner_radius')
         boundary = self.chosen('boundary', [('rectangle', ''), ('circle', '')])
         width_id = self.dimension_id(AREA_FIELDS, boundary)
         if isinstance(source, adsk.fusion.ConstructionPlane):
@@ -317,17 +340,23 @@ class Session:
         for identifier in required:
             if not d[identifier].isValidExpression:
                 raise ValueError('Check the value of ' + d[identifier].name + '.')
+        if shape == 'voronoi' and d['round_corners'].value and d['corner_radius'].value <= 0:
+            raise ValueError('Corner Radius must be positive. Clear Round Corners for sharp corners.')
         settings = Settings(shape=shape, size=d[size_id].value,
                             slot_length=d[length_id].value if length_id else d[size_id].value,
                             gap=d['gap'].value, margin=d['margin'].value,
-                            staggered=self.chosen('layout', LAYOUTS) == 'staggered',
+                            staggered=shape != 'voronoi' and self.chosen('layout', LAYOUTS) == 'staggered',
                             grid_angle=d['grid_angle'].value,
-                            shape_angle=d['shape_angle'].value if shape != 'circle' else 0,
+                            shape_angle=d['shape_angle'].value if shape not in ('circle', 'voronoi') else 0,
                             offset_x=d['offset_x'].value, offset_y=d['offset_y'].value, limit=d['limit'].value,
                             clip_boundary=d['clip_boundary'].value,
                             arm_width=d['arm_width'].value if shape == 'cross' else 0.15,
                             star_ratio=d['star_ratio'].value / 100 if shape == 'star' else 0.45,
-                            star_points=d['star_points'].value if shape == 'star' else 5)
+                            star_points=d['star_points'].value if shape == 'star' else 5,
+                            irregularity=d['irregularity'].value / 100 if shape == 'voronoi' else 0.8,
+                            seed=d['seed'].value if shape == 'voronoi' else 1,
+                            corner_radius=d['corner_radius'].value
+                                if shape == 'voronoi' and d['round_corners'].value else 0)
         settings.validate()
         config = {
             'boundary': boundary, 'width': d[width_id].value, 'height': d['height'].value,
@@ -367,6 +396,14 @@ class Changed(adsk.core.InputChangedEventHandler):
         if isinstance(args.input, adsk.core.GroupCommandInput):
             return
         try:
+            if args.input.id == 'new_pattern':
+                self.session.updating = True
+                try:
+                    d = self.session.inputs
+                    d['seed'].value = (d['seed'].value + 1) % 2147483648
+                    d['new_pattern'].value = False
+                finally:
+                    self.session.updating = False
             self.session.sync_dimensions(args.input.id)
             if args.input.id in ('source', 'boundary', 'width', 'area_diameter', 'height'):
                 self.session.renderer.reset()

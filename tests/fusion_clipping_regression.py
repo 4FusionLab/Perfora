@@ -60,7 +60,7 @@ try:
     _clip_case('exact_half_hexagon', _half_hexagon)
 
     for _shape in ('hexagon', 'circle', 'square', 'slot', 'triangle', 'rectangle', 'diamond',
-                   'ellipse', 'pentagon', 'octagon', 'cross', 'star'):
+                   'ellipse', 'pentagon', 'octagon', 'cross', 'star', 'voronoi'):
         for _margin in (0, 0.2):
             def _profiles(shape=_shape, margin=_margin):
                 comp = _smoke.component(_clip_design, shape + str(margin))
