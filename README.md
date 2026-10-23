@@ -1,5 +1,7 @@
 # Perfora for Autodesk Fusion
 
+<img src="perfora.png" alt="Perfora" width="240">
+
 **Goddess of holes. Precision for Fusion.**
 
 Perfora is a 4FusionLab add-in for creating hole patterns and perforated panels in Autodesk Fusion.
@@ -25,7 +27,7 @@ Designed for ventilation panels, grilles, enclosures, and 3D-printing projects.
 
 ## Availability
 
-**In development. This repository currently contains project information and licensing only.**
+**In development. This repository currently contains project information, artwork, and licensing only.**
 
 The add-in source code, installer, test suite, and distribution packages have not been published. There is no public download or installation procedure yet.
 
