@@ -35,6 +35,18 @@ else:
     for i in range(regions):
         body,face=fixture['face_fixture'](component,kind,4*i);bodies.append(body);selected.append(face)
 
+path=None;guides=[]
+if kind=='plane' and layout in ('path','between_curves'):
+    support=selected[0] if isinstance(selected[0],adsk.fusion.BRepFace) else selected[0].parentSketch.referencePlane
+    guide_sketch=component.sketches.addWithoutEdges(support)
+    if layout=='path':
+        path=guide_sketch.sketchCurves.sketchLines.addByTwoPoints(entry.model.point((-1.3,0)),entry.model.point((1.3,0)))
+        path.isConstruction=True
+    else:
+        for y in (-.75,.75):
+            guide=guide_sketch.sketchCurves.sketchLines.addByTwoPoints(entry.model.point((-1.3,y)),entry.model.point((1.3,y)))
+            guide.isConstruction=True;guides.append(guide)
+    guide_sketch.isVisible=False
 baseline=(design.timeline.count,component.sketches.count,tuple(b.volume for b in bodies))
 output=Path.home()/'Library/Logs/Perfora/release-ui.json'
 report=dict(passed=False,stage='opening',kind=kind,regions=regions,layout=layout,result_mode=mode,fusion=app.version)
@@ -66,6 +78,12 @@ class Activate(adsk.core.CommandEventHandler):
             choices=entry.LAYOUTS if kind=='plane' else s.surface_choices
             s.inputs[key].listItems.item(next(i for i,(k,_) in enumerate(choices) if k==layout)).isSelected=True
             s.update_visibility()
+            if path is not None:
+                s.inputs['path'].clearSelection();assert s.inputs['path'].addSelection(path)
+            if guides:
+                for key,guide in zip(('guide1','guide2'),guides):
+                    s.inputs[key].clearSelection();assert s.inputs[key].addSelection(guide)
+                s.inputs['guide_rows'].value=3
             source,settings,cfg=s.read()
             assert isinstance(source,list)==(regions>1)
             assert settings.layout==layout
@@ -78,10 +96,24 @@ class Activate(adsk.core.CommandEventHandler):
         save()
 
 class Created(adsk.core.CommandCreatedEventHandler):
+    def __init__(self):super().__init__()
     def notify(self,args):
         global session
         session=entry._sessions[-1]
         handler=Activate(session);lifetime.append(handler);args.command.activate.add(handler)
+
+
+def prepare():
+    """Call from the native Python console after the command has opened.
+
+    MCP scripts can create the command, but their temporary callback owner may
+    not receive later UI activation. This explicit setup keeps native OK/Cancel
+    acceptance independent of that tool-context limitation.
+    """
+    global session
+    session=entry._sessions[-1]
+    Activate(session).notify(None)
+    return report
 
 
 def preview(kind='fast'):

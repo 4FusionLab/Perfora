@@ -109,15 +109,15 @@ Cell Spacing controls the nominal distance between sites, rather than the size o
 
 Enable **Round Corners** to add tangent circular fillets to the Voronoi holes. **Corner Radius** sets the maximum radius. Short bevels are absorbed by the rounded contour; the radius is reduced only when the hole is too narrow. Rounding is off by default and preserves the minimum web. Fast Preview follows the same arcs used by the sketch and Extrude. New convex corners at straight and circular trim boundaries are rounded too. Existing concave source corners and elliptical/spline boundary segments retain their exact geometry.
 
-## Multiple planar regions (development)
+## Multiple regions (development)
 
-This branch adds selecting up to **32 planar faces or closed sketch profiles** in **Profiles**, with common settings and one combined **Maximum Holes** limit. This is **unreleased and pending Fusion CAD/UI acceptance**; the 1.0.1 acceptance results below do not cover it. Construction planes remain single-source. Sketch creates one sketch per region, Extrude creates one native extrusion per region, and Feature groups all regions in one parametric timeline node.
+This branch adds up to **32 regions of one surface type** in **Profiles**, with common settings and one combined **Maximum Holes** limit. Planar faces and profiles may be combined; cylinders, cones and freeform faces remain separate types. This feature is unpublished. Construction planes remain single-source. Sketch creates one sketch per region, including fixed 3D contours on curved faces. Extrude uses native extrusion on planar sources and Base Feature/Combine on curved sources. Feature groups all regions in one parametric timeline node.
 
-With several regions, the default origin is the component origin projected onto each plane. The pattern X axis follows projected component X, switching to projected component Y near an X-normal plane; Y completes a consistent plane frame. Coplanar regions share the same lattice phase, including Voronoi and Circular, regardless of selection order. **Start Point** overrides the origin and is projected onto each plane. X/Y Offset, Pattern Angle, and Spread Radius use these shared plane axes (offsets use pattern axes for grids/Voronoi). Extrude direction follows each source sketch normal; inspect Full Preview for opposite-facing sources. Returning to a single source restores the existing automatic-center behavior.
+For several planar regions, the default origin is the component origin projected onto each plane. The pattern X axis follows projected component X, switching to projected component Y near an X-normal plane; Y completes a consistent plane frame. Coplanar regions share the same lattice phase, including Voronoi and Circular, regardless of selection order. **Start Point** overrides the origin and is projected onto each plane. X/Y Offset and Pattern Angle use these shared plane axes (offsets use pattern axes for grids/Voronoi). Saved legacy Spread Radius parameters remain supported. Extrude direction follows each source sketch normal; inspect Full Preview for opposite-facing sources. Returning to a single source restores the existing automatic-center behavior.
 
 Repeated references are ignored. Positive-area overlaps are rejected before output is created; adjacent regions stay separate and each retains its own Edge Offset and internal openings. All regions must belong to one component occurrence. Cut/Intersect maps a face or face-backed profile to its supporting body, which must be included in Objects. Profiles without a supporting body require exactly one Object. Intersect requires one region per Object; unused or ambiguous Objects are rejected. Feature Join uses the same explicit mapping; native Extrude Join retains Fusion's automatic touching-body behavior. Multiple-region New Component is rejected; use New Body or a single source. Existing single-source operations remain available.
 
-Feature stores all source dependencies and its Objects mapping; source set, operation, and Objects remain fixed in Edit Feature. Older single-source Features remain readable/editable. Full Preview/OK use fresh source geometry and the same canonical layout as Fast Preview; failures remove all new output, and recompute attempts to restore every changed base body if one update fails. **Native transaction rollback, geometry, recompute, save/reopen, and UI behavior still require the prepared Fusion checks.** [Binding rules and acceptance checklist](docs/MULTI_REGION.md).
+Feature stores all source dependencies and its Objects mapping; source set, operation, and Objects remain fixed in Edit Feature. Older single-source Features remain readable/editable. Full Preview/OK use fresh source geometry and the same canonical layout as Fast Preview; failures remove all new output, and recompute attempts to restore every changed base body if one update fails. **Current native CAD/UI and local F3D results are recorded in the [integration report](docs/RELEASE_INTEGRATION.md).** [Binding rules and acceptance checklist](docs/MULTI_REGION.md).
 
 ## Parametric Feature
 
@@ -145,41 +145,25 @@ Spread Radius has been removed from the command. New patterns fill the selected 
 - **Start Point** uses Fusion's native Select control: pick a sketch point, model vertex, or construction point. Points on other planes are projected onto the Profiles plane. Clear the selection to use the outer boundary's bounding-box center. **X Offset / Y Offset** move the pattern relative to the selected point or automatic center, in sketch axes without periodic wrapping. **Pattern Angle** rotates the pattern about this center without moving the center itself.
 - **Edge Offset**, internal openings, **Trim to Boundary**, Fast/Full Preview, profiles and Extrude operations remain available. In Feature mode, the selected point is a dependency: moving it recomputes the pattern, and Edit Feature can replace or clear it. Ring radii and spacing are set before trimming; changing the boundary can move the pattern with its bounding-box center.
 
-## Next-release feature set
-
-This local branch combines cylindrical, conical and freeform faces, eight new distributions, Along Path, and up to 32 regions of **one surface type** in one component. Planar faces and planar sketch profiles may be combined. Planar, cylindrical, conical and freeform sources cannot be mixed. Repeated references are deduplicated. Construction Plane remains a single source. Maximum Holes applies to the complete selection.
-
-| Source | Repeating-hole distributions |
-| --- | --- |
-| Planar | Staggered, Rectangular, Circular, Along Path, Contour, Fan, Phyllotaxis, Poisson Disk, Wave, Chevron, Running Bond, Between Curves |
-| Cylinder | Staggered, Rectangular, Running Bond, Poisson Disk |
-| Cone | Staggered, Rectangular, Running Bond |
-| Freeform | Staggered, Rectangular, Running Bond, Poisson Disk, Wave, Chevron |
-
-Voronoi retains its own distribution on all supported surface types. Conical Running Bond maintains the fractional row shift while adapting row capacity to local radius. Centered motifs and planar guides stay on planar sources; Chevron and Wave are not offered on surfaces of revolution. Unsupported combinations produce an explicit error during recompute too.
-
-Multiple regions support Sketch, Extrude and one parametric Feature node. Coplanar regions share one phase; curved regions follow their local normals. All regions are prepared before modifying the first body. Conservative finite-tool checks reject conflicts across neighboring curved regions without resizing holes. Intersect requires a separate target body for each region. New Component remains available for a single source.
-
-These features are unpublished. The manifest remains 1.0.1 pending the release version decision. See [RELEASE_INTEGRATION.md](docs/RELEASE_INTEGRATION.md) for actual acceptance and limitations.
 
 ## Development branch: eight more distributions
 
-**Not yet accepted in Fusion.** This working branch adds **Contour, Fan, Phyllotaxis, Poisson Disk, Wave, Chevron, Running Bond, and Between Curves** for all 12 repeating hole shapes. Voronoi keeps its own distribution; Rectangular, Staggered, and Circular remain available.
+**Validated in Fusion on macOS; exact coverage is in the [integration report](docs/RELEASE_INTEGRATION.md).** This working branch adds **Contour, Fan, Phyllotaxis, Poisson Disk, Wave, Chevron, Running Bond, and Between Curves** for all 12 repeating hole shapes. Voronoi keeps its own distribution; Rectangular, Staggered, and Circular remain available.
 
-Native fields, shared Fast/Full Preview and Sketch/Extrude/Feature paths, parameter storage, guide dependencies, Edit Feature restoration, and older Feature defaults are implemented in source. Offline geometry and contract tests pass; **no Fusion connection, installation, UI run, or CAD acceptance has been performed for these changes**. Published v1.0.1 does not contain these additions.
+Native fields, shared Fast/Full Preview and Sketch/Extrude/Feature paths, parameter storage, guide dependencies, Edit Feature restoration, and older Feature defaults are implemented in source. Offline geometry/contract tests and native CAD/UI acceptance on macOS pass; see the [integration report](docs/RELEASE_INTEGRATION.md) for exact coverage. Published v1.0.1 does not contain these additions.
 
-Along Spacing and Row Spacing use automatic enclosing-hole spacing at 0; smaller requested pitches are raised to the safe minimum. A spatial neighbour index omits candidates that could violate Web Thickness, including rotated shapes, fan centers, contour seams, and chevron vertices. Packing is conservative. Phyllotaxis has Density Ratio and Spread Radius; Poisson Disk has Seed/New Pattern; Wave uses length-based sampling, amplitude/wavelength/phase/row phase; Running Bond accepts cumulative shifts such as `1 / 3` and `1 / 4`.
+Along Spacing and Row Spacing use automatic enclosing-hole spacing at 0; smaller requested pitches are raised to the safe minimum. A spatial neighbour index omits candidates that could violate Web Thickness, including rotated shapes, fan centers, contour seams, and chevron vertices. Packing is conservative. Phyllotaxis has Density Ratio; saved Spread Radius parameters remain compatible; Poisson Disk has Seed/New Pattern; Wave uses length-based sampling, amplitude/wavelength/phase/row phase; Running Bond accepts cumulative shifts such as `1 / 3` and `1 / 4`.
 
-Contour follows approximate signed-distance levels, with explicit Contour Tolerance and a sampling budget; it is not an exact CAD offset, and sub-resolution details can disappear. Between Curves currently requires two separate open planar curves/edges in the Profiles component, matches normalized arc length and endpoints, and rejects crossed, collapsed, folded, closed, nonplanar, or cross-component guides. Arbitrary complex spline strips and curve chains are not promised. For Contour/Between Curves, Start Point and offsets move only a positive Spread Radius scope; Pattern Angle is hidden.
+Contour follows approximate signed-distance levels, with explicit Contour Tolerance and a sampling budget; it is not an exact CAD offset, and sub-resolution details can disappear. Between Curves currently requires two separate open planar curves/edges in the Profiles component, matches normalized arc length and endpoints, and rejects crossed, collapsed, folded, closed, nonplanar, or cross-component guides. Arbitrary complex spline strips and curve chains are not promised. For Contour/Between Curves, Start Point and offsets affect only saved legacy Spread Radius scopes; Pattern Angle is hidden.
 
-New Feature nodes expose the added model parameters. Older nodes keep missing values as stored snapshots when edited; recreate a Feature to obtain new model parameters and their expression dependencies. [Implementation limits, integration seam, and exact pending CAD/UI acceptance →](docs/LAYOUT_VARIANTS.md)
-## Along Path (development, awaiting Fusion validation)
+New Feature nodes expose the added model parameters. Older nodes keep missing values as stored snapshots when edited; recreate a Feature to obtain new model parameters and their expression dependencies. [Implementation limits, integration seam, and CAD/UI acceptance →](docs/LAYOUT_VARIANTS.md)
+## Along Path (development)
 
-The `codex/curve-layout` branch adds **Distribution → Along Path** for all 12 repeating shapes: select one coplanar line, arc, circle or spline in the Profiles component. **Path Spacing** measures arc length; **Start Offset**, **End Offset**, **Position** and **Reverse Path** control placement. **Fixed** or **Tangent** orientation adds **Hole Angle**. Closed paths omit duplicate seam centers. Tight turns, nearby sections and the closing seam are checked against Web Thickness using conservative enclosing bounds; conflicts are reported rather than silently skipping holes.
+The integrated development branch adds **Distribution → Along Path** for all 12 repeating shapes: select one coplanar line, arc, circle or spline in the Profiles component. **Path Spacing** measures arc length; **Start Offset**, **End Offset**, **Position** and **Reverse Path** control placement. **Fixed** or **Tangent** orientation adds **Hole Angle**. Closed paths omit duplicate seam centers. Tight turns, nearby sections and the closing seam are checked against Web Thickness using conservative enclosing bounds; conflicts are reported rather than silently skipping holes.
 
 The implementation connects to Fast/Full Preview, existing trimming/inner cutouts/Edge Offset, Sketch, Extrude and Feature. Feature stores a live path dependency and new native path parameters; Edit Feature can replace the path or change distribution. Older nodes remain compatible with existing distributions; recreate them to use Along Path, because existing nodes cannot gain its native parameters. Chains, off-plane/cross-component paths and elliptical paths are unsupported. Start Point, Spread Radius, Pattern Angle and X/Y Offset are inactive in this distribution; Voronoi keeps its own distribution.
 
-**This functionality is unreleased and has not been tested or installed in Fusion.** Local tests do not prove native UI, CAD, Feature recompute/edit, Undo/Redo or archive reopen. [Behavior, API rationale, tolerances, limitations and pending CAD acceptance →](docs/CURVE_LAYOUT.md)
+**This functionality is unpublished.** Native CAD/UI, recompute/edit, Undo/Redo and local F3D acceptance are recorded in the [integration report](docs/RELEASE_INTEGRATION.md). [Behavior, API rationale, tolerances, limitations and CAD acceptance →](docs/CURVE_LAYOUT.md)
 
 ## Performance
 
@@ -256,6 +240,24 @@ Native CAD acceptance is recorded for Fusion 2706.1.14 on macOS 27.0.1, includin
 - Sketch and Extrude outputs keep a fixed hole layout. Use Feature to regenerate the pattern.
 - Native Extrude parameters remain editable in Fusion. Source and Cut/Intersect target bodies must belong to the same component. Editing a component affects all its occurrences.
 - The default limit is 1,500 holes, configurable up to 5,000. Dense patterns and full previews take longer. Some rotated shapes use conservative spacing, so the actual web can be wider than requested.
+
+## Next-release feature set
+
+This local branch combines cylindrical, conical and freeform faces, eight new distributions, Along Path, and up to 32 regions of **one surface type** in one component. Planar faces and planar sketch profiles may be combined. Planar, cylindrical, conical and freeform sources cannot be mixed. Repeated references are deduplicated. Construction Plane remains a single source. Maximum Holes applies to the complete selection.
+
+| Source | Repeating-hole distributions |
+| --- | --- |
+| Planar | Staggered, Rectangular, Circular, Along Path, Contour, Fan, Phyllotaxis, Poisson Disk, Wave, Chevron, Running Bond, Between Curves |
+| Cylinder | Staggered, Rectangular, Running Bond, Poisson Disk |
+| Cone | Staggered, Rectangular, Running Bond |
+| Freeform | Staggered, Rectangular, Running Bond, Poisson Disk, Wave, Chevron |
+
+Voronoi retains its own distribution on all supported surface types. Conical Running Bond maintains the fractional row shift while adapting row capacity to local radius. Centered motifs and planar guides stay on planar sources; Chevron and Wave are not offered on surfaces of revolution. Unsupported combinations produce an explicit error during recompute too.
+
+Multiple regions support Sketch, Extrude and one parametric Feature node. Coplanar regions share one phase; curved regions follow their local normals. All regions are prepared before modifying the first body. Conservative finite-tool checks reject conflicts across neighboring curved regions without resizing holes. Intersect requires a separate target body for each region. New Component remains available for a single source.
+
+These features are unpublished. The manifest remains 1.0.1 pending the release version decision. See [RELEASE_INTEGRATION.md](docs/RELEASE_INTEGRATION.md) for actual acceptance and limitations.
+
 
 ## Development
 

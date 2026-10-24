@@ -35,6 +35,15 @@ try:
     _,along,count=entry.parametric.build(part.xYConstructionPlane,entry.Settings(layout='path',size=.25,gap=.1,margin=.05,path_spacing=.5),cfg)
     fixture['healthy'](along)
     report['path_cells']=count
+    guide_part=comp.occurrences.addNewComponent(adsk.core.Matrix3D.create()).component
+    guide_sketch=guide_part.sketches.addWithoutEdges(guide_part.xYConstructionPlane)
+    guides=[]
+    for y in (-.65,.65):
+        guide=guide_sketch.sketchCurves.sketchLines.addByTwoPoints(entry.model.point((-1.5,y)),entry.model.point((1.5,y)))
+        guide.isConstruction=True;guides.append(guide)
+    guide_cfg=fixture['config'](surface=False,result='feature',operation='body',reverse=False,guide1=guides[0],guide2=guides[1])
+    _,guided,count=entry.parametric.build(guide_part.xYConstructionPlane,entry.Settings(layout='between_curves',size=.25,gap=.1,margin=.05,guide_rows=3),guide_cfg)
+    fixture['healthy'](guided);report['between_curves_cells']=count
     volumes=sorted(b.volume for b in comp.bRepBodies)
     with tempfile.TemporaryDirectory(prefix='perfora-release-') as folder:
         archive=Path(folder)/'Integrated.f3d'
@@ -61,7 +70,14 @@ try:
         along.parameters.itemById('path_spacing').expression='7 mm'
         design.computeAll();fixture['healthy'](along)
         assert abs(sum(b.volume for b in part.bRepBodies)-before)>1e-5
-    report.update(passed=True,multi_recomputed=True,path_recomputed=True)
+        guide_part=comp.occurrences.item(1).component
+        guided=guide_part.features.customFeatures.item(0);fixture['healthy'](guided)
+        assert all(guide.isValid for guide in entry.parametric.guide_entities(guided))
+        before=sum(b.volume for b in guide_part.bRepBodies)
+        guided.parameters.itemById('guide_rows').expression='4'
+        design.computeAll();fixture['healthy'](guided)
+        assert abs(sum(b.volume for b in guide_part.bRepBodies)-before)>1e-5
+    report.update(passed=True,multi_recomputed=True,path_recomputed=True,between_curves_recomputed=True)
 except Exception:report['error']=traceback.format_exc()
 finally:
     if reopened:reopened.close(False)

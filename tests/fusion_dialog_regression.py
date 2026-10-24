@@ -39,7 +39,8 @@ class PerforaDialogRegression(adsk.core.CommandCreatedEventHandler):
             session.inputs['preview_mode'].listItems.item(0).isSelected = True
             session.update_visibility()
             _dialog_lifetime.append(session)
-            assert len(session.handlers) == 8, 'Missing command handlers'
+            assert len(session.handlers) == 9, 'Missing command handlers'
+            assert any(isinstance(handler, _dialog_entry.PreSelect) for handler in session.handlers)
             assert all(key in session.inputs for key in ('status', 'bodies', 'distance2', 'preview'))
             assert 'clip_boundary' in session.inputs and not session.inputs['clip_boundary'].value
             session.inputs['clip_boundary'].value = True

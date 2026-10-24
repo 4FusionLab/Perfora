@@ -267,6 +267,7 @@ class CurveIntegrationTests(unittest.TestCase):
         for key in ('area_group','source_info','cylinder_group','surface_layout','guide1','guide2','guide_reverse','output_group','side2','new_pattern','preview_color'):
             d[key]=NS(isVisible=True)
         d['source']=Select(self.source);d['path']=Select(self.path);d['center_point']=Select()
+        d['guide1']=Select();d['guide2']=Select()
         d['bodies']=Select();d['target1']=Select();d['target2']=Select()
         return s
 

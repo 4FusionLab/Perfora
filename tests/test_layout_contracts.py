@@ -219,7 +219,7 @@ class DialogContractTests(unittest.TestCase):
         ui=definitions('Perfora.py',dict(math=math,Path=Path,Settings=Settings,LENGTH_SHAPES=LENGTH_SHAPES,
                        VARIANT_PARAMETERS=VARIANT_PARAMETERS,LAYOUT_PARAMETERS=LAYOUT_PARAMETERS,
                        multi_region=NS(sources=lambda selected:selected),surface=SURFACE,parametric=f,model=model,adsk=ADSK),
-                       methods=('chosen','selected_source','selected_sources','dimension_id','update_visibility','read','restore_feature'))
+                       methods=('chosen','selected_source','selected_sources','legacy_spread_radius','dimension_id','update_visibility','read','restore_feature'))
         s=ui.Session()
         s.updating=False
         s._extrude_inputs=None
@@ -306,8 +306,42 @@ class DialogContractTests(unittest.TestCase):
         self.assertEqual(s.read()[1].offset_x,0)
         s.inputs['spread_radius'].value=1
         s.update_visibility()
-        self.assertTrue(s.inputs['offset_x'].isVisible)
-        with self.assertRaises(ValueError): s.read()
+        self.assertFalse(s.inputs['offset_x'].isVisible)
+        self.assertEqual(s.read()[1].spread_radius,0)
+
+    def test_optional_guides_and_path_survive_hiding_but_respect_clear(self):
+        ui,s=self.session()
+        path=Entity()
+        self.choose(s,ui,'path');s.inputs['path'].addSelection(path)
+        self.choose(s,ui,'wave')
+        s.inputs['path'].clearSelection()  # Native Fusion clears hidden selection inputs.
+        self.choose(s,ui,'path')
+        self.assertIs(s.inputs['path'].selection(0).entity,path)
+        s.inputs['path'].clearSelection()  # An explicit user clear must remain cleared.
+        self.choose(s,ui,'wave');self.choose(s,ui,'path')
+        self.assertEqual(s.inputs['path'].selectionCount,0)
+        guides=(Entity(),Entity())
+        self.choose(s,ui,'between_curves')
+        for key,guide in zip(('guide1','guide2'),guides):s.inputs[key].addSelection(guide)
+        self.choose(s,ui,'running_bond')
+        for key in ('guide1','guide2'):s.inputs[key].clearSelection()
+        self.choose(s,ui,'between_curves')
+        for key,guide in zip(('guide1','guide2'),guides):
+            self.assertIs(s.inputs[key].selection(0).entity,guide)
+
+    def test_hidden_spread_does_not_block_edit_or_lose_legacy_expression(self):
+        ui,s=self.session()
+        custom,_=custom_feature(ui.parametric)
+        s.edited_feature=custom
+        s.inputs['result'].selectedItem.index=2
+        s.inputs['operation'].selectedItem.index=3
+        s.inputs['spread_radius'].isValidExpression=False
+        self.assertEqual(s.read()[1].spread_radius,0)
+        parameter=custom.parameters.itemById('spread_radius')
+        parameter.value=.8;parameter.expression='LegacyRadius'
+        _,settings,config=s.read()
+        self.assertEqual(settings.spread_radius,.8)
+        self.assertEqual(config['_expressions']['spread_radius'],'LegacyRadius')
 
     def test_feature_restore_retains_new_and_old_distribution_values(self):
         ui,s=self.session()

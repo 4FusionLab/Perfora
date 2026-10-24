@@ -97,6 +97,9 @@ class Activate(adsk.core.CommandEventHandler):
                 assert s.chosen('result', entry.RESULTS) == 'feature'
             choose(s, 'result', entry.RESULTS, 'extrude')
             choose(s, 'preview_mode', entry.PREVIEW_MODES, 'fast')
+            choose(s, 'shape', entry.SHAPES, 'circle')
+            choose(s, 'layout', entry.LAYOUTS, 'staggered')
+            s.inputs['source'].clearSelection()
             s.inputs['source'].addSelection(selected_source)
             s.update_visibility()
             assert s.chosen('operation', entry.OPERATIONS) == 'cut'
@@ -232,6 +235,7 @@ class Activate(adsk.core.CommandEventHandler):
             choose(s, 'layout', entry.LAYOUTS, 'circular')
             assert s.inputs['center_point'].isVisible and s.inputs['center_point'].selectionCount == 1
             choose(s, 'operation', entry.OPERATIONS, 'cut')
+            s.inputs['reverse'].value = True
             s.inputs['clip_boundary'].value = True
             s.inputs['margin'].expression = '2 mm'
             s.inputs['spread_radius'].expression = '12 mm'

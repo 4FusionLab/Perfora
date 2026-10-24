@@ -85,8 +85,11 @@ class Session:
         self._auto_bodies = []
         self.initial_defaults_applied = False
         self.inputs = {}
+        self.selection_memory = {}
         self.numeric_inputs = {}
         self.app = adsk.core.Application.get()
+        self.preselected_sources = ([selection.entity for selection in self.app.userInterface.activeSelections]
+                                    if edited_feature is None else [])
         self.units = adsk.fusion.Design.cast(self.app.activeProduct).unitsManager
         self.defaults_timer = None
         self.defaults_closed = False
@@ -96,6 +99,7 @@ class Session:
         self.preview_error = ''
         self._status_text = None
         self.renderer = Renderer()
+        self.selection_notice = ''
         self.surface_notice = ''
         self.surface_choices = SURFACE_LAYOUTS
         self.cylinder_source = None
@@ -110,7 +114,9 @@ class Session:
         self.selection(root, 'source', 'Profiles', ['Faces', 'Profiles', 'ConstructionPlanes'], 1, 32,
                        'Select up to 32 regions of one surface type in one component: planar, cylindrical, conical, or freeform. A construction plane is a single region.')
 
-        radial = self.group(root, 'cylinder_group', 'Boundary')
+        self.inputs['source'].isUseCurrentSelections = False
+
+        radial = self.group(root, 'cylinder_group', 'Boundary', expanded=False)
         self.inputs['cylinder_info'] = radial.addTextBoxCommandInput('cylinder_info', '',
             'Holes follow the local surface normal.', 1, True)
         self.inputs['cylinder_info'].isFullWidth = True
@@ -163,6 +169,7 @@ class Session:
         self.inputs['clip_boundary'].tooltip = ('Trim intersecting holes to the boundary after applying Edge Offset. '
             'Clear this option to keep only complete holes.')
         self.dropdown(pattern, 'layout', 'Distribution', LAYOUTS, icons=True)
+        self.dropdown(pattern, 'surface_layout', 'Distribution', SURFACE_LAYOUTS, icons=True)
         for key, (label, unit, expression) in VARIANT_PARAMETERS.items():
             self.number(pattern, key, label, expression, unit)
         self.inputs['along_spacing'].tooltip = ('Center spacing measured along each row. 0 is automatic. '
@@ -179,7 +186,6 @@ class Session:
                            'Select one open planar sketch curve or edge in the Profiles component. Closed, crossing and folded strips are unsupported.')
             self.inputs[key].isUseCurrentSelections = False
         self.check(pattern, 'guide_reverse', 'Reverse Guide 2', False)
-        self.dropdown(pattern, 'surface_layout', 'Distribution', SURFACE_LAYOUTS, icons=True)
         self.inputs['surface_layout'].tooltip = 'Rectangular aligns rows. Staggered shifts alternate rows by half a pitch.'
         self.selection(pattern, 'path', 'Path', ['Edges', 'SketchCurves'], 0, 1,
                        'Select one line, arc, circle, or spline in the Profiles plane and component. '
@@ -472,6 +478,39 @@ class Session:
                 finally:self.updating=previous
         return self.cylinder_frame
 
+    def apply_preselected_sources(self):
+        """Import the first compatible set; Fusion can bypass preSelect for API preselection."""
+        accepted = []
+        skipped = False
+        previous = self.updating
+        self.updating = True
+        try:
+            for entity in self.preselected_sources:
+                if not isinstance(entity, (adsk.fusion.BRepFace, adsk.fusion.Profile, adsk.fusion.ConstructionPlane)):
+                    continue
+                try:
+                    multi_region.sources(accepted + [entity])
+                    if self.inputs['source'].addSelection(entity):
+                        accepted.append(entity)
+                    else:
+                        skipped = True
+                except (ValueError, RuntimeError):
+                    skipped = True
+            self.preselected_sources = []
+            if skipped:
+                self.selection_notice = 'Incompatible Profiles were skipped. Select one surface type.'
+        finally:
+            self.updating = previous
+        self.update_visibility()
+
+    def legacy_spread_radius(self):
+        """The removed control cannot validate or overwrite a saved parameter."""
+        if self.edited_feature is None:
+            return 0.
+        parameter = self.edited_feature.parameters.itemById('spread_radius')
+        return (parameter.value if parameter else
+                parametric.stored(self.edited_feature)['settings'].get('spread_radius', 0.))
+
     def sync_surface_layouts(self, source):
         kind = ('cylinder' if isinstance(source.geometry, adsk.core.Cylinder) else
                 'cone' if isinstance(source.geometry, adsk.core.Cone) else 'freeform')
@@ -507,7 +546,16 @@ class Session:
             is_plane = isinstance(source, adsk.fusion.ConstructionPlane)
             def visible(identifier, enabled):
                 if d[identifier].isVisible != enabled:
+                    remembered = identifier in ('path', 'guide1', 'guide2', 'center_point')
+                    if remembered:
+                        if not hasattr(self, 'selection_memory'): self.selection_memory = {}
+                        if not enabled:
+                            self.selection_memory[identifier] = tuple(d[identifier].selection(i).entity
+                                for i in range(d[identifier].selectionCount))
                     d[identifier].isVisible = enabled
+                    if remembered and enabled and not d[identifier].selectionCount:
+                        for entity in self.selection_memory.get(identifier, ()):
+                            if getattr(entity, 'isValid', False): d[identifier].addSelection(entity)
             visible('area_group', is_plane)
             visible('cylinder_group', is_curved)
             for identifier in surface.ZONE_PARAMETERS:
@@ -527,9 +575,9 @@ class Session:
                 'Use Perforated Panel with New Body for a separate grille.')
             d['result'].tooltip = ('Sketch creates fixed 3D surface contours. Feature regenerates the pattern.' if is_curved else
                 'Sketch creates profiles. Extrude creates a fixed pattern. Feature regenerates the pattern.')
-            notice = getattr(self, 'surface_notice', '')
+            notice = getattr(self, 'surface_notice', '') or getattr(self, 'selection_notice', '')
             d['source_info'].formattedText = notice or ('Planar regions share component axes and phase.' if not is_curved else
-                'Each region follows its local surface normals. Maximum Holes applies to the complete selection.')
+                'Local surface normals. Maximum Holes is shared by all regions.')
             visible('source_info', multiple or bool(notice))
             boundary = self.chosen('boundary', [('rectangle', ''), ('circle', '')])
             for identifier, (_, shapes) in AREA_FIELDS.items():
@@ -564,7 +612,7 @@ class Session:
                 visible(identifier, along_path)
             visible('path_orientation', along_path and shape != 'circle')
             boundary_anchored = layout in ('contour', 'between_curves')
-            scoped = not d['spread_radius'].isValidExpression or d['spread_radius'].value > 0
+            scoped = self.legacy_spread_radius() > 0
             visible('center_point', not along_path and (not boundary_anchored or scoped))
             visible('grid_angle', not is_curved and not along_path and not boundary_anchored)
             for key in ('offset_x', 'offset_y'):
@@ -662,7 +710,7 @@ class Session:
         required += variant_keys
         if layout in ('contour', 'between_curves'):
             if 'grid_angle' in required: required.remove('grid_angle')
-            if d['spread_radius'].isValidExpression and d['spread_radius'].value == 0:
+            if self.legacy_spread_radius() == 0:
                 required.remove('offset_x')
                 required.remove('offset_y')
         along_path = layout == 'path'
@@ -738,7 +786,7 @@ class Session:
                                 if shape == 'voronoi' and d['round_corners'].value else 0,
                             layout='grid' if layout in ('staggered', 'rows') else layout,
                             start_radius=d['start_radius'].value if circular or layout == 'fan' else 0,
-                            spread_radius=d['spread_radius'].value if self.edited_feature and not along_path else 0,
+                            spread_radius=self.legacy_spread_radius() if not along_path else 0,
                             path_spacing=d['path_spacing'].value if along_path else .8,
                             path_start=d['path_start'].value if along_path else 0,
                             path_end=d['path_end'].value if along_path else 0,
@@ -832,6 +880,9 @@ class Session:
                         'path_start', 'path_end', 'path_position'):
                 if key not in required:
                     expressions[key] = str(getattr(settings, key)) + (' rad' if key == 'grid_angle' else ' cm')
+            if self.edited_feature is not None and not along_path:
+                parameter = self.edited_feature.parameters.itemById('spread_radius')
+                if parameter: expressions['spread_radius'] = parameter.expression
             if is_curved:expressions['grid_angle']='0 deg'
             config['_expressions'] = expressions
         if len(selected) > 1:
@@ -896,6 +947,7 @@ class Changed(adsk.core.InputChangedEventHandler):
             if args.input.id in ('source', 'boundary', 'width', 'area_diameter', 'height'):
                 self.session.renderer.reset()
             if args.input.id == 'source':
+                self.session.selection_notice = ''
                 self.session.cylinder_source = self.session.cylinder_frame = None
                 self.session.cylinder_layout_key = None
             self.session.preview_error = ''
@@ -951,6 +1003,7 @@ class ActivateDefaults(adsk.core.CommandEventHandler):
         if not self.session.initial_defaults_applied:
             self.session.initial_defaults_applied = True
             self.session.inputs['result'].listItems.item(2).isSelected = True
+            self.session.apply_preselected_sources()
         self.session.restore_empty_inputs()
 
 
@@ -1032,6 +1085,7 @@ class Destroy(adsk.core.CommandEventHandler):
             self.session.edited_feature.parentComponent.parentDesign.timeline.markerPosition = self.session.restore_marker
         if self.session in _sessions:
             _sessions.remove(self.session)
+        self.session.selection_memory.clear()
         self.session.handlers.clear()
 
 

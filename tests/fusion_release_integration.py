@@ -143,12 +143,13 @@ def same_body(component, result):
             adsk.core.Point3D.create(0,0,z1),radius)
     body=cylinder(0,2.4,1.4)
     assert manager.booleanOperation(body,cylinder(2.4,4.8,.9),adsk.fusion.BooleanTypes.UnionBooleanType)
-    assert manager.booleanOperation(body,cylinder(0,4.8,.7),adsk.fusion.BooleanTypes.DifferenceBooleanType)
+    assert manager.booleanOperation(body,cylinder(0,2.2,1.22),adsk.fusion.BooleanTypes.DifferenceBooleanType)
+    assert manager.booleanOperation(body,cylinder(2.2,4.8,.72),adsk.fusion.BooleanTypes.DifferenceBooleanType)
     base=component.features.baseFeatures.add();base.startEdit();component.bRepBodies.add(body,base);base.finishEdit()
     body=base.bodies.item(0)
-    faces=[face for face in body.faces if multi.source_kind(face)=='cylinder' and face.geometry.radius>.8]
+    faces=[face for face in body.faces if multi.source_kind(face)=='cylinder' and min(abs(face.geometry.radius-r) for r in (1.4,.9))<1e-6]
     assert len(faces)==2
-    cfg=config(result=result,bodies=[body],distance1='8 mm')
+    cfg=config(result=result,bodies=[body],distance1='2 mm')
     s=geo.Settings(layout='running_bond',size=.3,gap=.3,margin=.25,clip_boundary=True,limit=5000)
     before=body.volume
     build=feature.build if result=='feature' else model.build
@@ -163,6 +164,28 @@ def same_body(component, result):
 
 for result in ('extrude','feature'):
     case('multi_cylinder_shared_body_'+result,lambda c,r=result:same_body(c,r))
+
+
+def dense_preview(component, number):
+    selected=[];bodies=[]
+    for index in range(number):
+        body,source=face_fixture(component,'cylinder',4*index)
+        bodies.append(body);selected.append(source)
+    cfg=config(bodies=bodies)
+    s=geo.Settings(shape='hexagon',size=.35,gap=.25,margin=.12,clip_boundary=True,limit=5000)
+    renderer=entry.Renderer()
+    baseline=(component.sketches.count,component.features.count)
+    try:
+        count=renderer.show(selected,s,cfg);cold=renderer.last_seconds;builds=renderer.layout_builds
+        renderer.show(selected,s,cfg,color='magenta');warm=renderer.last_seconds
+        assert renderer.layout_builds==builds
+        assert (component.sketches.count,component.features.count)==baseline
+        assert count>10*number
+        return dict(regions=number,cells=count,cold_seconds=cold,color_seconds=warm,builds=builds)
+    finally:renderer.reset()
+
+for number in (2,8,32):
+    case('dense_hex_preview_'+str(number),lambda c,n=number:dense_preview(c,n))
 
 
 def mixed(component):
