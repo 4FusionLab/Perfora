@@ -98,12 +98,21 @@ def check_preview():
     report['preview_status']=session._status_text;save();return report['preview_status']
 
 
+def verify_undo():
+    assert app.userInterface.activeCommand != entry.COMMAND_ID
+    assert (design.timeline.count, component.sketches.count) == baseline[:2]
+    assert all(abs(b.volume-before)<1e-8 for b,before in zip(bodies,baseline[2]))
+    report['undo_passed']=True;save();return True
+
+
 def finish(created):
     try:
         assert app.userInterface.activeCommand!=entry.COMMAND_ID
         assert report['stage']=='ready',report
         if created:
-            if mode=='profiles':assert component.sketches.count==baseline[1]+regions
+            if mode=='profiles':
+                assert component.sketches.count==baseline[1]+regions
+                assert all(abs(b.volume-before)<1e-8 for b,before in zip(bodies,baseline[2]))
             else:
                 assert all(b.isSolid and 0<b.volume<before for b,before in zip(bodies,baseline[2]))
                 if mode=='feature':
@@ -113,6 +122,7 @@ def finish(created):
             assert (design.timeline.count,component.sketches.count)==baseline[:2]
             assert all(abs(b.volume-before)<1e-8 for b,before in zip(bodies,baseline[2]))
         assert component.customGraphicsGroups.count==0
+        if created and report.get('undo_passed'): report['redo_passed']=True
         report.update(passed=True,stage='complete',transaction='created' if created else 'cancelled')
     except Exception:report.update(passed=False,stage='failed',error=traceback.format_exc())
     finally:

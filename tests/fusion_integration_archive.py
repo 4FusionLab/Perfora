@@ -44,14 +44,15 @@ try:
         reopened=app.importManager.importToNewDocument(options)
         design=adsk.fusion.Design.cast(app.activeProduct);comp=design.rootComponent
         design.computeAll()
+        assert len(volumes)==comp.bRepBodies.count
         assert all(abs(a-b)<1e-6 for a,b in zip(volumes,sorted(b.volume for b in comp.bRepBodies)))
         custom=comp.features.customFeatures.item(0)
         fixture['healthy'](custom)
         assert len(entry.parametric.source_entities(custom))==2
-        before=sum(b.volume for b in comp.bRepBodies)
+        before=sum(b.volume for b in comp.bRepBodies if b.isLightBulbOn)
         custom.parameters.itemById('size').expression='3 mm'
         design.computeAll();fixture['healthy'](custom)
-        assert abs(sum(b.volume for b in comp.bRepBodies)-before)>1e-5
+        assert abs(sum(b.volume for b in comp.bRepBodies if b.isLightBulbOn)-before)>1e-5
         part=comp.occurrences.item(0).component
         along=part.features.customFeatures.item(0)
         fixture['healthy'](along)

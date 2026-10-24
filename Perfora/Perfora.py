@@ -484,7 +484,7 @@ class Session:
             items.clear()
             if key not in dict(choices):
                 key = 'staggered'
-                self.surface_notice = 'Distribution changed to Staggered for this surface. Select Distribution to adjust the pattern.'
+                self.surface_notice = 'Distribution changed to Staggered. Choose a compatible pattern.'
             for value, label in choices:
                 items.add(label, value == key, '')
             self.surface_choices = choices
@@ -499,6 +499,7 @@ class Session:
             d = self.inputs
             source = self.selected_source()
             is_curved = surface.is_curved(source)
+            if not is_curved: self.surface_notice = ''
             if surface.supported(source):
                 self.capture_surface(source)
                 self.sync_surface_layouts(source)
