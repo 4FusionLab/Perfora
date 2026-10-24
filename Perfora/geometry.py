@@ -8,6 +8,7 @@ EPS = 1e-9
 POLYGON_SHAPES = ('hexagon', 'square', 'triangle', 'rectangle', 'diamond', 'pentagon', 'octagon', 'cross', 'star', 'voronoi')
 LENGTH_SHAPES = ('slot', 'rectangle', 'diamond', 'ellipse')
 SHAPE_IDS = ('circle', 'slot', 'ellipse') + POLYGON_SHAPES
+VARIANT_LAYOUTS = ('contour', 'fan', 'phyllotaxis', 'poisson', 'wave', 'chevron', 'running_bond', 'between_curves')
 
 
 def rotate(p, angle):
@@ -160,6 +161,23 @@ class Settings:
     spread_radius: float = 0.0
     origin_x: float = None
     origin_y: float = None
+    along_spacing: float = 0.0  # 0 selects enclosing diameter + Web Thickness.
+    row_spacing: float = 0.0
+    fan_angle: float = math.pi
+    fan_rays: int = 12
+    fan_angular_step: float = 0.0  # 0 uses Ray Count; otherwise radians.
+    phyllotaxis_density: float = 1.0
+    wave_amplitude: float = 0.3
+    wave_length: float = 3.0
+    wave_phase: float = 0.0
+    wave_row_phase: float = 0.0
+    chevron_angle: float = math.pi / 4
+    bond_shift: float = 1 / 3
+    contour_tolerance: float = 0.02
+    guide_rows: int = 5
+    guide_reverse: bool = False
+    guide1: tuple = ()  # Prepared 2D strokes only; live references stay in config.
+    guide2: tuple = ()
 
     def validate(self):
         if not math.isfinite(self.spread_radius) or self.spread_radius < 0:
@@ -171,8 +189,11 @@ class Settings:
             raise ValueError('Start Point must have finite coordinates.')
         if self.shape not in SHAPE_IDS:
             raise ValueError('Unknown hole shape.')
-        if self.layout not in ('grid', 'circular'):
+        if self.layout not in ('grid', 'circular') + VARIANT_LAYOUTS:
             raise ValueError('Unknown distribution.')
+        if self.layout in VARIANT_LAYOUTS:
+            from .distributions import validate
+            validate(self)
         if self.layout == 'circular':
             if self.shape == 'voronoi':
                 raise ValueError('Circular distribution is not available for Voronoi.')
@@ -619,6 +640,9 @@ def generate(region, settings):
         return generate_voronoi(region, settings)
     if settings.layout == 'circular':
         return generate_circular(region, settings)
+    if settings.layout in VARIANT_LAYOUTS:
+        from .distributions import generate_variant
+        return generate_variant(region, settings)
     outer = candidate_points(region, settings.grid_angle)
     if not outer:
         raise ValueError('The selected region has no outer boundary.')

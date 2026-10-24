@@ -14,6 +14,7 @@ from .geometry import Settings, LENGTH_SHAPES
 from . import model, ui_resources, cylindrical, surface, feature as parametric
 from .preview import Renderer, PREVIEW_COLORS
 from .numeric_inputs import NumericInput
+from .distributions import VARIANT_PARAMETERS, LAYOUT_PARAMETERS
 
 COMMAND_ID = 'DiegoV_Perforator'  # Stable ID for existing installations.
 PANEL_ID = 'SolidCreatePanel'
@@ -60,6 +61,9 @@ DIRECTIONS = [('one', 'One Side'), ('two', 'Two Sides'), ('symmetric', 'Symmetri
 EXTENTS = [('distance', 'Distance'), ('object', 'To Object'), ('all', 'All')]
 STARTS = [('profile', 'Profile Plane'), ('offset', 'Offset')]
 LAYOUTS = [('staggered', 'Staggered'), ('rows', 'Rectangular'), ('circular', 'Circular')]
+LAYOUTS += [('contour', 'Contour'), ('fan', 'Fan'), ('phyllotaxis', 'Phyllotaxis'),
+            ('poisson', 'Poisson Disk'), ('wave', 'Wave'), ('chevron', 'Chevron'),
+            ('running_bond', 'Running Bond'), ('between_curves', 'Between Curves')]
 SURFACE_LAYOUTS = LAYOUTS[:2]  # Local rows; planar concentric rings do not wrap.
 ORIENTATIONS = [('fixed', 'Fixed'), ('radial', 'Radial'), ('tangential', 'Tangential')]
 PREVIEW_MODES = [('fast', 'Fast'), ('exact', 'Full')]
@@ -150,6 +154,22 @@ class Session:
         self.inputs['clip_boundary'].tooltip = ('Trim intersecting holes to the boundary after applying Edge Offset. '
             'Clear this option to keep only complete holes.')
         self.dropdown(pattern, 'layout', 'Distribution', LAYOUTS, icons=True)
+        for key, (label, unit, expression) in VARIANT_PARAMETERS.items():
+            self.number(pattern, key, label, expression, unit)
+        self.inputs['along_spacing'].tooltip = ('Center spacing measured along each row. 0 is automatic. '
+            'Spacing is raised to the enclosing hole diameter plus Web Thickness; nearby candidates may be omitted to keep the web.')
+        self.inputs['row_spacing'].tooltip = 'Row spacing. 0 is automatic; the enclosing hole diameter plus Web Thickness is the minimum.'
+        self.inputs['fan_angular_step'].tooltip = '0 uses Ray Count. A positive angle sets the angular step; the sector endpoint is included for an open sector.'
+        self.inputs['fan_angle'].tooltip = 'Sector starting at Pattern Angle, counterclockwise. A full 360 deg sector omits the duplicate last ray.'
+        self.inputs['phyllotaxis_density'].tooltip = 'Golden-angle density multiplier. Higher values add candidates; Web Thickness remains enforced.'
+        self.inputs['bond_shift'].tooltip = 'Cumulative fraction of a pitch per row. Enter 1 / 3, 1 / 4, or another ratio from 0 to 1.'
+        self.inputs['contour_tolerance'].tooltip = ('Resolution bound for approximate signed-distance contour rows. '
+            'Smaller values cost more. Exact boundary trimming still uses Fusion geometry.')
+        for key, label in (('guide1', 'Guide 1'), ('guide2', 'Guide 2')):
+            self.selection(pattern, key, label, ['SketchCurves', 'Edges'], 0, 1,
+                           'Select one open planar sketch curve or edge in the Profiles component. Closed, crossing and folded strips are unsupported.')
+            self.inputs[key].isUseCurrentSelections = False
+        self.check(pattern, 'guide_reverse', 'Reverse Guide 2', False)
         self.dropdown(pattern, 'surface_layout', 'Distribution', SURFACE_LAYOUTS, icons=True)
         self.inputs['surface_layout'].tooltip = 'Rectangular aligns rows. Staggered shifts alternate rows by half a pitch.'
         self.selection(pattern, 'center_point', 'Start Point',
@@ -239,7 +259,13 @@ class Session:
                                  ('boundary', [('rectangle', 'Rectangle'), ('circle', 'Circle')])):
                 chosen = settings[key] if key == 'shape' else config[key]
                 d[key].listItems.item(next(i for i, (k, _) in enumerate(options) if k == chosen)).isSelected = True
-            d['layout'].listItems.item(2 if settings.get('layout') == 'circular' else (0 if settings['staggered'] else 1)).isSelected = True
+            layout = settings.get('layout', 'grid')
+            layout = ('staggered' if settings['staggered'] else 'rows') if layout == 'grid' else layout
+            d['layout'].listItems.item(next(i for i, (key, _) in enumerate(LAYOUTS) if key == layout)).isSelected = True
+            defaults = Settings()
+            for key in VARIANT_PARAMETERS:
+                d[key].value = settings.get(key, getattr(defaults, key))
+            d['guide_reverse'].value = settings.get('guide_reverse', False)
             d['surface_layout'].listItems.item(0 if settings['staggered'] else 1).isSelected = True
             d['orientation'].listItems.item(2 if settings.get('tangential_orientation') else
                 (1 if settings.get('radial_orientation') else 0)).isSelected = True
@@ -453,18 +479,32 @@ class Session:
             visible('arm_width', shape == 'cross')
             visible('star_points', shape == 'star')
             visible('star_ratio', shape == 'star')
-            for identifier in ('irregularity', 'seed', 'new_pattern', 'round_corners'):
+            layout = (self.chosen('surface_layout', SURFACE_LAYOUTS) if is_curved else self.chosen('layout', LAYOUTS)) if shape != 'voronoi' else 'grid'
+            for identifier in ('irregularity', 'round_corners'):
                 visible(identifier, shape == 'voronoi')
+            for identifier in ('seed', 'new_pattern'):
+                visible(identifier, shape == 'voronoi' or layout == 'poisson')
+            for key in VARIANT_PARAMETERS:
+                visible(key, key in LAYOUT_PARAMETERS.get(layout, ()))
+            if layout == 'fan':
+                visible('fan_rays', not d['fan_angular_step'].isValidExpression or d['fan_angular_step'].value == 0)
+            for key in ('guide1', 'guide2', 'guide_reverse'):
+                visible(key, layout == 'between_curves')
             visible('corner_radius', shape == 'voronoi' and d['round_corners'].value)
             visible('layout', shape != 'voronoi' and not is_curved)
             visible('surface_layout', shape != 'voronoi' and is_curved)
-            circular = not is_curved and shape != 'voronoi' and self.chosen('layout', LAYOUTS) == 'circular'
-            visible('center_point', True)
-            visible('start_radius', circular)
+            circular = layout == 'circular'
+            boundary_anchored = layout in ('contour', 'between_curves')
+            scoped = not d['spread_radius'].isValidExpression or d['spread_radius'].value > 0
+            visible('center_point', not boundary_anchored or scoped)
+            visible('grid_angle', not is_curved and not boundary_anchored)
+            for key in ('offset_x', 'offset_y'):
+                visible(key, not boundary_anchored or scoped)
+            visible('start_radius', circular or layout == 'fan')
+            d['start_radius'].tooltip = ('Radius of the first hole center on each ray. Nearby holes are omitted to preserve Web Thickness.'
+                if layout == 'fan' else 'Radius of the first ring, measured to hole centers. 0 starts with a center hole; ring spacing preserves Web Thickness.')
             visible('orientation', circular and shape != 'circle')
-            for identifier in ('offset_x','offset_y','clip_boundary'):
-                visible(identifier, True)
-            visible('grid_angle',not is_curved)
+            visible('clip_boundary', True)
             visible('spread_radius',False)
             d['spread_radius'].tooltip = ('Limit the surface to the 3D distance from Start Point, including X/Y Offset. '
                 '0 fills the selected boundary. Edge Offset also applies to this limit.' if is_curved else
@@ -531,13 +571,20 @@ class Session:
         shape = self.chosen('shape', SHAPES)
         size_id = self.dimension_id(SIZE_FIELDS, shape)
         length_id = self.dimension_id(LENGTH_FIELDS, shape)
-        required = [size_id, 'gap', 'margin', 'limit']
-        required += ['offset_x','offset_y']
-        if not is_curved:required.append('grid_angle')
+        required = [size_id, 'gap', 'margin', 'offset_x', 'offset_y', 'limit']
+        if not is_curved: required.append('grid_angle')
         if is_curved and isinstance(source.geometry,(adsk.core.Cylinder,adsk.core.Cone)):
             required += list(surface.ZONE_PARAMETERS)
-        circular = not is_curved and shape != 'voronoi' and self.chosen('layout', LAYOUTS) == 'circular'
-        if circular:
+        layout = (self.chosen('surface_layout', SURFACE_LAYOUTS) if is_curved else self.chosen('layout', LAYOUTS)) if shape != 'voronoi' else 'grid'
+        circular = layout == 'circular'
+        variant_keys = [key for key in LAYOUT_PARAMETERS.get(layout, ()) if d[key].isVisible]
+        required += variant_keys
+        if layout in ('contour', 'between_curves'):
+            if 'grid_angle' in required: required.remove('grid_angle')
+            if d['spread_radius'].isValidExpression and d['spread_radius'].value == 0:
+                required.remove('offset_x')
+                required.remove('offset_y')
+        if circular or layout == 'fan':
             required.append('start_radius')
         if shape not in ('circle', 'voronoi'):
             required.append('shape_angle')
@@ -579,33 +626,42 @@ class Session:
                 raise ValueError('Check the value of ' + d[identifier].name + '.')
         if shape == 'voronoi' and d['round_corners'].value and d['corner_radius'].value <= 0:
             raise ValueError('Corner Radius must be positive. Clear Round Corners for sharp corners.')
+        variant_values = {key: d[key].value for key in variant_keys if key in VARIANT_PARAMETERS}
+        for key in ('fan_rays', 'guide_rows'):
+            if key in variant_values:
+                if variant_values[key] != int(variant_values[key]):
+                    raise ValueError(VARIANT_PARAMETERS[key][0] + ' must be an integer.')
+                variant_values[key] = int(variant_values[key])
         settings = Settings(shape=shape, size=d[size_id].value,
                             slot_length=d[length_id].value if length_id else d[size_id].value,
                             gap=d['gap'].value, margin=d['margin'].value,
-                            staggered=shape != 'voronoi' and (self.chosen('surface_layout',SURFACE_LAYOUTS) if is_curved else self.chosen('layout',LAYOUTS))=='staggered',
-                            grid_angle=0 if is_curved else d['grid_angle'].value,
+                            staggered=shape != 'voronoi' and layout == 'staggered',
+                            grid_angle=d['grid_angle'].value if 'grid_angle' in required else 0,
                             shape_angle=d['shape_angle'].value if shape not in ('circle', 'voronoi') else 0,
-                            offset_x=d['offset_x'].value,
-                            offset_y=d['offset_y'].value, limit=d['limit'].value,
+                            offset_x=d['offset_x'].value if 'offset_x' in required else 0,
+                            offset_y=d['offset_y'].value if 'offset_y' in required else 0, limit=d['limit'].value,
                             clip_boundary=d['clip_boundary'].value,
                             arm_width=d['arm_width'].value if shape == 'cross' else 0.15,
                             star_ratio=d['star_ratio'].value / 100 if shape == 'star' else 0.45,
                             star_points=d['star_points'].value if shape == 'star' else 5,
                             irregularity=d['irregularity'].value / 100 if shape == 'voronoi' else 0.8,
-                            seed=d['seed'].value if shape == 'voronoi' else 1,
+                            seed=d['seed'].value if shape == 'voronoi' or layout == 'poisson' else 1,
                             corner_radius=d['corner_radius'].value
                                 if shape == 'voronoi' and d['round_corners'].value else 0,
-                            layout='circular' if circular else 'grid',
-                            start_radius=d['start_radius'].value if circular else 0,
+                            layout='grid' if layout in ('staggered', 'rows') else layout,
+                            start_radius=d['start_radius'].value if circular or layout == 'fan' else 0,
                             spread_radius=d['spread_radius'].value if self.edited_feature else 0,
                             radial_orientation=circular and shape != 'circle' and
                                 self.chosen('orientation', ORIENTATIONS) == 'radial',
                             tangential_orientation=circular and shape != 'circle' and
-                                self.chosen('orientation', ORIENTATIONS) == 'tangential')
+                                self.chosen('orientation', ORIENTATIONS) == 'tangential',
+                            guide_reverse=d['guide_reverse'].value if layout == 'between_curves' else False,
+                            **variant_values)
         settings.validate()
         config = {
+            'guide1': None, 'guide2': None,
             'center_point': d['center_point'].selection(0).entity
-                if d['center_point'].selectionCount else None,
+                if d['center_point'].isVisible and d['center_point'].selectionCount else None,
             'boundary': boundary,
             'width': d[width_id].value if width_id in required else
                 self.units.evaluateExpression(d[width_id].default_expression, d[width_id].unit),
@@ -619,6 +675,12 @@ class Session:
         }
         if config['center_point'] is not None:
             model.point_position(config['center_point'], model.source_component(source))
+        if layout == 'between_curves':
+            for key in ('guide1', 'guide2'):
+                if not d[key].selectionCount:
+                    raise ValueError('Select two open planar guides for Between Curves.')
+                config[key] = d[key].selection(0).entity
+                model.guide_reference(config[key], model.source_component(source))
         for side in ('1', '2'):
             for key in ('distance', 'taper', 'object_offset'):
                 config[key + side] = d[key + side].model_expression
@@ -649,6 +711,12 @@ class Session:
             expressions = {k: d[k].model_expression for k in parametric.parameters(config)
                            if k in self.numeric_inputs and k not in ('star_points', 'seed', 'limit', 'irregularity','spread_radius')
                            and (k not in surface.ZONE_PARAMETERS or isinstance(source.geometry,(adsk.core.Cylinder,adsk.core.Cone)))}
+            for key in VARIANT_PARAMETERS:
+                if key not in variant_keys:
+                    expressions.pop(key, None)
+            for key in ('grid_angle', 'offset_x', 'offset_y', 'start_radius'):
+                if key not in required:
+                    expressions.pop(key, None)
             expressions.update(size=d[size_id].model_expression,
                                slot_length=d[length_id].model_expression if length_id else d[size_id].model_expression,
                                width=d[width_id].model_expression,
@@ -855,6 +923,9 @@ class EditActivate(adsk.core.CommandEventHandler):
                 center = parametric.center_entity(custom)
                 if center is not None:
                     s.inputs['center_point'].addSelection(center)
+                for key, entity in zip(('guide1', 'guide2'), parametric.guide_entities(custom, allow_missing=True)):
+                    if entity is not None:
+                        s.inputs[key].addSelection(entity)
                 data = parametric.stored(custom)
                 for i in range(data['body_count']):
                     s.inputs['bodies'].addSelection(custom.dependencies.itemById('body' + str(i)).entity)

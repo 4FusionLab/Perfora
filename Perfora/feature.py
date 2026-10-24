@@ -11,6 +11,7 @@ import adsk.fusion
 
 from . import clipping, model, solid, surface
 from .geometry import Settings, generate
+from .distributions import VARIANT_PARAMETERS
 
 DEFINITION_ID = '4FusionLab.Perfora.Parametric'
 EDIT_COMMAND_ID = 'DiegoV_Perforator_EditFeature'
@@ -34,7 +35,9 @@ PARAMETERS = {
     'start': ('Start Offset', 'mm'), 'distance1': ('Distance 1', 'mm'),
     'distance2': ('Distance 2', 'mm'),
 }
-INTEGER_PARAMETERS = ('star_points', 'seed', 'limit')
+PARAMETERS.update({key: (label, unit) for key, (label, unit, _) in VARIANT_PARAMETERS.items()})
+OPTIONAL_PARAMETERS = ('start_radius', 'spread_radius') + tuple(VARIANT_PARAMETERS)
+INTEGER_PARAMETERS = ('star_points', 'seed', 'limit', 'fan_rays', 'guide_rows')
 
 
 def register():
@@ -79,7 +82,7 @@ def parameters(config):
 def metadata(settings, config):
     return dict(schema=SCHEMA, settings=dict(settings.__dict__),
                 config={k: v for k, v in config.items()
-                        if k not in ('bodies', 'target1', 'target2', '_expressions', 'center_point')},
+                        if k not in ('bodies', 'target1', 'target2', '_expressions', 'center_point', 'guide1', 'guide2')},
                 center_selected=config.get('center_point') is not None,
                 body_count=len(config['bodies']))
 
@@ -120,18 +123,34 @@ def center_entity(custom):
     return entity
 
 
+def guide_entities(custom, allow_missing=False):
+    if stored(custom)['settings'].get('layout') != 'between_curves':
+        return (None, None)
+    result = []
+    for key in ('guide1', 'guide2'):
+        dependency = custom.dependencies.itemById(key)
+        entity = dependency.entity if dependency else None
+        if entity is None or not entity.isValid:
+            if not allow_missing:
+                raise ValueError('A guide is missing. Edit the Perfora Feature to select two valid guides.')
+            entity = None  # Edit must remain usable for replacing a lost guide.
+        result.append(entity)
+    return tuple(result)
+
+
 def read(custom):
     data = stored(custom)
     settings = Settings(**data['settings'])
     config = dict(data['config'])
     config['center_point'] = center_entity(custom)
+    config.update(zip(('guide1', 'guide2'), guide_entities(custom)))
     values = {}
     for key in parameters(config):
         p = custom.parameters.itemById(key)
         if not p:
-            if key in ('start_radius', 'spread_radius'):
+            if key in OPTIONAL_PARAMETERS:
                 values[key] = getattr(settings, key)
-                continue  # Existing 0.2.0 nodes predate the optional radius parameter.
+                continue  # Older nodes predate optional placement parameters.
             raise ValueError('The Feature is missing parameter: ' + key)
         values[key] = p.value
     for key in INTEGER_PARAMETERS:
@@ -238,6 +257,10 @@ def build(source, settings, config, cache=None):
         data.addDependency('source', dependency_entity(source, component))
     if config.get('center_point') is not None:
         data.addDependency('center_point', model.point_reference(config['center_point'], component))
+    if settings.layout == 'between_curves':
+        for key in ('guide1', 'guide2'):
+            if not data.addDependency(key, model.guide_reference(config.get(key), component)):
+                raise ValueError('Unable to capture the guide dependency.')
     for i, target in enumerate(config['bodies']):
         data.addDependency('body' + str(i), dependency_entity(target, component))
     expressions = config.get('_expressions', {})
@@ -343,6 +366,17 @@ def update(custom, settings, config, cache=None):
                 custom.dependencies.add('center_point', reference)
         elif dependency:
             dependency.deleteMe()
+        for key in ('guide1', 'guide2'):
+            dependency = custom.dependencies.itemById(key)
+            entity = config.get(key) if settings.layout == 'between_curves' else None
+            if entity is not None:
+                reference = model.guide_reference(entity, custom.parentComponent)
+                if dependency:
+                    dependency.entity = reference
+                else:
+                    custom.dependencies.add(key, reference)
+            elif dependency:
+                dependency.deleteMe()
         custom.customNamedValues.addOrSetValue('perfora', json.dumps(metadata(settings, config)))
         expressions = config.get('_expressions', {})
         for key, (_, unit) in parameters(config).items():
@@ -350,7 +384,7 @@ def update(custom, settings, config, cache=None):
             if val is None:
                 val = getattr(settings, key) if key in settings.__dict__ else config[key]
             parameter = custom.parameters.itemById(key)
-            if not parameter and key in ('start_radius', 'spread_radius'):
+            if not parameter and key in OPTIONAL_PARAMETERS:
                 continue  # Older nodes retain this value in their versioned settings.
             if isinstance(val, str):
                 parameter.expression = val

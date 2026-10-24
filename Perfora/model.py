@@ -110,13 +110,72 @@ def layout_settings(settings, config, region, frame, component):
     locate the pattern too. Stored offsets remain relative to the selected point.
     """
     center = config.get('center_point')
-    if center is None:
-        return settings
-    position = point_position(center, component)
+    if center is not None:
+        position = point_position(center, component)
+        origin, u, v = frame
+        delta = [position.asArray()[i] - origin[i] for i in range(3)]
+        x, y = sum(a*b for a, b in zip(delta, u)), sum(a*b for a, b in zip(delta, v))
+        settings = replace(settings, origin_x=x, origin_y=y)
+    if settings.layout == 'between_curves':
+        guides = [guide_strokes(config.get(key), frame, component) for key in ('guide1', 'guide2')]
+        settings = replace(settings, guide1=guides[0], guide2=guides[1])
+    return settings
+
+
+def guide_reference(entity, component):
+    """Initial guide support is deliberately restricted to the source component.
+
+    Preserve a selected proxy for dependency capture. Cross-component guide
+    transforms are an integration extension, never a silent projection.
+    """
+    if entity is None or not entity.isValid:
+        raise ValueError('Select two valid guides for Between Curves.')
+    local = native(entity)
+    if isinstance(local, adsk.fusion.SketchCurve):
+        owner = local.parentSketch.parentComponent
+    elif isinstance(local, adsk.fusion.BRepEdge):
+        owner = local.body.parentComponent
+    else:
+        raise ValueError('Select an open sketch curve or model edge for each guide.')
+    if owner != component:
+        raise ValueError('Guides and Profiles must belong to the same component.')
+    if component == component.parentDesign.rootComponent or entity.assemblyContext:
+        return entity
+    occurrences = component.parentDesign.rootComponent.allOccurrencesByComponent(component)
+    if occurrences.count != 1:
+        raise ValueError('Select guides in an unambiguous component occurrence.')
+    return local.createForAssemblyContext(occurrences.item(0))
+
+
+def guide_strokes(entity, frame, component):
+    """Fusion -> immutable planar strokes, shared by all result/preview modes.
+
+    BRepEdge.evaluator retains trimmed edge extents. Convert native sketch
+    geometry with sketchToModelSpace, matching sketch_frame; never flatten Z or
+    assume worldGeometry has the component's local assembly context.
+    """
+    guide_reference(entity, component)
+    local = native(entity)
+    is_sketch = isinstance(local, adsk.fusion.SketchCurve)
+    evaluator = (local.geometry.evaluator if is_sketch
+                 else local.evaluator)
+    ok, start, end = evaluator.getParameterExtents()
+    if not ok:
+        raise ValueError('Unable to determine a guide parameter range.')
+    ok, points = evaluator.getStrokes(start, end, TOLERANCE)
+    if not ok or len(points) > 2048:
+        raise ValueError('Unable to sample the guide within the supported complexity. Simplify the curve.')
     origin, u, v = frame
-    delta = [position.asArray()[i] - origin[i] for i in range(3)]
-    x, y = sum(a*b for a, b in zip(delta, u)), sum(a*b for a, b in zip(delta, v))
-    return replace(settings, origin_x=x, origin_y=y)
+    normal = (u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0])
+    result = []
+    for position in points:
+        if is_sketch:
+            position = local.parentSketch.sketchToModelSpace(position)
+        delta = [position.asArray()[i]-origin[i] for i in range(3)]
+        if abs(sum(a*b for a,b in zip(delta, normal))) > TOLERANCE*5:
+            raise ValueError('Both guides must lie on the Profiles plane. Nonplanar guides are not supported.')
+        result.append(tuple(sum(a*b for a,b in zip(delta, axis)) for axis in (u,v)))
+    return tuple(result)
 
 
 def strokes(evaluator, convert):
@@ -411,6 +470,15 @@ def new_source_sketch(source):
     return sketch
 
 
+def sketch_metadata(settings, config):
+    """Frozen result snapshot; live references must never enter sketch JSON."""
+    result = dict(settings.__dict__)
+    result.update({key: val for key, val in config.items()
+                   if key not in ('bodies', 'target1', 'target2', 'center_point',
+                                  'guide1', 'guide2', '_expressions')})
+    return result
+
+
 def build(source, settings, config, cache=None):
     """Must run within a Fusion command transaction (execute/executePreview)."""
     source = native(source)
@@ -454,8 +522,7 @@ def build(source, settings, config, cache=None):
         profiles = selected_profiles(sketch, config['material'], settings.clip_boundary)
         if not settings.clip_boundary and config['material'] == 'cells' and profiles.count != len(cells):
             raise ValueError('The profile count differs from the hole count. Increase Web Thickness.')
-        metadata = dict(settings.__dict__)
-        metadata.update({key: val for key, val in config.items() if key not in ('bodies', 'target1', 'target2', 'center_point')})
+        metadata = sketch_metadata(layout, config)
         sketch.attributes.add(ATTRIBUTE_GROUP, 'settings', json.dumps(metadata, ensure_ascii=False))
         if config['result'] == 'extrude':
             feature = extrude(component, profiles, config)

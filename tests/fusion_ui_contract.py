@@ -23,6 +23,7 @@ original_design = adsk.fusion.Design.cast(app.activeProduct)
 original_timeline = original_design.timeline.count
 original_volume = sum(b.volume for b in original_design.rootComponent.bRepBodies)
 result_mode = globals().get('result_mode', 'extrude')
+layout_variant = globals().get('layout_variant')
 registered_command = globals().get('registered_command', False)
 doc = app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
 design = adsk.fusion.Design.cast(app.activeProduct)
@@ -39,6 +40,15 @@ if source_profile:
     selected_source = boundary_sketch.profiles.item(0)
 anchor_sketch = comp.sketches.addWithoutEdges(comp.xYConstructionPlane)
 anchor = anchor_sketch.sketchPoints.add(adsk.core.Point3D.create(.35, .2, 0))
+variant_guides = []
+if layout_variant == 'between_curves':
+    guide_sketch = comp.sketches.addWithoutEdges(face)
+    for y in (-.65, .65):
+        guide = guide_sketch.sketchCurves.sketchLines.addByTwoPoints(
+            adsk.core.Point3D.create(-1.4, y, 0), adsk.core.Point3D.create(1.4, y+.1, 0))
+        guide.isConstruction = True
+        variant_guides.append(guide)
+    guide_sketch.isVisible = False
 design.userParameters.add('PerforaDefaultProbe', adsk.core.ValueInput.createByString('7 mm'), 'mm', '')
 timeline = design.timeline.count
 volume = body.volume
@@ -236,7 +246,18 @@ class Activate(adsk.core.CommandEventHandler):
             for key, control in s.inputs.items():
                 assert not re.search('[А-Яа-яЁё]', control.name + control.tooltip), key
             choose(s, 'result', entry.RESULTS, result_mode)
+            if layout_variant:
+                s.inputs['spread_radius'].expression = '0 mm'
+                for key, guide in zip(('guide1', 'guide2'), variant_guides):
+                    s.inputs[key].addSelection(guide)
+                choose(s, 'layout', entry.LAYOUTS, layout_variant)
+                assert s.read()[1].layout == layout_variant
+                for key in entry.VARIANT_PARAMETERS:
+                    assert s.inputs[key].isVisible == (key in entry.LAYOUT_PARAMETERS[layout_variant]), key
+                assert s.inputs['guide1'].isVisible == (layout_variant == 'between_curves')
+                assert s.inputs['seed'].isVisible == (layout_variant == 'poisson')
             report.update(result_mode=result_mode, registered_command=registered_command, source_profile=source_profile,
+                          layout_variant=layout_variant,
                           passed=True, stage='ready', shapes=len(entry.SHAPES), operations=5, directions=3,
                           distributions=len(entry.LAYOUTS), circular_settings=str(s.read()[1]),
                           numeric_defaults=len(defaults),
