@@ -13,6 +13,7 @@ from types import SimpleNamespace as NS
 import unittest
 from Perfora.geometry import Settings, LENGTH_SHAPES, generate
 from Perfora.distributions import VARIANT_PARAMETERS, LAYOUT_PARAMETERS
+from Perfora.feature_data import metadata, decode
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -60,7 +61,7 @@ def model_definitions():
 
 def feature_definitions(model=None):
     return definitions('feature.py',dict(Settings=Settings,VARIANT_PARAMETERS=VARIANT_PARAMETERS,
-        surface=SURFACE,model=model or NS(native=lambda x:x),replace=replace,json=json,math=math,Path=Path,adsk=ADSK))
+        decode=decode,metadata=metadata,surface=SURFACE,model=model or NS(native=lambda x:x),replace=replace,json=json,math=math,Path=Path,adsk=ADSK))
 
 
 class Collection:
@@ -206,6 +207,7 @@ class Control:
         return Item()
     def selection(self,i): return NS(entity=self._selected[i])
     def addSelection(self,e): self._selected.append(e); self.selectionCount=len(self._selected)
+    def clearSelection(self): self._selected=[]; self.selectionCount=0
 
 
 class DialogContractTests(unittest.TestCase):
@@ -216,8 +218,8 @@ class DialogContractTests(unittest.TestCase):
                  guide_reference=lambda *args:None,source_support_body=lambda x:None)
         ui=definitions('Perfora.py',dict(math=math,Path=Path,Settings=Settings,LENGTH_SHAPES=LENGTH_SHAPES,
                        VARIANT_PARAMETERS=VARIANT_PARAMETERS,LAYOUT_PARAMETERS=LAYOUT_PARAMETERS,
-                       surface=SURFACE,parametric=f,model=model,adsk=ADSK),
-                       methods=('chosen','selected_source','dimension_id','update_visibility','read','restore_feature'))
+                       multi_region=NS(sources=lambda selected:selected),surface=SURFACE,parametric=f,model=model,adsk=ADSK),
+                       methods=('chosen','selected_source','selected_sources','dimension_id','update_visibility','read','restore_feature'))
         s=ui.Session()
         s.updating=False
         s._extrude_inputs=None
@@ -229,7 +231,7 @@ class DialogContractTests(unittest.TestCase):
         # Extract constructor declarations so new/missing controls cannot be
         # silently absent in the offline fixture. No constructor/API execution.
         for key in ('area_group','height','shape','shape_angle','result','material','operation','direction','boundary',
-                    'cylinder_group','surface_layout','path','path_reverse','path_orientation','layout','orientation','source','clip_boundary','round_corners','seed','new_pattern','irregularity',
+                    'source_info','cylinder_group','surface_layout','path','path_reverse','path_orientation','layout','orientation','source','clip_boundary','round_corners','seed','new_pattern','irregularity',
                     'center_point','guide1','guide2','guide_reverse','start_mode','reverse','side2','bodies','output_group',
                     'preview','preview_mode','preview_color','distance1','distance2','taper1','taper2','start','target1',
                     'target2','extent1','extent2','object_offset1','object_offset2'):
@@ -247,6 +249,22 @@ class DialogContractTests(unittest.TestCase):
         s.units=NS(evaluateExpression=lambda expression,unit:float(expression))
         s.update_visibility()
         return ui,s
+
+    def test_inferred_objects_follow_single_source_replacement(self):
+        ui,s=self.session()
+        first=s.inputs['source'].selection(0).entity
+        second=Plane()
+        bodies={first:Entity(),second:Entity()}
+        ui.Session.update_visibility.__globals__['model'].source_support_body=lambda source:bodies[source]
+        s._auto_bodies=[]
+        s.inputs['result'].selectedItem.index=1  # Extrude
+        s.inputs['operation'].selectedItem.index=1  # Cut
+        s.update_visibility()
+        self.assertIs(s.inputs['bodies'].selection(0).entity,bodies[first])
+        s.inputs['source'].clearSelection();s.inputs['source'].addSelection(second)
+        s.update_visibility()
+        self.assertEqual(s.inputs['bodies'].selectionCount,1)
+        self.assertIs(s.inputs['bodies'].selection(0).entity,bodies[second])
 
     def choose(self,s,ui,key):
         s.inputs['layout'].selectedItem.index=next(i for i,(k,_) in enumerate(ui.LAYOUTS) if k==key)

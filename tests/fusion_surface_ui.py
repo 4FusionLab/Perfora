@@ -120,7 +120,7 @@ class Activate(adsk.core.CommandEventHandler):
                        ('result','material','clip_boundary','center_point','surface_layout'))
             assert not s.inputs['layout'].isVisible and not s.inputs['spread_radius'].isVisible
             assert not s.inputs['grid_angle'].isVisible
-            assert [i.name for i in s.inputs['surface_layout'].listItems]==['Staggered','Rectangular']
+            assert [i.name for i in s.inputs['surface_layout'].listItems]==[label for _,label in s.surface_choices]
             assert s.inputs['output_group'].isVisible == (result_type!='profiles')
             source, settings, cfg = s.read()
             assert cfg['surface'] and cfg['result']==result_type

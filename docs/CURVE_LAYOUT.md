@@ -1,5 +1,7 @@
 # Along Path: implementation and pending CAD acceptance
 
+**Обновление интеграции:** реализация включена в `codex/release-features`. Исторический офлайн-статус ниже описывает исходную ветку; текущие CAD/UI-результаты и совместимость поверхностей фиксируются в [RELEASE_INTEGRATION.md](RELEASE_INTEGRATION.md).
+
 Development branch only. This change starts at Perfora 1.0.1 and has **not** been run, installed, registered, reloaded, or visually inspected in Fusion. The manifest/release version is unchanged. Local numerical and adapter tests do not establish native CAD correctness.
 
 ## User contract

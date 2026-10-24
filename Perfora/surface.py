@@ -713,11 +713,11 @@ def make_body(source,settings,config):
     return prepared.body(),len(prepared.sections)
 
 
-def build(source,settings,config):
-    source=model.native(source)
-    component=model.source_component(source)
+def build(source,settings,config,prepared=None,source_snapshot=None,component=None):
+    source=source if prepared is not None else model.native(source)
+    component=component or model.source_component(source)
     config=normalized(config,component)
-    prepared=prepare(source,settings,config)
+    prepared=prepared or prepare(source,settings,config)
     if config['result']=='profiles':
         sketch=component.sketches.addWithoutEdges(component.xYConstructionPlane)
         try:
@@ -730,7 +730,7 @@ def build(source,settings,config):
             for section in prepared.sections:
                 tool=solid.extrude([section.sheet],section.low,section.high)
                 manager.transform(tool,matrix(*section.frame))
-                patch=manager.copy(source)
+                patch=manager.copy(source_snapshot if source_snapshot is not None else source)
                 if not manager.booleanOperation(patch,tool,adsk.fusion.BooleanTypes.IntersectionBooleanType):
                     raise ValueError('Unable to create surface contours.')
                 for f in patch.faces:
@@ -776,6 +776,7 @@ def build(source,settings,config):
                     raise ValueError(combine.errorOrWarningMessage)
                 combine.name='Perforation ('+config['operation'].title()+')'
             base.bodies.item(0).isLightBulbOn=False
+        prepared.created = tuple([base] + combines)
         return None,combine or base,len(prepared.sections)
     except Exception:
         for combine in reversed(combines):

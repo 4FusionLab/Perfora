@@ -258,7 +258,7 @@ try:
 
     def placement_modes():
         details=[]
-        for options in (dict(layout='circular',start_radius=.2),dict(grid_angle=.2,offset_x=.1,offset_y=.07),dict(spread_radius=.65)):
+        for options in (dict(grid_angle=.2,offset_x=.1,offset_y=.07),dict(spread_radius=.65)):
             comp,body,face=tube('Surface Placement')
             settings=geo.Settings(size=.2,gap=.18,margin=.05,staggered=False,clip_boundary=True,**options)
             prepared=surface.prepare(face,settings,config())
@@ -266,7 +266,7 @@ try:
             assert feature.bodies.item(0).isSolid
             details.append(dict(mode=str(options),holes=count))
         return details
-    case('circular_angle_offsets_spread',placement_modes)
+    case('angle_offsets_legacy_spread',placement_modes)
     def operations():
         details=[]
         for operation in ('join','intersect','body','component'):

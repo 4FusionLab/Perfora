@@ -6,6 +6,26 @@ from Perfora.geometry import Settings
 from Perfora import surface_geometry as sg
 
 class SurfaceGeometryTests(unittest.TestCase):
+    def test_surface_distribution_policy_and_conical_bond(self):
+        self.assertIn('chevron', sg.SURFACE_DISTRIBUTIONS['freeform'])
+        for kind in ('cylinder', 'cone'):
+            with self.assertRaises(ValueError):
+                sg.validate_distribution(kind, Settings(layout='chevron'))
+        with self.assertRaises(ValueError):
+            sg.validate_distribution('cone', Settings(layout='poisson'))
+        region = sg.ConeRegion(2.5, -.2, 2.5, 0., 4.)
+        settings = Settings(layout='running_bond', size=.3, gap=.15, bond_shift=1/3)
+        a = sg.conical_cells(region, settings, -.2, 0.)
+        b = sg.conical_cells(region, replace(settings, bond_shift=.25), -.2, 0.)
+        self.assertNotEqual(a, b)
+        self.assertTrue(all(cell.size == settings.size for _, _, cell in a))
+
+    def test_grouped_web_checks_only_cross_region_tools(self):
+        def tool(x): return ((x,0,0),(1,0,0),(0,1,0),(0,0,1),-.2,0,.25)
+        placements = [tool(0), tool(.1), tool(3), tool(3.1)]
+        self.assertEqual(sg.spaced_indices(placements,.15,groups=[0,0,1,1]),(0,1,2,3))
+        self.assertNotEqual(len(sg.spaced_indices(placements,.15,groups=[0,1,1,1])),4)
+
     def test_pointed_cone_uses_local_circumference_and_physical_row_pitch(self):
         slope=-math.tan(math.radians(15))
         slant=math.hypot(1,slope)

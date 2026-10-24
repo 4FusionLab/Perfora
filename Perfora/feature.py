@@ -273,9 +273,6 @@ def make_body(source, settings, config, frame=None, scratch=None, cache=None):
 
 def build(source, settings, config, cache=None):
     global _busy
-    from . import cylindrical
-    if cylindrical.is_cylinder(model.native(source)) and not config.get('surface'):
-        raise ValueError('Cylindrical faces support fixed Radial Cut only. Feature recompute and Edit Feature are not supported yet.')
     if isinstance(source, (tuple, list)):
         from . import multi_region
         selected, _ = multi_region.validate(source, config)
@@ -301,7 +298,10 @@ def build(source, settings, config, cache=None):
             if not data.addDependency(key, model.guide_reference(config.get(key), component)):
                 raise ValueError('Unable to capture the guide dependency.')
     if settings.layout == 'path':
-        if not data.addDependency('path', model.path_reference(config.get('path'), component)):
+        path = model.path_reference(config.get('path'), component)
+        if isinstance(model.native(path), adsk.fusion.SketchCurve):
+            data.addDependency('path_sketch', path.parentSketch)
+        if not data.addDependency('path', path):
             raise ValueError('Unable to create the Path dependency.')
     for i, target in enumerate(config['bodies']):
         data.addDependency('body' + str(i), dependency_entity(target, component))
@@ -324,7 +324,8 @@ def build(source, settings, config, cache=None):
         custom = component.features.customFeatures.add(data)
         custom.customNamedValues.addOrSetValue('perfora', json.dumps(metadata(settings, config)))
         if not config.get('surface'):
-            frame = model.new_source_sketch(source)
+            frame = (component.sketches.addWithoutEdges(component.xYConstructionPlane)
+                     if config.get('surface') else model.new_source_sketch(source))
             frame.name = 'Perfora Reference'
             scratch = model.new_source_sketch(source)
             scratch.name = 'Perfora Edge Offset'
@@ -386,11 +387,14 @@ def build_many(selected, settings, config, cache=None):
     dependencies.extend(('body' + str(i), dependency_entity(body, component)) for i, body in enumerate(config['bodies']))
     if config.get('center_point') is not None:
         dependencies.append(('center_point', model.point_reference(config['center_point'], component)))
+    if settings.layout == 'path': dependencies.append(('path', model.path_reference(config.get('path'), component)))
+    if settings.layout == 'between_curves':
+        dependencies.extend((key, model.guide_reference(config.get(key), component)) for key in ('guide1','guide2'))
     for identifier, entity in dependencies:
         if not data.addDependency(identifier, entity):
             raise ValueError('Unable to create Feature dependency: ' + identifier)
     expressions = config.get('_expressions', {})
-    for key, (label, unit) in PARAMETERS.items():
+    for key, (label, unit) in parameters(config).items():
         val = expressions.get(key)
         if val is None:
             val = getattr(settings, key) if key in settings.__dict__ else config[key]
@@ -405,7 +409,8 @@ def build_many(selected, settings, config, cache=None):
         owned.append(custom)
         custom.customNamedValues.addOrSetValue('perfora', json.dumps(metadata(settings, config)))
         for index, source in enumerate(selected):
-            frame = model.new_source_sketch(source)
+            frame = (component.sketches.addWithoutEdges(component.xYConstructionPlane)
+                     if config.get('surface') else model.new_source_sketch(source))
             owned.append(frame)
             frames.append(frame)
             frame.name = 'Perfora Reference %d' % (index+1)
@@ -564,8 +569,15 @@ def update(custom, settings, config, cache=None):
                 dependency.entity = reference
             else:
                 custom.dependencies.add('path', reference)
+            owner = custom.dependencies.itemById('path_sketch')
+            if isinstance(model.native(reference), adsk.fusion.SketchCurve):
+                if owner: owner.entity = reference.parentSketch
+                else: custom.dependencies.add('path_sketch', reference.parentSketch)
+            elif owner: owner.deleteMe()
         elif dependency:
             dependency.deleteMe()
+            owner = custom.dependencies.itemById('path_sketch')
+            if owner: owner.deleteMe()
         custom.customNamedValues.addOrSetValue('perfora', json.dumps(metadata(settings, config)))
         expressions = config.get('_expressions', {})
         for key, (_, unit) in parameters(config).items():

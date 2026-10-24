@@ -236,7 +236,10 @@ try:
         healthy(custom)
         assert after > before
         nodes = design.timeline.count
-        path.endSketchPoint.move(adsk.core.Vector3D.create(-.6,0,0))
+        custom.timelineObject.rollTo(True)
+        assert path.endSketchPoint.move(adsk.core.Vector3D.create(-.6,0,0))
+        design.timeline.moveToEnd()
+        adsk.doEvents()
         shorter = sum(b.volume for b in comp.bRepBodies)
         healthy(custom)
         assert shorter < after

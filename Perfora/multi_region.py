@@ -6,7 +6,19 @@ import json
 import adsk.core
 import adsk.fusion
 
-from . import clipping, model, regions, solid
+from . import clipping, model, regions, solid, surface
+
+
+def source_kind(entity):
+    entity = model.native(entity)
+    if not isinstance(entity, adsk.fusion.BRepFace): return 'plane'
+    geometry = entity.geometry
+    if isinstance(geometry, adsk.core.Plane): return 'plane'
+    if isinstance(geometry, adsk.core.Cylinder): return 'cylinder'
+    if isinstance(geometry, adsk.core.Cone): return 'cone'
+    if not surface.supported(entity):
+        raise ValueError('Select planar, cylindrical, conical, or smooth freeform solid faces.')
+    return 'freeform'
 
 
 def sources(selected):
@@ -26,16 +38,16 @@ def sources(selected):
         if not any(entity == previous for previous in result):
             result.append(entity)
     if not result:
-        raise ValueError('Select a profile, planar face, or construction plane.')
+        raise ValueError('Select a face, closed profile, or construction plane.')
     if len(result) > regions.MAX_REGIONS:
         raise ValueError('Select at most %d Profiles regions.' % regions.MAX_REGIONS)
     if len(result) > 1 and any(isinstance(s, adsk.fusion.ConstructionPlane) for s in result):
         raise ValueError('Use one construction plane, or select multiple planar faces and closed profiles.')
+    if len({source_kind(s) for s in result}) != 1:
+        raise ValueError('Select Profiles of one surface type only: planar, cylindrical, conical, or freeform.')
     # Selection filters are a convenience; API callers and Feature recompute
     # must also reject nonplanar faces and off-plane profiles.
     for entity in result:
-        if isinstance(entity, adsk.fusion.BRepFace) and not isinstance(entity.geometry, adsk.core.Plane):
-            raise ValueError('All selected faces must be planar.')
         if isinstance(entity, adsk.fusion.Profile) and not entity.isOnSketchPlane:
             raise ValueError('Select profiles on their sketch planes.')
     return result
@@ -51,7 +63,7 @@ def validate(selected, config):
         raise ValueError('Multiple Profiles support New Body in the source component. Use one region for New Component.')
     if config['result'] == 'profiles' or config['operation'] == 'body':
         return selected, tuple(() for _ in selected)
-    if config['operation'] == 'join' and config['result'] == 'extrude':
+    if config['operation'] == 'join' and config['result'] == 'extrude' and source_kind(selected[0]) == 'plane':
         # Native Join determines touching bodies itself, as in the single-source command.
         return selected, tuple(() for _ in selected)
     if context is not None and any(getattr(b, 'assemblyContext', None) is not None and b.assemblyContext != context
@@ -134,12 +146,15 @@ class Plan:
     body_indices: tuple
     revision: object
     inset: object = None
+    prepared: object = None
 
 
 def prepare(selected, settings, config, cache=None, frames=None, previous=None):
     selected, mapping = validate(selected, config)
     if len(selected) < 2:
         raise ValueError('Multiple Profiles requires at least two different regions.')
+    if source_kind(selected[0]) != 'plane':
+        return prepare_curved(selected, settings, config, mapping, previous)
     plans = []
     for index, source in enumerate(selected):
         revision = model.source_revision(source)
@@ -163,7 +178,7 @@ def prepare(selected, settings, config, cache=None, frames=None, previous=None):
                 region = model.get_region(source, adapter, config)
                 original = clipping.source_body(source, adapter, config, region)
             layout = model.layout_settings(settings, config, region, frame, component)
-            if config.get('center_point') is None:
+            if config.get('center_point') is None and settings.layout not in ('path', 'between_curves', 'contour'):
                 layout = replace(layout, origin_x=0., origin_y=0.)
             candidates = cache.for_region(index).resolve(region, layout, frame) if cache is not None else None
             clipped = inset = None
@@ -237,6 +252,8 @@ def draw(plan, sketch, config):
 
 def build(selected, settings, config, cache=None):
     plans = prepare(selected, settings, config, cache)
+    if plans[0].prepared is not None:
+        return build_curved(plans, settings, config)
     owned, outputs = [], []
     try:
         # Every sketch is complete before the first Boolean consumes a source face.
@@ -245,7 +262,7 @@ def build(selected, settings, config, cache=None):
             owned.append(sketch)
             sketch.name = 'Perforation %d - %s' % (index+1, settings.shape.title())
             profiles = draw(plan, sketch, config)
-            payload = dict(settings.__dict__)
+            payload = model.sketch_metadata(plan.settings, {})
             payload.update(region_index=index, region_count=len(plans), frame=plan.frame,
                            binding='component', material=config['material'], result=config['result'])
             sketch.attributes.add(model.ATTRIBUTE_GROUP, 'settings', json.dumps(payload))
@@ -268,6 +285,7 @@ def build(selected, settings, config, cache=None):
 
 
 def make_body(plan, config):
+    if plan.prepared is not None: return plan.prepared.body()
     manager = adsk.fusion.TemporaryBRepManager.get()
     sheets = [clipping.sheet([clipping.cell_curves(c)]) for c in
               (plan.clipped.whole if plan.clipped else plan.cells)]
@@ -296,3 +314,50 @@ def make_body(plan, config):
     if not manager.transform(body, matrix(plan.frame)):
         raise ValueError('Unable to position the Feature body.')
     return body
+
+
+def prepare_curved(selected, settings, config, mapping, previous=None):
+    plans = []
+    for index, source in enumerate(selected):
+        revision = model.source_revision(source)
+        local = surface.normalized(config, model.source_component(source))
+        # A preparation is local to one immutable source snapshot and tool extent.
+        old = next((p for p in previous or () if p.source == source and p.revision == revision
+                    and p.settings == settings and getattr(p, '_config', None) == local), None)
+        prepared = old.prepared if old else surface.prepare(source, settings, local)
+        snapshot = old.original if old else adsk.fusion.TemporaryBRepManager.get().copy(source)
+        plan = Plan(source, None, None, None, settings, snapshot,
+                    prepared.sections, None, mapping[index], revision, prepared=prepared)
+        plan._config = local
+        plans.append(plan)
+        if sum(len(p.cells) for p in plans) > settings.limit:
+            raise ValueError('The total hole count exceeds Maximum Holes (%d).' % settings.limit)
+    # Separate source patches can meet; their finite tools must still preserve
+    # a web. Reject conflicting regions rather than silently removing a motif.
+    from . import surface_geometry as sg
+    from .cylindrical_geometry import enclosing_radius
+    sections = [section for plan in plans for section in plan.cells]
+    placements = [(*section.frame, section.low, section.high, enclosing_radius(section.cell)) for section in sections]
+    groups = [index for index, plan in enumerate(plans) for _ in plan.cells]
+    if len(sg.spaced_indices(placements, settings.gap, groups)) != len(sections):
+        raise ValueError('Hole tools from different Profiles overlap. Increase spacing or choose separated regions.')
+    return plans
+
+
+def build_curved(plans, settings, config):
+    component = model.source_component(plans[0].source)
+    owned, outputs = [], []
+    try:
+        for plan in plans:
+            local = dict(config, bodies=[config['bodies'][i] for i in plan.body_indices])
+            sketch, feature, count = surface.build(plan.source, settings, local,
+                prepared=plan.prepared, source_snapshot=plan.original, component=component)
+            if sketch: owned.append(sketch)
+            if feature:
+                # Surface output owns a base and zero or more combines.
+                owned.extend(getattr(plan.prepared, 'created', (feature,)))
+            outputs.append((sketch, feature, count))
+        return outputs[0][0], outputs[-1][1], sum(o[2] for o in outputs)
+    except Exception:
+        cleanup(owned)
+        raise

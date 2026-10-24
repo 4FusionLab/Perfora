@@ -96,6 +96,7 @@ class Session:
         self.preview_error = ''
         self._status_text = None
         self.renderer = Renderer()
+        self.surface_notice = ''
         self.surface_choices = SURFACE_LAYOUTS
         self.cylinder_source = None
         self.cylinder_frame = None
@@ -107,7 +108,7 @@ class Session:
         self.button_row(root, 'result', 'Type', RESULTS)
         self.inputs['result'].listItems.item(2).isSelected = True
         self.selection(root, 'source', 'Profiles', ['Faces', 'Profiles', 'ConstructionPlanes'], 1, 32,
-                       'Select a planar, cylindrical, conical, or smooth freeform face, a closed sketch profile, or a construction plane.')
+                       'Select up to 32 regions of one surface type in one component: planar, cylindrical, conical, or freeform. A construction plane is a single region.')
 
         radial = self.group(root, 'cylinder_group', 'Boundary')
         self.inputs['cylinder_info'] = radial.addTextBoxCommandInput('cylinder_info', '',
@@ -120,9 +121,8 @@ class Session:
         self.number(radial, 'axial_length', 'Axial Length', '0 mm')
         self.inputs['axial_length'].tooltip = '0 uses the remaining face height. Edge Offset applies at both ends of the zone.'
         self.inputs['source_info'] = root.addTextBoxCommandInput('source_info', '',
-            'Multiple Profiles: the pattern starts at the projected component origin. X follows projected component X '
-            '(component Y near an X-normal plane). Coplanar regions share one phase. Start Point overrides the origin. '
-            'Extrude direction follows each source sketch normal.', 4, True)
+            'Select regions of one surface type. Planar regions share component axes and phase; '
+            'curved regions follow their local surface normals.', 2, True)
         self.inputs['source_info'].isFullWidth = True
         self.inputs['source_info'].isVisible = False
 
@@ -254,6 +254,7 @@ class Session:
         self.inputs['status'] = root.addTextBoxCommandInput('status', '', '', 2, True)
         self.inputs['status'].isFullWidth = True
         self.inputs['status'].isVisible = False
+        self.connect(command.preSelect, PreSelect(self))
         self.connect(command.inputChanged, Changed(self))
         self.connect(command.validateInputs, Validate(self))
         self.connect(command.executePreview, Execute(self, True))
@@ -481,7 +482,9 @@ class Session:
             key = self.chosen('surface_layout', previous)
             items = self.inputs['surface_layout'].listItems
             items.clear()
-            if key not in dict(choices): key = 'staggered'
+            if key not in dict(choices):
+                key = 'staggered'
+                self.surface_notice = 'Distribution changed to Staggered for this surface. Select Distribution to adjust the pattern.'
             for value, label in choices:
                 items.add(label, value == key, '')
             self.surface_choices = choices
@@ -523,7 +526,10 @@ class Session:
                 'Use Perforated Panel with New Body for a separate grille.')
             d['result'].tooltip = ('Sketch creates fixed 3D surface contours. Feature regenerates the pattern.' if is_curved else
                 'Sketch creates profiles. Extrude creates a fixed pattern. Feature regenerates the pattern.')
-            visible('source_info', multiple)
+            notice = getattr(self, 'surface_notice', '')
+            d['source_info'].formattedText = notice or ('Planar regions share component axes and phase.' if not is_curved else
+                'Each region follows its local surface normals. Maximum Holes applies to the complete selection.')
+            visible('source_info', multiple or bool(notice))
             boundary = self.chosen('boundary', [('rectangle', ''), ('circle', '')])
             for identifier, (_, shapes) in AREA_FIELDS.items():
                 visible(identifier, boundary in shapes)
@@ -611,7 +617,7 @@ class Session:
             visible('bodies', uses_bodies)
             visible('preview_mode', d['preview'].value)
             visible('preview_color', d['preview'].value and self.chosen('preview_mode', PREVIEW_MODES) == 'fast')
-            if uses_bodies and source is not None and (multiple or len(self._auto_bodies) > 1 or not d['bodies'].selectionCount):
+            if uses_bodies and source is not None and (multiple or self._auto_bodies or not d['bodies'].selectionCount):
                 # Profiles on a solid face use that face's body too. Preserve
                 # the visible assembly proxy expected by the selection API.
                 supports = []
@@ -839,6 +845,25 @@ class Session:
         return selected if len(selected) > 1 else source, settings, config
 
 
+class PreSelect(adsk.core.SelectionEventHandler):
+    def __init__(self, session):
+        super().__init__()
+        self.session = session
+
+    def notify(self, args):
+        try:
+            active = args.firingEvent.activeInput
+            if active.id != 'source': return
+            selected = self.session.inputs['source']
+            candidate = args.selection.entity
+            if selected.selectionCount:
+                multi_region.sources([selected.selection(i).entity for i in range(selected.selectionCount)] + [candidate])
+            else:
+                multi_region.sources([candidate])
+        except Exception:
+            args.isSelectable = False
+
+
 class Changed(adsk.core.InputChangedEventHandler):
     def __init__(self, session):
         super().__init__()
@@ -864,6 +889,8 @@ class Changed(adsk.core.InputChangedEventHandler):
                     d['new_pattern'].value = False
                 finally:
                     self.session.updating = False
+            if args.input.id in ('layout', 'surface_layout'):
+                self.session.surface_notice = ''
             self.session.sync_dimensions(args.input.id)
             if args.input.id in ('source', 'boundary', 'width', 'area_diameter', 'height'):
                 self.session.renderer.reset()

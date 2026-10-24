@@ -42,6 +42,13 @@ def save(stage):
 
 def case(name, action):
     save(name)
+    global doc, design
+    # Keep native computeAll bounded: prior cases must not regenerate every
+    # previous Feature in an ever-growing acceptance design.
+    if doc:
+        doc.close(False)
+    doc=app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
+    design=adsk.fusion.Design.cast(app.activeProduct)
     started=perf_counter()
     try:
         results.append(dict(name=name,passed=True,seconds=perf_counter()-started,detail=action()))
@@ -69,7 +76,7 @@ def healthy(custom):
 doc=app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
 try:
     design=adsk.fusion.Design.cast(app.activeProduct)
-    for layout in geo.VARIANT_LAYOUTS:
+    for layout in globals().get('layouts', geo.VARIANT_LAYOUTS):
         for shape in globals().get('shapes',tuple(s for s in geo.SHAPE_IDS if s!='voronoi')):
             for trim in (False,True):
                 def check(layout=layout,shape=shape,trim=trim):
@@ -168,7 +175,8 @@ try:
             return dict(before_volume_cm3=before_volume,after_volume_cm3=after_volume,
                         guide_dependency=custom.dependencies.itemById('guide1').entity.isValid)
         finally: renderer.reset()
-    case('live_guide_preview_dependency',live_guides)
+    if 'between_curves' in globals().get('layouts', geo.VARIANT_LAYOUTS):
+        case('live_guide_preview_dependency',live_guides)
 finally:
     doc.close(False)
     if original: original.activate()

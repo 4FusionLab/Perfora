@@ -261,7 +261,7 @@ def separating_constraints(placements, gap):
     return result
 
 
-def spaced_indices(placements,gap):
+def spaced_indices(placements,gap,groups=None):
     """Keep full repeating tools in stable order, including periodic seam contacts.
 
     A rotated chart or circular rings can put distant chart sites together in
@@ -280,6 +280,7 @@ def spaced_indices(placements,gap):
             for b in (-1,0,1):
                 for c in (-1,0,1):
                     for j in buckets.get((key[0]+a,key[1]+b,key[2]+c),()):
+                        if groups is not None and groups[i] == groups[j]: continue
                         q,_,_,qn,qlo,qhi,qr=placements[j]
                         ca,cb=closest_segments(add(o,mul(n,lo)),add(o,mul(n,hi)),
                                                add(q,mul(qn,qlo)),add(q,mul(qn,qhi)))

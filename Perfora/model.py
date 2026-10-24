@@ -135,8 +135,18 @@ def path_reference(entity, component):
 
 
 def path_revision(entity):
-    return (entity.body.revisionId if isinstance(entity, adsk.fusion.BRepEdge)
-            else entity.parentSketch.revisionId)
+    revision = (entity.body.revisionId if isinstance(entity, adsk.fusion.BRepEdge)
+                else entity.parentSketch.revisionId)
+    # Fusion can defer revisionId changes until the command/event finishes.
+    # Read exact curve data as well so live edits cannot reuse stale samples.
+    geometry = entity.geometry
+    nurbs = geometry if isinstance(geometry, adsk.core.NurbsCurve3D) else getattr(geometry, 'asNurbsCurve', None)
+    if nurbs is None: return revision  # Offline evaluator contract.
+    def frozen(value):
+        if hasattr(value, 'asArray'): return tuple(value.asArray())
+        if not isinstance(value, (str, bytes)) and hasattr(value, '__iter__'): return tuple(frozen(v) for v in value)
+        return value
+    return revision, frozen(nurbs.getData())
 
 
 def path_samples(entity, settings, frame, component):

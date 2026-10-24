@@ -132,7 +132,7 @@ def adapter_modules():
     package = ModuleType('_perfora_offline_multi')
     package.__path__ = [str(Path(__file__).resolve().parents[1] / 'Perfora')]
     core, fusion, adsk = ModuleType('adsk.core'), ModuleType('adsk.fusion'), ModuleType('adsk')
-    for name in ('Plane',):
+    for name in ('Plane','Cylinder','Cone','Sphere','Torus'):
         setattr(core,name,type(name,(),{}))
     for name in ('BRepFace','Profile','ConstructionPlane','Sketch','BaseFeature','CustomFeatureEventHandler'):
         setattr(fusion,name,type(name,(),{}))
@@ -198,6 +198,17 @@ class AdapterTests(unittest.TestCase):
             self.multi.sources([self.a,foreign])
         self.a.geometry = object()
         with self.assertRaisesRegex(ValueError,'planar'):
+            self.multi.sources([self.a,self.b])
+
+    def test_surface_selection_is_homogeneous_and_deduplicated(self):
+        self.a.geometry = self.core.Cylinder()
+        self.b.geometry = self.core.Cylinder()
+        self.assertEqual(self.multi.sources([self.a,self.a,self.b]),[self.a,self.b])
+        self.b.geometry = self.core.Cone()
+        with self.assertRaisesRegex(ValueError,'one surface type'):
+            self.multi.sources([self.a,self.b])
+        self.b.geometry = self.core.Plane()
+        with self.assertRaisesRegex(ValueError,'one surface type'):
             self.multi.sources([self.a,self.b])
 
     def test_multiple_construction_planes_and_unsupported_component_output(self):

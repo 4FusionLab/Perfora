@@ -272,7 +272,8 @@ class Renderer:
         center = config.get('center_point')
         center_key = tuple(model.point_position(center, component).asArray()) if center is not None else None
         key = (tuple(selected), tuple(model.source_revision(s) for s in selected), settings, center_key,
-               config['result'], config['operation'], tuple(model.native(b) for b in config['bodies']))
+               config['result'], config['operation'], tuple(model.native(b) for b in config['bodies']),
+               tuple((k, config.get(k)) for k in ('surface','direction','reverse','start','distance1','distance2','cylinder_start','cylinder_sweep','axial_start','axial_length')) if config.get('surface') else ())
         if self.source is not None:
             self.reset()
         if key != self.multi_key or (self.multi_plans and any(not p.original.isValid for p in self.multi_plans)):
@@ -287,6 +288,9 @@ class Renderer:
         if self.coordinate_key != draw_key:
             coordinates = []
             for plan in self.multi_plans:
+                if plan.prepared is not None:
+                    coordinates.extend(plan.prepared.coordinates)
+                    continue
                 local = (plan.clipped.outlines(plan.region, config['material'] == 'panel') if plan.clipped else
                          outline_coordinates(plan.cells, plan.region, config['material'] == 'panel'))
                 for i in range(0, len(local), 3):
