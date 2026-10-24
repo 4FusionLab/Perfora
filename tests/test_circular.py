@@ -124,6 +124,21 @@ class CircularTests(unittest.TestCase):
         s = Settings(start_radius=float('nan'))
         self.assertEqual(generate(rectangle_region(4, 3), s), generate(rectangle_region(4, 3), Settings()))
 
+    def test_fifty_mm_square_crops_circular_rings_symmetrically(self):
+        settings=Settings(layout='circular',shape='circle',size=.5,gap=.15,margin=.3)
+        for angle in (0.,.31):
+            for trim in (False,True):
+                with self.subTest(angle=angle,trim=trim):
+                    square=rectangle_region(5.,5.)
+                    points=[rotate(p,angle) for p in square.loops[0].points]
+                    region=Region((Loop(tuple((x+9,y+2.5) for x,y in points)),))
+                    cells=generate(region,replace(settings,grid_angle=.17,clip_boundary=trim))
+                    sites={(round(c.center[0]-9,7),round(c.center[1]-2.5,7)) for c in cells}
+                    self.assertIn((0.,0.),sites)
+                    self.assertEqual(sites,{(-x,-y) for x,y in sites})
+                    inner=[p for p in sites if abs(math.hypot(*p)-.65)<1e-6]
+                    self.assertEqual(len(inner),6,'The first circular ring must retain its six-hole layout')
+
 
 if __name__ == '__main__':
     unittest.main()

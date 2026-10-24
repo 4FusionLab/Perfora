@@ -108,7 +108,7 @@ class BoundaryIndex:
 @dataclass(frozen=True)
 class Region:
     loops: tuple
-    tolerance: float = 0.0001  # 0.001 mm; applied as an extra boundary clearance.
+    tolerance: float = 0.0001  # 0.001 mm boundary approximation/search tolerance.
     scope_center: tuple = None
     scope_radius: float = 0.0
 
@@ -492,7 +492,10 @@ def round_contour(contour, requested_radius):
 
 
 def fits(cell, region, segments, margin):
-    clearance = margin + region.tolerance + EPS
+    # Edge Offset is an inclusive minimum, matching the exact inset used by
+    # Trim to Boundary. A hidden stroking allowance used to remove whole holes
+    # even when the exact Boolean intersection left their contours unchanged.
+    clearance = margin
     if not region.contains(cell.center):
         return False
     rounded = cell.shape in ('circle', 'slot')
@@ -500,17 +503,19 @@ def fits(cell, region, segments, margin):
               cell.ellipse_points(enclosing=True) if cell.shape == 'ellipse' else cell.vertices)
     if region.scope_center is not None:
         reach = max(dist(p, region.scope_center) for p in points) + (cell.size/2 if rounded else 0)
-        if reach + clearance > region.scope_radius:
+        if reach + clearance > region.scope_radius + EPS:
             return False
     if isinstance(segments, BoundaryIndex):
         padding = margin + region.tolerance + 2*EPS + (cell.size/2 if rounded else 0)
         segments = segments.nearby(points, padding)
     if rounded:
         a, b = points
-        return all(segment_distance(a, b, c, d) >= cell.size / 2 + clearance for c, d in segments)
+        return all(segment_distance(a, b, c, d) + EPS >= cell.size / 2 + clearance for c, d in segments)
     if not all(region.contains(p) for p in points):
         return False
-    if any(segment_distance(a, b, c, d) < clearance for a, b in edges(points) for c, d in segments):
+    if any(segment_distance(a, b, c, d) + EPS < clearance
+           or (cross(a,b,c)*cross(a,b,d)<0 and cross(c,d,a)*cross(c,d,b)<0)
+           for a, b in edges(points) for c, d in segments):
         return False
     # A cell may entirely enclose a small pre-existing void without crossing it.
     return not any(point_in_polygon(loop.points[0], points) for loop in region.loops if not loop.outer)
@@ -697,6 +702,11 @@ def generate_circular(region, settings):
         r = s.start_radius + ring * step
         count = (1 if r < step / 2 else
                  max(2, math.floor(math.pi / math.asin(min(1.0, step / (2 * r))) + 1e-12)))
+        if count > 1:
+            # Retain the original chord-packed rings (6, 12, 18, ...), adding
+            # opposite partners only when the capacity is odd. Forcing square
+            # symmetry reduces the first ring to four sites and creates a cross.
+            count -= count % 2
         for index in range(count):
             angle = s.grid_angle + index * math.tau / count
             center = (ox + r * math.cos(angle), oy + r * math.sin(angle))

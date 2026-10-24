@@ -22,6 +22,8 @@ To perforate part of an existing face, draw a closed sketch on that face, finish
 
 **Perfora 1.0.1 fixes Feature Cut recompute after upstream resizing.** Parametric patterns, circular placement, bounded spread, and faster previews. [Release notes →](docs/releases/v1.0.1.md)
 
+**Development branch:** cylindrical, conical and smooth freeform solid faces use the common Sketch/Extrude/Feature workflow, including Voronoi and boundary trimming. This is not in the published 1.0.1 release; see the curved-face behavior and limitations below.
+
 ## Made with Perfora
 
 <table>
@@ -121,13 +123,11 @@ Since **1.0.1**, Feature Cut preserves its target when an upstream face shrinks 
 
 **Start Point** is available for Staggered, Rectangular, Circular, and Voronoi. Use the native Select control to pick a sketch point, model vertex, or construction point; points on other planes are projected onto Profiles. Clear the selection for automatic placement. X/Y Offset add displacement from this point (in pattern axes for grids/Voronoi, sketch axes for Circular).
 
-**Spread Radius** limits perforation to a circular zone around that origin, including the offsets. **0 mm** fills the selected boundary. Positive values need no additional sketch profile: select a face or construction plane, pick a point, and enter a radius. The source boundary and existing openings still constrain the result. Edge Offset also applies to the spread boundary. With Trim to Boundary off, only whole holes fit; with it on, partial holes are trimmed exactly to the zone. Perforated Panel retains the source panel outside the perforation zone.
-
-New Feature nodes expose Spread Radius as a Fusion model parameter, including expressions. Point dependencies and the radius drive recompute. Older nodes remain editable but cannot gain additional native model parameters through the current API; recreate a node if it needs the new parameter in Fusion's Parameters dialog.
+Spread Radius has been removed from the command. New patterns fill the selected boundary; choose a boundary profile to limit the area. Existing Feature model parameters and their saved spread limits remain supported for compatibility.
 
 ## Circular distribution
 
-**Distribution → Circular** places holes on concentric rings. It supports all 12 repeating shapes; Voronoi keeps its own distribution. Available in the stable 1.0 release.
+**Distribution → Circular** places holes on concentric rings. It supports all 12 repeating shapes; Voronoi keeps its own distribution. Available in the stable 1.0 release. In this development branch, rings retain their chord-packed layout (six holes on the first regular ring), with even counts preserving opposite site pairs and central symmetry for centered circular holes. Offsets, asymmetric hole contours and existing openings can change the final symmetry.
 
 - **Start Radius** measures the first ring to hole centers. At 0, the pattern starts with one center hole; a positive value omits that hole. This does not specify a solid central zone: holes may extend inside the first ring.
 - Holes per ring and radial spacing are automatic, based on the shape size and **Web Thickness**. Chord spacing preserves the web across each ring's closing seam. Noncircular shapes use conservative enclosing bounds, so actual webs can be wider than requested.
@@ -185,14 +185,28 @@ To specify the Fusion API directory: `python3 install.py --api-root "/path/to/Fu
 
 **Build a separate grille:** select a closed sketch profile or construction plane → set the pattern → Extrude → Perforated Panel → New Body or New Component → set thickness → OK.
 
-On a construction plane, Boundary defines a centered rectangle or circle. **Trim to Boundary** includes partial holes along the edge; **Edge Offset** remains active.
+On a construction plane, Boundary defines a centered rectangle or circle. **Trim to Boundary** includes partial holes along the edge; **Edge Offset** remains active. On planar sources, a complete hole exactly meeting Edge Offset is retained with either setting; the whole-hole check does not add a hidden clearance.
 
 ## Know the limits
+
+### Curved faces — development branch
+
+Select one cylindrical, conical, or regular smooth freeform face of a solid body in **Profiles**. The same **Type → Sketch / Extrude / Feature**, **Pattern**, **Placement**, and **Extrude** sections are used for planar and curved sources. Spheres, tori, meshes, singular patches, and patterns spanning multiple faces are excluded. These capabilities are not part of the published 1.0.1 release.
+
+All 12 repeating shapes and **Voronoi** are available, with Seed/New Pattern, Irregularity, Round Corners, Rectangular/Staggered rows, Start Point and offsets. Circular and Pattern Angle are available only for planar sources; rotating a flat chart does not create a consistent wrapped pattern. Voronoi defines its own distribution. On cylinders and cones, **Boundary** also offers Start Angle, Sweep Angle, Axial Start and Axial Length (0 uses the remaining height). Closed cylindrical sites are periodic without a duplicated seam cell. Conical rows use physical meridian spacing and compute their own hole counts from the local circumference and tool depth. Additional holes appear toward the base instead of letting the narrow tip limit the whole pattern. Rectangular keeps the same angular start direction; Staggered offsets alternate rows by half their local angular pitch. Individual columns may branch as the row count changes. Sites too near the apex are omitted.
+
+Dimensions describe straight tool sections in the tangent plane at each site, rather than an exact wrapped shape or constant geodesic dimensions. **Distance**, Start Offset, Flip Direction, One Side, Two Sides and Symmetric control bounded local tools. Freeform row coordinates use physical iso-section lengths and an inverse arc-length map, eliminating UV stretching on extruded faces. Repeating-hole pitch also accounts for convergence through tool depth. A globally equidistant flat grid is not guaranteed on doubly curved surfaces. Conical rows and 3D clearance checks remain conservative: actual webs can be wider, and conflicting sites are omitted without changing hole dimensions. Sites whose local boundary crosses a fold are omitted while other regular parts of the face remain usable. A NURBS boundary collapsing to a pole no longer rejects the whole face: interior regularity is checked separately, and local trim envelopes containing the pole are omitted. Large faces may require a higher Maximum Holes setting. The spacing filter checks finite tools in 3D, including automatic surface leads, instead of using the worst curvature of the whole face. All and To Object extents, taper and Perforated Panel currently require planar sources.
+
+**Trim to Boundary** keeps partial holes. **Edge Offset** stays active at the source/zone boundary and around existing openings. Exact projected BRep curves define local trim masks; rectangular masks use an exact inset. Other outlines use swept boundary exclusions with an extra 0.002 mm clearance for the bounded curve-stroking error. Offset is conservative in local projection, not a geodesic surface offset.
+
+**Sketch** creates fixed 3D surface contours; they are not planar Extrude profiles. **Extrude** creates fixed straight tools in a Base Feature plus native Combine for Join/Cut/Intersect, or New Body/New Component. It is not a single native Extrude feature. **Feature** owns those tools and operations, stores expressions/dependencies, regenerates after parameter/source changes, and supports **Edit Feature**. Feature supports Join/Cut/Intersect/New Body; source, operation and targets remain fixed during edit. Solid outputs require Capture Design History. Finite face angles are passed without rounding to Fusion display precision; preselected faces initialize their own full zone. Keep cylinder/cone tool bounds below the radius; inspect Full Preview to check wall penetration.
+
+Fast Preview and final solids share the same preparation path. Cached color/section changes do not rebuild the layout. Full Preview uses the actual solid operation and Cancel rolls it back.
 
 Native CAD acceptance is recorded for Fusion 2706.1.14 on macOS 27.0.1, including local F3D reopen. Windows CI checks Python code and installation; native Windows Fusion CAD, cloud save/reopen, and complex assemblies are not claimed as tested.
 
 - Edge Offset must leave a valid inset; touching or intersecting offset loops can be rejected by Fusion.
-- Planar geometry and solid bodies only; curved faces and mesh bodies are unsupported.
+- Curved sources use the development workflow described above. Spheres, tori, singular faces and mesh bodies are unsupported.
 - Sketch and Extrude outputs keep a fixed hole layout. Use Feature to regenerate the pattern.
 - Native Extrude parameters remain editable in Fusion. Source and Cut/Intersect target bodies must belong to the same component. Editing a component affects all its occurrences.
 - The default limit is 1,500 holes, configurable up to 5,000. Dense patterns and full previews take longer. Some rotated shapes use conservative spacing, so the actual web can be wider than requested.

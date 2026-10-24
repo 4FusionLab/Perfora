@@ -44,6 +44,7 @@ class Renderer:
         self.inset_body = None
         self.trim_key = None
         self.clipped_layout = None
+        self.surface_prepared = None
 
     def clear(self):
         if self.graphics and self.graphics.isValid:
@@ -71,9 +72,15 @@ class Renderer:
         self.trim_margin = None
         self.trim_key = None
         self.clipped_layout = None
+        self.surface_prepared = None
         self.geometry_cache.clear()
 
     def show(self, source, settings, config, color='gold'):
+        from . import cylindrical
+        if config.get('surface'):
+            return self.show_surface(model.native(source), settings, config, color)
+        if cylindrical.is_cylinder(model.native(source)):
+            return self.show_cylinder(model.native(source), settings, config, color)
         started = perf_counter()
         rgb = COLOR_RGB[color]
         source = model.native(source)
@@ -170,4 +177,75 @@ class Renderer:
                 self.clear()
                 raise
         self.last_seconds = perf_counter() - started
+        return len(self.cells)
+
+    def show_cylinder(self, source, settings, config, color):
+        from . import cylindrical
+        started = perf_counter()
+        key = ('cylinder', source.entityToken, model.source_revision(source), settings,
+               tuple(config[k] for k in ('cut_depth', 'cylinder_start', 'cylinder_sweep', 'axial_start', 'axial_length')))
+        if key != self.coordinate_key:
+            self.reset()
+            self.frame, self.cells = cylindrical.prepare(source, settings, config)
+            self.coordinates = cylindrical.coordinates(self.frame, settings, self.cells)
+            self.component = model.source_component(source)
+            self.source = source
+            self.source_revision = model.source_revision(source)
+            self.coordinate_key = key
+            self.layout_builds += 1
+        if not (self.graphics and self.graphics.isValid):
+            self.graphics = self.component.customGraphicsGroups.add()
+            try:
+                self.graphics.isSelectable = False
+                self.lines = self.graphics.addLines(adsk.fusion.CustomGraphicsCoordinates.create(self.coordinates), [], False)
+                self.lines.isSelectable = False
+                self.lines.depthPriority = 1
+                self.lines.weight = 3.
+                self.draws += 1
+            except Exception:
+                self.clear()
+                raise
+        rgb = COLOR_RGB[color]
+        if self.color_key != rgb:
+            self.lines.color = adsk.fusion.CustomGraphicsSolidColorEffect.create(adsk.core.Color.create(*rgb, 255))
+            self.color_key = rgb
+        self.last_seconds = perf_counter() - started
+        return len(self.cells)
+
+    def show_surface(self, source, settings, config, color):
+        from . import surface
+        started = perf_counter()
+        normalized = surface.normalized(config, model.source_component(source))
+        keys = ('_start','_distance1','_distance2','direction','reverse',*surface.ZONE_PARAMETERS)
+        anchor = config.get('center_point')
+        anchor = tuple(model.point_position(anchor, model.source_component(source)).asArray()) if anchor is not None else None
+        key = ('surface',source.entityToken,model.source_revision(source),settings,
+               tuple(normalized[k] for k in keys),anchor)
+        if key != self.coordinate_key:
+            self.reset()
+            self.surface_prepared = surface.prepare(source,settings,config)
+            self.cells = self.surface_prepared.sections
+            self.coordinates = self.surface_prepared.coordinates
+            self.component = model.source_component(source)
+            self.source = source
+            self.source_revision = model.source_revision(source)
+            self.coordinate_key = key
+            self.layout_builds += 1
+        if not (self.graphics and self.graphics.isValid):
+            self.graphics = self.component.customGraphicsGroups.add()
+            try:
+                self.graphics.isSelectable = False
+                self.lines = self.graphics.addLines(adsk.fusion.CustomGraphicsCoordinates.create(self.coordinates), [], False)
+                self.lines.isSelectable = False
+                self.lines.depthPriority = 1
+                self.lines.weight = 3.
+                self.draws += 1
+            except Exception:
+                self.clear()
+                raise
+        rgb = COLOR_RGB[color]
+        if self.color_key != rgb:
+            self.lines.color = adsk.fusion.CustomGraphicsSolidColorEffect.create(adsk.core.Color.create(*rgb,255))
+            self.color_key = rgb
+        self.last_seconds = perf_counter()-started
         return len(self.cells)

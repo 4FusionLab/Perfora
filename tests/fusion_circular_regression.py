@@ -48,6 +48,39 @@ def case(name, action):
 try:
     doc = app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
     design = adsk.fusion.Design.cast(app.activeProduct)
+
+    def exact_edge_offset():
+        comp=fixture.component(design,'Exact Edge Offset')
+        settings=geo.Settings(layout='circular',size=.5,gap=.15,margin=.3)
+        config=fixture.config(result='profiles',width=5.,height=5.)
+        renderer=preview.Renderer()
+        key=lambda c:(round(c.center[0],7),round(c.center[1],7))
+        poles={(-1.95,0.),(1.95,0.)}
+        try:
+            count=renderer.show(comp.xYConstructionPlane,settings,config)
+            whole={key(c) for c in renderer.cells}
+            assert poles<=whole,'Complete tangent holes were rejected without Trim to Boundary'
+            renderer.reset()
+            renderer.show(comp.xYConstructionPlane,replace(settings,clip_boundary=True),config)
+            assert poles<={key(c) for c in renderer.clipped_layout.whole},'Exact clipping changed a whole tangent hole'
+        finally:renderer.reset()
+        for trim in (False,True):
+            sketch,_,built=model.build(comp.xYConstructionPlane,replace(settings,clip_boundary=trim),config)
+            circles={(round(c.centerSketchPoint.geometry.x,7),round(c.centerSketchPoint.geometry.y,7)):
+                c.radius for c in sketch.sketchCurves.sketchCircles}
+            assert poles<=circles.keys()
+            assert all(abs(circles[p]-.25)<1e-9 for p in poles)
+            if not trim:assert built==count==sketch.profiles.count
+        # A real intrusion into the inset must still become a partial contour.
+        shifted=replace(settings,offset_x=-1e-4,clip_boundary=True)
+        try:
+            renderer.show(comp.xYConstructionPlane,shifted,config)
+            assert (-1.9501,0.) not in {key(c) for c in renderer.clipped_layout.whole}
+            assert renderer.clipped_layout.partial_loops
+        finally:renderer.reset()
+        return dict(whole_holes=count,edge_offset_mm=3.,tangent_holes_preserved=True,real_crossing_still_trimmed=True)
+    case('exact_edge_offset_retains_whole_cells',exact_edge_offset)
+
     for shape in geo.SHAPE_IDS:
         if shape == 'voronoi':
             continue

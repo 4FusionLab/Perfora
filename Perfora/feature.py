@@ -9,7 +9,7 @@ import traceback
 import adsk.core
 import adsk.fusion
 
-from . import clipping, model, solid
+from . import clipping, model, solid, surface
 from .geometry import Settings, generate
 
 DEFINITION_ID = '4FusionLab.Perfora.Parametric'
@@ -57,6 +57,8 @@ def unregister():
 
 
 def validate(config, design=None):
+    if config.get('cylindrical') and not config.get('surface'):
+        raise ValueError('Cylindrical Radial Cut uses a fixed pattern. Feature recompute and Edit Feature are not supported yet.')
     design = design or adsk.fusion.Design.cast(adsk.core.Application.get().activeProduct)
     if not design or design.designType != adsk.fusion.DesignTypes.ParametricDesignType:
         raise ValueError('Feature requires Capture Design History.')
@@ -68,6 +70,10 @@ def validate(config, design=None):
         raise ValueError('Feature requires a zero Taper Angle. Use Extrude for tapered holes.')
     if config['operation'] == 'component':
         raise ValueError('Feature supports New Body in the source component. Use Extrude for New Component.')
+
+
+def parameters(config):
+    return dict(PARAMETERS, **surface.ZONE_PARAMETERS) if config.get('surface') else PARAMETERS
 
 
 def metadata(settings, config):
@@ -120,7 +126,7 @@ def read(custom):
     config = dict(data['config'])
     config['center_point'] = center_entity(custom)
     values = {}
-    for key in PARAMETERS:
+    for key in parameters(config):
         p = custom.parameters.itemById(key)
         if not p:
             if key in ('start_radius', 'spread_radius'):
@@ -134,8 +140,9 @@ def read(custom):
         values[key] = int(values[key])
     settings = replace(settings, **{k: v for k, v in values.items() if k in settings.__dict__})
     settings.validate()
-    for key in ('width', 'height'):
-        config[key] = values[key]
+    for key in ('width', 'height', *surface.ZONE_PARAMETERS):
+        if key in values:
+            config[key] = values[key]
     for key in ('start', 'distance1', 'distance2'):
         config[key] = custom.parameters.itemById(key).expression
     source = source_entity(custom)
@@ -158,7 +165,10 @@ def clear_sketch(sketch):
             p.deleteMe()
 
 
-def make_body(source, settings, config, frame, scratch, cache=None):
+def make_body(source, settings, config, frame=None, scratch=None, cache=None):
+    if config.get('surface'):
+        validate(config, model.source_component(source).parentDesign)
+        return surface.make_body(source, settings, config)
     validate(config, frame.parentComponent.parentDesign)
     if isinstance(source, adsk.fusion.ConstructionPlane):
         keys = ('width', 'height') if config['boundary'] == 'rectangle' else ('width',)
@@ -211,9 +221,14 @@ def make_body(source, settings, config, frame, scratch, cache=None):
 
 def build(source, settings, config, cache=None):
     global _busy
+    from . import cylindrical
+    if cylindrical.is_cylinder(model.native(source)) and not config.get('surface'):
+        raise ValueError('Cylindrical faces support fixed Radial Cut only. Feature recompute and Edit Feature are not supported yet.')
     component = model.source_component(source)
+    config = surface.normalized(config, component) if config.get('surface') else dict(config)
     validate(config, component.parentDesign)
-    config = dict(config)
+    if config.get('surface') and config['operation'] in ('cut','join','intersect') and not config['bodies']:
+        config['bodies'] = [model.native(source).body]
     data = component.features.customFeatures.createInput(register())
     origin = next((axis for axis in ('xY', 'xZ', 'yZ')
                    if source == getattr(component, axis + 'ConstructionPlane')), None)
@@ -226,7 +241,7 @@ def build(source, settings, config, cache=None):
     for i, target in enumerate(config['bodies']):
         data.addDependency('body' + str(i), dependency_entity(target, component))
     expressions = config.get('_expressions', {})
-    for key, (label, unit) in PARAMETERS.items():
+    for key, (label, unit) in parameters(config).items():
         val = expressions.get(key)
         if val is None:
             val = getattr(settings, key) if key in settings.__dict__ else config[key]
@@ -243,10 +258,11 @@ def build(source, settings, config, cache=None):
         # and leaves it rolled back, producing a dependency cycle.
         custom = component.features.customFeatures.add(data)
         custom.customNamedValues.addOrSetValue('perfora', json.dumps(metadata(settings, config)))
-        frame = model.new_source_sketch(source)
-        frame.name = 'Perfora Reference'
-        scratch = model.new_source_sketch(source)
-        scratch.name = 'Perfora Edge Offset'
+        if not config.get('surface'):
+            frame = model.new_source_sketch(source)
+            frame.name = 'Perfora Reference'
+            scratch = model.new_source_sketch(source)
+            scratch.name = 'Perfora Edge Offset'
         body, count = make_body(source, settings, config, frame, scratch, cache)
         base = component.features.baseFeatures.add()
         base.name = 'Perfora Geometry'
@@ -275,10 +291,11 @@ def build(source, settings, config, cache=None):
                     raise ValueError(combine.errorOrWarningMessage)
             tool.isVisible = False
         custom.timelineObject.rollTo(True)
-        if not custom.setStartAndEndFeatures(frame, combines[-1] if combines else base):
+        if not custom.setStartAndEndFeatures(base if config.get('surface') else frame, combines[-1] if combines else base):
             raise ValueError('Unable to group the Perfora Feature.')
         custom.timelineObject.rollTo(False)
-        frame.isVisible = scratch.isVisible = False
+        if frame:
+            frame.isVisible = scratch.isVisible = False
         return frame, custom, count
     except Exception:
         for item in reversed([custom, frame, scratch, base] + combines):
@@ -294,7 +311,8 @@ def rebuild(custom, cache=None):
     features = custom.features
     sketches = [f for f in features if isinstance(f, adsk.fusion.Sketch)]
     base = next(f for f in features if isinstance(f, adsk.fusion.BaseFeature))
-    body, count = make_body(source, settings, config, sketches[0], sketches[1], cache)
+    body, count = (make_body(source, settings, config) if config.get('surface') else
+                   make_body(source, settings, config, sketches[0], sketches[1], cache))
     if not base.startEdit():
         raise ValueError('Unable to update the Perfora Feature.')
     try:
@@ -327,7 +345,7 @@ def update(custom, settings, config, cache=None):
             dependency.deleteMe()
         custom.customNamedValues.addOrSetValue('perfora', json.dumps(metadata(settings, config)))
         expressions = config.get('_expressions', {})
-        for key, (_, unit) in PARAMETERS.items():
+        for key, (_, unit) in parameters(config).items():
             val = expressions.get(key)
             if val is None:
                 val = getattr(settings, key) if key in settings.__dict__ else config[key]

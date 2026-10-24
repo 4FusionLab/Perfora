@@ -8,6 +8,21 @@ from Perfora.geometry import (Cell, Loop, Region, Settings, disk_region, fits, g
 
 
 class GeometryTests(unittest.TestCase):
+    def test_exact_edge_offset_keeps_whole_cells_without_extra_clearance(self):
+        region=rectangle_region(5,5)
+        for shape in ('circle','slot','square'):
+            for x,expected in ((-1.95,True),(-1.95+1e-5,True),(-1.95-1e-5,False)):
+                with self.subTest(shape=shape,x=x):
+                    cell=Cell((x,0),shape,.5,.5,0)
+                    self.assertEqual(fits(cell,region,region.segments,.3),expected)
+
+    def test_touching_source_boundary_is_not_a_crossing(self):
+        region=rectangle_region(5,5)
+        for shape in ('circle','square'):
+            with self.subTest(shape=shape):
+                self.assertTrue(fits(Cell((-2.25,0),shape,.5,.5,0),region,region.segments,0))
+                self.assertFalse(fits(Cell((-2.25001,0),shape,.5,.5,0),region,region.segments,0))
+
     def test_clipped_candidates_include_centres_outside_boundary(self):
         region = rectangle_region(2, 2)
         cells = generate(region, Settings(shape='hexagon', size=1, gap=0.2, margin=0.2,

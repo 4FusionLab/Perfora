@@ -11,7 +11,7 @@ import adsk.core
 import adsk.fusion
 
 from .geometry import Settings, LENGTH_SHAPES
-from . import model, ui_resources, feature as parametric
+from . import model, ui_resources, cylindrical, surface, feature as parametric
 from .preview import Renderer, PREVIEW_COLORS
 from .numeric_inputs import NumericInput
 
@@ -60,6 +60,7 @@ DIRECTIONS = [('one', 'One Side'), ('two', 'Two Sides'), ('symmetric', 'Symmetri
 EXTENTS = [('distance', 'Distance'), ('object', 'To Object'), ('all', 'All')]
 STARTS = [('profile', 'Profile Plane'), ('offset', 'Offset')]
 LAYOUTS = [('staggered', 'Staggered'), ('rows', 'Rectangular'), ('circular', 'Circular')]
+SURFACE_LAYOUTS = LAYOUTS[:2]  # Local rows; planar concentric rings do not wrap.
 ORIENTATIONS = [('fixed', 'Fixed'), ('radial', 'Radial'), ('tangential', 'Tangential')]
 PREVIEW_MODES = [('fast', 'Fast'), ('exact', 'Full')]
 
@@ -75,6 +76,7 @@ class Session:
         self.edited_feature = edited_feature
         self.restore_marker = None
         self._extrude_inputs = None
+        self._planar_material = None
         self.initial_defaults_applied = False
         self.inputs = {}
         self.numeric_inputs = {}
@@ -88,14 +90,28 @@ class Session:
         self.preview_error = ''
         self._status_text = None
         self.renderer = Renderer()
+        self.cylinder_source = None
+        self.cylinder_frame = None
+        self.cylinder_layout_key = None
         command.setDialogInitialSize(320, 780)
         command.okButtonText = 'OK'
         command.isRepeatable = True
         root = command.commandInputs
         self.button_row(root, 'result', 'Type', RESULTS)
         self.inputs['result'].listItems.item(2).isSelected = True
-        self.selection(root, 'source', 'Profiles', ['PlanarFaces', 'Profiles', 'ConstructionPlanes'], 1, 1,
-                       'Select a planar face, a closed sketch profile, or a construction plane.')
+        self.selection(root, 'source', 'Profiles', ['Faces', 'Profiles', 'ConstructionPlanes'], 1, 1,
+                       'Select a planar, cylindrical, conical, or smooth freeform face, a closed sketch profile, or a construction plane.')
+
+        radial = self.group(root, 'cylinder_group', 'Boundary')
+        self.inputs['cylinder_info'] = radial.addTextBoxCommandInput('cylinder_info', '',
+            'Holes follow the local surface normal.', 1, True)
+        self.inputs['cylinder_info'].isFullWidth = True
+        self.number(radial, 'cylinder_start', 'Start Angle', '0 deg', 'deg')
+        self.number(radial, 'cylinder_sweep', 'Sweep Angle', '360 deg', 'deg')
+        self.inputs['cylinder_sweep'].tooltip = '360 deg closes the pattern without a duplicated seam. For a sector, stay within the selected face.'
+        self.number(radial, 'axial_start', 'Axial Start', '0 mm')
+        self.number(radial, 'axial_length', 'Axial Length', '0 mm')
+        self.inputs['axial_length'].tooltip = '0 uses the remaining face height. Edge Offset applies at both ends of the zone.'
 
         area = self.group(root, 'area_group', 'Boundary')
         self.dropdown(area, 'boundary', 'Shape', [('rectangle', 'Rectangle'), ('circle', 'Circle')])
@@ -134,6 +150,8 @@ class Session:
         self.inputs['clip_boundary'].tooltip = ('Trim intersecting holes to the boundary after applying Edge Offset. '
             'Clear this option to keep only complete holes.')
         self.dropdown(pattern, 'layout', 'Distribution', LAYOUTS, icons=True)
+        self.dropdown(pattern, 'surface_layout', 'Distribution', SURFACE_LAYOUTS, icons=True)
+        self.inputs['surface_layout'].tooltip = 'Rectangular aligns rows. Staggered shifts alternate rows by half a pitch.'
         self.selection(pattern, 'center_point', 'Start Point',
                        ['SketchPoints', 'Vertices', 'ConstructionPoints'], 0, 1,
                        'Select a sketch point, vertex, or construction point. Leave empty for the boundary center. '
@@ -182,8 +200,8 @@ class Session:
                        'Select the bodies to cut or intersect. The selected face body is included by default.')
         self.check(root, 'preview', 'Preview', True)
         self.dropdown(root, 'preview_mode', 'Preview Type', PREVIEW_MODES)
-        self.inputs['preview_mode'].tooltip = ('Fast displays cached contours on the profile plane. Full previews the '
-            'complete extrusion. OK always creates the exact sketch or Extrude feature.')
+        self.inputs['preview_mode'].tooltip = ('Fast displays cached contours on the selected source. Full previews the '
+            'complete solid operation. OK creates the exact result.')
         self.dropdown(root, 'preview_color', 'Preview Color', PREVIEW_COLORS)
         self.inputs['preview_color'].tooltip = ('Color of Fast Preview contours. Gold is the default. '
             'Full Preview uses the Fusion model appearance.')
@@ -222,6 +240,7 @@ class Session:
                 chosen = settings[key] if key == 'shape' else config[key]
                 d[key].listItems.item(next(i for i, (k, _) in enumerate(options) if k == chosen)).isSelected = True
             d['layout'].listItems.item(2 if settings.get('layout') == 'circular' else (0 if settings['staggered'] else 1)).isSelected = True
+            d['surface_layout'].listItems.item(0 if settings['staggered'] else 1).isSelected = True
             d['orientation'].listItems.item(2 if settings.get('tangential_orientation') else
                 (1 if settings.get('radial_orientation') else 0)).isSelected = True
             d['start_radius'].value = settings.get('start_radius', 0)
@@ -233,7 +252,7 @@ class Session:
                 d[key].value = int(custom.parameters.itemById(key).value)
             d['irregularity'].value = round(custom.parameters.itemById('irregularity').value * 100)
             d['round_corners'].value = custom.parameters.itemById('corner_radius').value > 0
-            for key in parametric.PARAMETERS:
+            for key in parametric.parameters(config):
                 if key in self.numeric_inputs and key not in ('star_points', 'seed', 'limit', 'irregularity'):
                     parameter = custom.parameters.itemById(key)
                     if parameter:
@@ -374,6 +393,21 @@ class Session:
             self.inputs['status'].formattedText = html.escape(message).replace('\n', '<br>')
             self.inputs['status'].isVisible = bool(message)
 
+    def capture_surface(self,source):
+        if self.cylinder_source!=source or self.cylinder_frame is None:
+            self.cylinder_frame=surface.Chart(source)
+            self.cylinder_source=source
+            if not self.edited_feature and self.cylinder_frame.kind!='freeform':
+                previous=self.updating;self.updating=True
+                try:
+                    # Display precision must never enlarge a trimmed sector.
+                    self.inputs['cylinder_sweep'].expression=format(math.degrees(self.cylinder_frame.sweep),'.12g')+' deg'
+                    self.inputs['cylinder_start'].expression='0 deg'
+                    self.inputs['axial_start'].expression='0 mm'
+                    self.inputs['axial_length'].expression='0 mm'
+                finally:self.updating=previous
+        return self.cylinder_frame
+
     def update_visibility(self):
         if self.updating:
             return
@@ -381,11 +415,31 @@ class Session:
         try:
             d = self.inputs
             source = self.selected_source()
+            is_curved = surface.is_curved(source)
+            if surface.supported(source):self.capture_surface(source)
             is_plane = isinstance(source, adsk.fusion.ConstructionPlane)
             def visible(identifier, enabled):
                 if d[identifier].isVisible != enabled:
                     d[identifier].isVisible = enabled
             visible('area_group', is_plane)
+            visible('cylinder_group', is_curved)
+            for identifier in surface.ZONE_PARAMETERS:
+                visible(identifier, is_curved and isinstance(source.geometry,(adsk.core.Cylinder,adsk.core.Cone)))
+            visible('result', True)
+            visible('material', True)
+            d['material'].isEnabled = not is_curved
+            if is_curved:
+                if self._planar_material is None:
+                    self._planar_material=d['material'].selectedItem.index
+                d['material'].listItems.item(0).isSelected = True
+            elif self._planar_material is not None:
+                d['material'].listItems.item(self._planar_material).isSelected = True
+                self._planar_material=None
+            d['material'].tooltip = ('Curved faces support Holes. Perforated Panel requires planar Profiles.' if is_curved else
+                'Holes creates the hole profiles. Perforated Panel creates the surrounding material. '
+                'Use Perforated Panel with New Body for a separate grille.')
+            d['result'].tooltip = ('Sketch creates fixed 3D surface contours. Feature regenerates the pattern.' if is_curved else
+                'Sketch creates profiles. Extrude creates a fixed pattern. Feature regenerates the pattern.')
             boundary = self.chosen('boundary', [('rectangle', ''), ('circle', '')])
             for identifier, (_, shapes) in AREA_FIELDS.items():
                 visible(identifier, boundary in shapes)
@@ -402,24 +456,33 @@ class Session:
             for identifier in ('irregularity', 'seed', 'new_pattern', 'round_corners'):
                 visible(identifier, shape == 'voronoi')
             visible('corner_radius', shape == 'voronoi' and d['round_corners'].value)
-            visible('layout', shape != 'voronoi')
-            circular = shape != 'voronoi' and self.chosen('layout', LAYOUTS) == 'circular'
+            visible('layout', shape != 'voronoi' and not is_curved)
+            visible('surface_layout', shape != 'voronoi' and is_curved)
+            circular = not is_curved and shape != 'voronoi' and self.chosen('layout', LAYOUTS) == 'circular'
             visible('center_point', True)
             visible('start_radius', circular)
             visible('orientation', circular and shape != 'circle')
+            for identifier in ('offset_x','offset_y','clip_boundary'):
+                visible(identifier, True)
+            visible('grid_angle',not is_curved)
+            visible('spread_radius',False)
+            d['spread_radius'].tooltip = ('Limit the surface to the 3D distance from Start Point, including X/Y Offset. '
+                '0 fills the selected boundary. Edge Offset also applies to this limit.' if is_curved else
+                'Limit perforation to a radius around Start Point, including X/Y Offset. 0 fills the selected boundary. '
+                'Edge Offset also applies to this limit; Trim to Boundary keeps partial holes.')
             for identifier, axis in (('offset_x', 'X'), ('offset_y', 'Y')):
-                d[identifier].tooltip = (axis + ' offset from Start Point, or the boundary center when no point is selected, in sketch axes.'
+                d[identifier].tooltip = (('Circumferential' if axis=='X' else 'Meridian / axial')+' pattern phase from Start Point or the automatic origin.' if is_curved else axis + ' offset from Start Point, or the boundary center when no point is selected, in sketch axes.'
                     if circular else axis + ' offset from Start Point, or the automatic center, in pattern axes. Without a spread limit, offsets are periodic.')
             visible('shape_angle', shape not in ('circle', 'voronoi'))
             is_feature = self.chosen('result', RESULTS) == 'feature'
             is_extrude = self.chosen('result', RESULTS) in ('extrude', 'feature')
-            if is_feature and self._extrude_inputs is None:
+            if (is_feature or is_curved) and self._extrude_inputs is None:
                 self._extrude_inputs = {side: (d['extent' + side].selectedItem.index,
                     d['taper' + side].expression) for side in ('1', '2')}
                 for side in ('1', '2'):
                     d['extent' + side].listItems.item(0).isSelected = True
                     d['taper' + side].expression = '0 deg'
-            elif not is_feature and self._extrude_inputs is not None:
+            elif not is_feature and not is_curved and self._extrude_inputs is not None:
                 for side, (extent, taper) in self._extrude_inputs.items():
                     d['extent' + side].listItems.item(extent).isSelected = True
                     d['taper' + side].expression = taper
@@ -429,19 +492,20 @@ class Session:
             visible('start', is_extrude and self.chosen('start_mode', STARTS) == 'offset')
             visible('side2', is_extrude and direction == 'two')
             visible('reverse', is_extrude and direction == 'one')
-            d['distance1'].tooltip = ('Full length of the symmetric extrusion.'
-                                      if direction == 'symmetric' else 'Extrusion distance for Side 1.')
+            d['distance1'].tooltip = ('Full length of the symmetric local tools.' if is_curved and direction=='symmetric' else
+                'Bounded distance along each local surface normal. Check wall penetration in Full Preview.' if is_curved else
+                'Full length of the symmetric extrusion.' if direction=='symmetric' else 'Extrusion distance for Side 1.')
             for side in ('1', '2'):
                 kind = self.chosen('extent' + side, EXTENTS)
                 symmetric = direction == 'symmetric' and side == '1'
                 side_visible = is_extrude and (side == '1' or direction == 'two')
-                visible('extent' + side, side_visible and not symmetric and not is_feature)
-                visible('taper' + side, side_visible and not is_feature)
+                visible('extent' + side, side_visible and not symmetric and not is_feature and not is_curved)
+                visible('taper' + side, side_visible and not is_feature and not is_curved)
                 visible('distance' + side, side_visible and (symmetric or kind == 'distance'))
                 visible('target' + side, side_visible and not symmetric and kind == 'object')
                 visible('object_offset' + side, side_visible and not symmetric and kind == 'object')
             uses_bodies = is_extrude and (self.chosen('operation', OPERATIONS) in ('cut', 'intersect')
-                                       or (is_feature and self.chosen('operation', OPERATIONS) == 'join'))
+                                       or ((is_feature or is_curved) and self.chosen('operation', OPERATIONS) == 'join'))
             visible('bodies', uses_bodies)
             visible('preview_mode', d['preview'].value)
             visible('preview_color', d['preview'].value and self.chosen('preview_mode', PREVIEW_MODES) == 'fast')
@@ -459,12 +523,20 @@ class Session:
         source = self.selected_source()
         if not source:
             raise ValueError('Select a profile, planar face, or construction plane.')
+        is_curved = surface.is_curved(source)
+        if is_curved and not surface.supported(source):
+            raise ValueError('Spheres and tori are not supported. Select another face.')
+        if surface.supported(source):self.capture_surface(source)
         # Hidden optional inputs must not block a different mode after an edit.
         shape = self.chosen('shape', SHAPES)
         size_id = self.dimension_id(SIZE_FIELDS, shape)
         length_id = self.dimension_id(LENGTH_FIELDS, shape)
-        required = [size_id, 'gap', 'margin', 'grid_angle', 'offset_x', 'offset_y', 'limit', 'spread_radius']
-        circular = shape != 'voronoi' and self.chosen('layout', LAYOUTS) == 'circular'
+        required = [size_id, 'gap', 'margin', 'limit']
+        required += ['offset_x','offset_y']
+        if not is_curved:required.append('grid_angle')
+        if is_curved and isinstance(source.geometry,(adsk.core.Cylinder,adsk.core.Cone)):
+            required += list(surface.ZONE_PARAMETERS)
+        circular = not is_curved and shape != 'voronoi' and self.chosen('layout', LAYOUTS) == 'circular'
         if circular:
             required.append('start_radius')
         if shape not in ('circle', 'voronoi'):
@@ -510,10 +582,11 @@ class Session:
         settings = Settings(shape=shape, size=d[size_id].value,
                             slot_length=d[length_id].value if length_id else d[size_id].value,
                             gap=d['gap'].value, margin=d['margin'].value,
-                            staggered=shape != 'voronoi' and self.chosen('layout', LAYOUTS) == 'staggered',
-                            grid_angle=d['grid_angle'].value,
+                            staggered=shape != 'voronoi' and (self.chosen('surface_layout',SURFACE_LAYOUTS) if is_curved else self.chosen('layout',LAYOUTS))=='staggered',
+                            grid_angle=0 if is_curved else d['grid_angle'].value,
                             shape_angle=d['shape_angle'].value if shape not in ('circle', 'voronoi') else 0,
-                            offset_x=d['offset_x'].value, offset_y=d['offset_y'].value, limit=d['limit'].value,
+                            offset_x=d['offset_x'].value,
+                            offset_y=d['offset_y'].value, limit=d['limit'].value,
                             clip_boundary=d['clip_boundary'].value,
                             arm_width=d['arm_width'].value if shape == 'cross' else 0.15,
                             star_ratio=d['star_ratio'].value / 100 if shape == 'star' else 0.45,
@@ -524,7 +597,7 @@ class Session:
                                 if shape == 'voronoi' and d['round_corners'].value else 0,
                             layout='circular' if circular else 'grid',
                             start_radius=d['start_radius'].value if circular else 0,
-                            spread_radius=d['spread_radius'].value,
+                            spread_radius=d['spread_radius'].value if self.edited_feature else 0,
                             radial_orientation=circular and shape != 'circle' and
                                 self.chosen('orientation', ORIENTATIONS) == 'radial',
                             tangential_orientation=circular and shape != 'circle' and
@@ -553,7 +626,7 @@ class Session:
             control = d['target' + side]
             config['target' + side] = control.selection(0).entity if control.selectionCount else None
         if result in ('extrude', 'feature') and (config['operation'] in ('cut', 'intersect')
-                or (result == 'feature' and config['operation'] == 'join')):
+                or ((result == 'feature' or is_curved) and config['operation'] == 'join')):
             if not config['bodies']:
                 raise ValueError('Select Objects for Cut or Intersect.')
             component = model.source_component(source)
@@ -562,10 +635,20 @@ class Session:
         for side in (('1', '2') if direction == 'two' else ('1',)):
             if result in ('extrude', 'feature') and abs(d['taper' + side].value) >= math.pi / 2:
                 raise ValueError('Taper Angle must be between -90 deg and 90 deg.')
+        if is_curved:
+            config['surface'] = True
+            if isinstance(source.geometry,(adsk.core.Cylinder,adsk.core.Cone)):
+                config.update({k:d[k].value for k in surface.ZONE_PARAMETERS})
+            config = surface.normalized(config, model.source_component(source))
+            if self.cylinder_source != source or self.cylinder_frame is None:
+                self.cylinder_frame = surface.Chart(source)
+                self.cylinder_source = source
+            surface.validate(source,settings,config,self.cylinder_frame)
         if result == 'feature':
             parametric.validate(config)
-            expressions = {k: d[k].model_expression for k in parametric.PARAMETERS
-                           if k in self.numeric_inputs and k not in ('star_points', 'seed', 'limit', 'irregularity')}
+            expressions = {k: d[k].model_expression for k in parametric.parameters(config)
+                           if k in self.numeric_inputs and k not in ('star_points', 'seed', 'limit', 'irregularity','spread_radius')
+                           and (k not in surface.ZONE_PARAMETERS or isinstance(source.geometry,(adsk.core.Cylinder,adsk.core.Cone)))}
             expressions.update(size=d[size_id].model_expression,
                                slot_length=d[length_id].model_expression if length_id else d[size_id].model_expression,
                                width=d[width_id].model_expression,
@@ -578,6 +661,7 @@ class Session:
                 expressions['arm_width'] = '1.5 mm'
             if shape != 'voronoi' or not d['round_corners'].value:
                 expressions['corner_radius'] = '0 mm'
+            if is_curved:expressions['grid_angle']='0 deg'
             config['_expressions'] = expressions
         return source, settings, config
 
@@ -610,6 +694,9 @@ class Changed(adsk.core.InputChangedEventHandler):
             self.session.sync_dimensions(args.input.id)
             if args.input.id in ('source', 'boundary', 'width', 'area_diameter', 'height'):
                 self.session.renderer.reset()
+            if args.input.id == 'source':
+                self.session.cylinder_source = self.session.cylinder_frame = None
+                self.session.cylinder_layout_key = None
             self.session.preview_error = ''
             self.session.update_visibility()
             self.session.read()
@@ -712,7 +799,8 @@ class Execute(adsk.core.CommandEventHandler):
                 sketch, feature, count = parametric.build(source, settings, config, cache=self.session.renderer.geometry_cache)
             else:
                 sketch, feature, count = model.build(source, settings, config, cache=self.session.renderer.geometry_cache)
-            message = '%d holes. %s' % (count, 'Sketch ready.' if feature is None else ('Feature ready.' if config['result'] == 'feature' else 'Extrude ready.'))
+            message = '%d holes. %s' % (count, 'Radial Cut ready.' if config.get('cylindrical') else
+                'Sketch ready.' if feature is None else ('Feature ready.' if config['result'] == 'feature' else 'Extrude ready.'))
             if feature and feature.healthState == adsk.fusion.FeatureHealthStates.WarningFeatureHealthState:
                 message += '\n' + feature.errorOrWarningMessage
             self.session.status(message)

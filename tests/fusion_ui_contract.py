@@ -219,7 +219,8 @@ class Activate(adsk.core.CommandEventHandler):
             s.inputs['clip_boundary'].value = True
             s.inputs['margin'].expression = '2 mm'
             s.inputs['spread_radius'].expression = '12 mm'
-            assert abs(s.read()[1].spread_radius-1.2) < 1e-9
+            assert s.read()[1].spread_radius==0
+            assert not s.inputs['spread_radius'].isVisible
             assert s.read()[1].tangential_orientation
             assert not s.read()[1].radial_orientation
             s.inputs['preview'].value = True

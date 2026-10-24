@@ -414,6 +414,11 @@ def new_source_sketch(source):
 def build(source, settings, config, cache=None):
     """Must run within a Fusion command transaction (execute/executePreview)."""
     source = native(source)
+    from . import cylindrical, surface
+    if config.get('surface'):
+        return surface.build(source, settings, config)
+    if cylindrical.is_cylinder(source):
+        return cylindrical.build(source, settings, config)
     component = source_component(source)
     sketch = new_source_sketch(source)
     feature = None
