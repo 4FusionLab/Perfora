@@ -11,7 +11,7 @@ import adsk.core
 import adsk.fusion
 
 from .geometry import Settings, LENGTH_SHAPES
-from . import model, ui_resources, cylindrical, surface, feature as parametric
+from . import model, ui_resources, cylindrical, surface, multi_region, feature as parametric
 from .preview import Renderer, PREVIEW_COLORS
 from .numeric_inputs import NumericInput
 from .distributions import VARIANT_PARAMETERS, LAYOUT_PARAMETERS
@@ -82,6 +82,7 @@ class Session:
         self.restore_marker = None
         self._extrude_inputs = None
         self._planar_material = None
+        self._auto_bodies = []
         self.initial_defaults_applied = False
         self.inputs = {}
         self.numeric_inputs = {}
@@ -105,7 +106,7 @@ class Session:
         root = command.commandInputs
         self.button_row(root, 'result', 'Type', RESULTS)
         self.inputs['result'].listItems.item(2).isSelected = True
-        self.selection(root, 'source', 'Profiles', ['Faces', 'Profiles', 'ConstructionPlanes'], 1, 1,
+        self.selection(root, 'source', 'Profiles', ['Faces', 'Profiles', 'ConstructionPlanes'], 1, 32,
                        'Select a planar, cylindrical, conical, or smooth freeform face, a closed sketch profile, or a construction plane.')
 
         radial = self.group(root, 'cylinder_group', 'Boundary')
@@ -118,6 +119,12 @@ class Session:
         self.number(radial, 'axial_start', 'Axial Start', '0 mm')
         self.number(radial, 'axial_length', 'Axial Length', '0 mm')
         self.inputs['axial_length'].tooltip = '0 uses the remaining face height. Edge Offset applies at both ends of the zone.'
+        self.inputs['source_info'] = root.addTextBoxCommandInput('source_info', '',
+            'Multiple Profiles: the pattern starts at the projected component origin. X follows projected component X '
+            '(component Y near an X-normal plane). Coplanar regions share one phase. Start Point overrides the origin. '
+            'Extrude direction follows each source sketch normal.', 4, True)
+        self.inputs['source_info'].isFullWidth = True
+        self.inputs['source_info'].isVisible = False
 
         area = self.group(root, 'area_group', 'Boundary')
         self.dropdown(area, 'boundary', 'Shape', [('rectangle', 'Rectangle'), ('circle', 'Circle')])
@@ -439,6 +446,10 @@ class Session:
         selection = self.inputs['source']
         return model.native(selection.selection(0).entity) if selection.selectionCount else None
 
+    def selected_sources(self):
+        selection = self.inputs['source']
+        return multi_region.sources([selection.selection(i).entity for i in range(selection.selectionCount)])
+
     def status(self, message):
         if message != self._status_text:
             self._status_text = message
@@ -488,6 +499,7 @@ class Session:
             if surface.supported(source):
                 self.capture_surface(source)
                 self.sync_surface_layouts(source)
+            multiple = d['source'].selectionCount > 1
             is_plane = isinstance(source, adsk.fusion.ConstructionPlane)
             def visible(identifier, enabled):
                 if d[identifier].isVisible != enabled:
@@ -511,6 +523,7 @@ class Session:
                 'Use Perforated Panel with New Body for a separate grille.')
             d['result'].tooltip = ('Sketch creates fixed 3D surface contours. Feature regenerates the pattern.' if is_curved else
                 'Sketch creates profiles. Extrude creates a fixed pattern. Feature regenerates the pattern.')
+            visible('source_info', multiple)
             boundary = self.chosen('boundary', [('rectangle', ''), ('circle', '')])
             for identifier, (_, shapes) in AREA_FIELDS.items():
                 visible(identifier, boundary in shapes)
@@ -598,12 +611,23 @@ class Session:
             visible('bodies', uses_bodies)
             visible('preview_mode', d['preview'].value)
             visible('preview_color', d['preview'].value and self.chosen('preview_mode', PREVIEW_MODES) == 'fast')
-            if uses_bodies and source is not None and not d['bodies'].selectionCount:
+            if uses_bodies and source is not None and (multiple or len(self._auto_bodies) > 1 or not d['bodies'].selectionCount):
                 # Profiles on a solid face use that face's body too. Preserve
                 # the visible assembly proxy expected by the selection API.
-                body = model.source_support_body(d['source'].selection(0).entity)
-                if body is not None:
-                    d['bodies'].addSelection(body)
+                supports = []
+                for i in range(d['source'].selectionCount):
+                    body = model.source_support_body(d['source'].selection(i).entity)
+                    if body is not None and not any(model.native(body) == model.native(b) for b in supports):
+                        supports.append(body)
+                current = [d['bodies'].selection(i).entity for i in range(d['bodies'].selectionCount)]
+                retained = [b for b in current if not any(model.native(b) == model.native(a) for a in self._auto_bodies)
+                            or any(model.native(b) == model.native(s) for s in supports)]
+                wanted = retained + [s for s in supports if not any(model.native(s) == model.native(b) for b in retained)]
+                if wanted != current and not self.edited_feature:
+                    d['bodies'].clearSelection()
+                    for body in wanted:
+                        d['bodies'].addSelection(body)
+                self._auto_bodies = supports
         finally:
             self.updating = False
 
@@ -616,6 +640,7 @@ class Session:
         if is_curved and not surface.supported(source):
             raise ValueError('Spheres and tori are not supported. Select another face.')
         if surface.supported(source):self.capture_surface(source)
+        selected = self.selected_sources()
         # Hidden optional inputs must not block a different mode after an edit.
         shape = self.chosen('shape', SHAPES)
         size_id = self.dimension_id(SIZE_FIELDS, shape)
@@ -802,7 +827,16 @@ class Session:
                     expressions[key] = str(getattr(settings, key)) + (' rad' if key == 'grid_angle' else ' cm')
             if is_curved:expressions['grid_angle']='0 deg'
             config['_expressions'] = expressions
-        return source, settings, config
+        if len(selected) > 1:
+            raw = [d['source'].selection(i).entity for i in range(d['source'].selectionCount)]
+            # Edit preserves the original mapping even if a support changes topology.
+            if self.edited_feature:
+                original = parametric.stored(self.edited_feature)['config']
+                for key in ('_source_count', '_body_map'):
+                    if key in original:
+                        config[key] = original[key]
+            multi_region.validate(raw, config)
+        return selected if len(selected) > 1 else source, settings, config
 
 
 class Changed(adsk.core.InputChangedEventHandler):
@@ -990,7 +1024,8 @@ class EditActivate(adsk.core.CommandEventHandler):
             args.command.beginStep()
             s.updating = True
             try:
-                s.inputs['source'].addSelection(parametric.source_entity(custom))
+                for source in parametric.source_entities(custom):
+                    s.inputs['source'].addSelection(source)
                 center = parametric.center_entity(custom)
                 if center is not None:
                     s.inputs['center_point'].addSelection(center)

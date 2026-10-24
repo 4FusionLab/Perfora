@@ -505,12 +505,17 @@ def extrude(component, profiles, config):
     feature = extrudes.add(data)
     if not feature:
         raise ValueError('Fusion could not create the Extrude feature.')
-    if feature.healthState == adsk.fusion.FeatureHealthStates.ErrorFeatureHealthState:
-        raise ValueError(feature.errorOrWarningMessage or 'Extrude failed.')
-    operation_name = {'join': 'Join', 'cut': 'Cut', 'intersect': 'Intersect',
-                      'body': 'New Body', 'component': 'New Component'}[config['operation']]
-    feature.name = 'Perforation (' + operation_name + ')'
-    return feature
+    try:
+        if feature.healthState == adsk.fusion.FeatureHealthStates.ErrorFeatureHealthState:
+            raise ValueError(feature.errorOrWarningMessage or 'Extrude failed.')
+        operation_name = {'join': 'Join', 'cut': 'Cut', 'intersect': 'Intersect',
+                          'body': 'New Body', 'component': 'New Component'}[config['operation']]
+        feature.name = 'Perforation (' + operation_name + ')'
+        return feature
+    except Exception:
+        if feature.isValid:
+            feature.deleteMe()
+        raise
 
 
 def sketch_reference_plane(sketch):
@@ -578,6 +583,12 @@ def sketch_metadata(settings, config):
 
 def build(source, settings, config, cache=None):
     """Must run within a Fusion command transaction (execute/executePreview)."""
+    if isinstance(source, (tuple, list)):
+        from . import multi_region
+        selected, _ = multi_region.validate(source, config)
+        if len(selected) > 1:
+            return multi_region.build(selected, settings, config, cache)
+        source = selected[0]
     source = native(source)
     from . import cylindrical, surface
     if config.get('surface'):

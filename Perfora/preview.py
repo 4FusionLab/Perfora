@@ -46,6 +46,8 @@ class Renderer:
         self.trim_key = None
         self.clipped_layout = None
         self.surface_prepared = None
+        self.multi_key = None
+        self.multi_plans = None
 
     def clear(self):
         if self.graphics and self.graphics.isValid:
@@ -74,10 +76,20 @@ class Renderer:
         self.trim_key = None
         self.clipped_layout = None
         self.surface_prepared = None
+        self.multi_key = None
+        self.multi_plans = None
         self.geometry_cache.clear()
         self.path_cache = model.PathCache()
 
     def show(self, source, settings, config, color='gold'):
+        if isinstance(source, (tuple, list)):
+            from . import multi_region
+            selected, _ = multi_region.validate(source, config)
+            if len(selected) > 1:
+                return self.show_many(selected, settings, config, color)
+            source = selected[0]
+        if self.multi_key is not None:
+            self.reset()
         from . import cylindrical
         if config.get('surface'):
             return self.show_surface(model.native(source), settings, config, color)
@@ -249,5 +261,59 @@ class Renderer:
         if self.color_key != rgb:
             self.lines.color = adsk.fusion.CustomGraphicsSolidColorEffect.create(adsk.core.Color.create(*rgb,255))
             self.color_key = rgb
+        self.last_seconds = perf_counter()-started
+        return len(self.cells)
+
+    def show_many(self, selected, settings, config, color):
+        from . import multi_region, regions
+        started = perf_counter()
+        selected, _ = multi_region.validate(selected, config)
+        component = model.source_component(selected[0])
+        center = config.get('center_point')
+        center_key = tuple(model.point_position(center, component).asArray()) if center is not None else None
+        key = (tuple(selected), tuple(model.source_revision(s) for s in selected), settings, center_key,
+               config['result'], config['operation'], tuple(model.native(b) for b in config['bodies']))
+        if self.source is not None:
+            self.reset()
+        if key != self.multi_key or (self.multi_plans and any(not p.original.isValid for p in self.multi_plans)):
+            self.clear()
+            # Drop a failed/old plan before preparing; stale contours must never survive.
+            previous = self.multi_plans
+            self.multi_key = self.multi_plans = None
+            self.multi_plans = multi_region.prepare(selected, settings, config, self.geometry_cache, previous=previous)
+            self.multi_key = key
+            self.layout_builds += 1
+        draw_key = (key, config['material'])
+        if self.coordinate_key != draw_key:
+            coordinates = []
+            for plan in self.multi_plans:
+                local = (plan.clipped.outlines(plan.region, config['material'] == 'panel') if plan.clipped else
+                         outline_coordinates(plan.cells, plan.region, config['material'] == 'panel'))
+                for i in range(0, len(local), 3):
+                    coordinates.extend(regions.to_world(plan.frame, local[i:i+3]))
+            self.coordinates = coordinates
+            self.coordinate_key = draw_key
+        if not (self.graphics and self.graphics.isValid and self.drawn_key == draw_key):
+            self.clear()
+            try:
+                self.graphics = component.customGraphicsGroups.add()
+                self.graphics.isSelectable = False
+                self.lines = self.graphics.addLines(adsk.fusion.CustomGraphicsCoordinates.create(self.coordinates), [], False)
+                self.lines.isSelectable = False
+                self.lines.depthPriority, self.lines.weight = 1, 3.
+                self.drawn_key = draw_key
+                self.draws += 1
+            except Exception:
+                self.clear()
+                raise
+        rgb = COLOR_RGB[color]
+        if self.color_key != rgb:
+            try:
+                self.lines.color = adsk.fusion.CustomGraphicsSolidColorEffect.create(adsk.core.Color.create(*rgb, 255))
+                self.color_key = rgb
+            except Exception:
+                self.clear()
+                raise
+        self.cells = tuple(c for p in self.multi_plans for c in p.cells)
         self.last_seconds = perf_counter()-started
         return len(self.cells)

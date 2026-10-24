@@ -12,10 +12,10 @@ import adsk.fusion
 from . import clipping, model, solid, surface
 from .geometry import Settings, generate
 from .distributions import VARIANT_PARAMETERS
+from .feature_data import SCHEMA, decode, metadata
 
 DEFINITION_ID = '4FusionLab.Perfora.Parametric'
 EDIT_COMMAND_ID = 'DiegoV_Perforator_EditFeature'
-SCHEMA = 1
 _definition = None
 _handler = None
 _busy = False
@@ -85,19 +85,8 @@ def parameters(config):
     return dict(PARAMETERS, **surface.ZONE_PARAMETERS) if config.get('surface') else PARAMETERS
 
 
-def metadata(settings, config):
-    return dict(schema=SCHEMA, settings={k: v for k, v in settings.__dict__.items() if k not in ('path_samples', 'guide1', 'guide2')},
-                config={k: v for k, v in config.items()
-                        if k not in ('bodies', 'target1', 'target2', '_expressions', 'center_point', 'guide1', 'guide2', 'path')},
-                center_selected=config.get('center_point') is not None,
-                body_count=len(config['bodies']))
-
-
 def stored(custom):
-    data = json.loads(custom.customNamedValues.value('perfora'))
-    if data['schema'] != SCHEMA:
-        raise ValueError('This Perfora Feature was created by an unsupported version.')
-    return data
+    return decode(custom.customNamedValues.value('perfora'))
 
 
 def dependency_entity(entity, component):
@@ -112,6 +101,8 @@ def dependency_entity(entity, component):
 
 
 def source_entity(custom):
+    if stored(custom).get('source_count', 1) > 1:
+        return source_entities(custom)[0]
     dependency = custom.dependencies.itemById('source')
     if dependency:
         return model.native(dependency.entity)
@@ -119,6 +110,20 @@ def source_entity(custom):
     if axis not in ('xY', 'xZ', 'yZ'):
         raise ValueError('The Feature source dependency is missing.')
     return getattr(custom.parentComponent, axis + 'ConstructionPlane')
+
+
+def source_entities(custom):
+    count = stored(custom).get('source_count', 1)
+    if count == 1:
+        return [source_entity(custom)]
+    result = []
+    for i in range(count):
+        dependency = custom.dependencies.itemById('source' + str(i))
+        entity = model.native(dependency.entity) if dependency else None
+        if entity is None or not entity.isValid:
+            raise ValueError('Feature Profiles region %d is missing. Restore the upstream geometry.' % (i+1))
+        result.append(entity)
+    return result
 
 
 def center_entity(custom):
@@ -172,13 +177,18 @@ def read(custom):
             config[key] = values[key]
     for key in ('start', 'distance1', 'distance2'):
         config[key] = custom.parameters.itemById(key).expression
-    source = source_entity(custom)
-    if not source or not source.isValid:
+    selected = source_entities(custom)
+    if any(not source or not source.isValid for source in selected):
         raise ValueError('The Feature source is missing. Restore the upstream geometry.')
-    config['bodies'] = [model.native(custom.dependencies.itemById('body' + str(i)).entity)
-                        for i in range(data['body_count'])]
+    config['bodies'] = []
+    for i in range(data['body_count']):
+        dependency = custom.dependencies.itemById('body' + str(i))
+        body = model.native(dependency.entity) if dependency else None
+        if body is None or not body.isValid:
+            raise ValueError('A Feature Object dependency is missing. Restore the upstream body.')
+        config['bodies'].append(body)
     config.update(target1=None, target2=None)
-    return source, settings, config
+    return selected if len(selected) > 1 else selected[0], settings, config
 
 
 def path_dependency(custom, strict=True):
@@ -266,6 +276,12 @@ def build(source, settings, config, cache=None):
     from . import cylindrical
     if cylindrical.is_cylinder(model.native(source)) and not config.get('surface'):
         raise ValueError('Cylindrical faces support fixed Radial Cut only. Feature recompute and Edit Feature are not supported yet.')
+    if isinstance(source, (tuple, list)):
+        from . import multi_region
+        selected, _ = multi_region.validate(source, config)
+        if len(selected) > 1:
+            return build_many(selected, settings, config, cache)
+        source = selected[0]
     component = model.source_component(source)
     config = surface.normalized(config, component) if config.get('surface') else dict(config)
     validate(config, component.parentDesign)
@@ -355,8 +371,145 @@ def build(source, settings, config, cache=None):
         _busy = previous_busy
 
 
+def build_many(selected, settings, config, cache=None):
+    """One timeline node, one source dependency/reference/base per region."""
+    global _busy
+    from . import multi_region
+    selected, mapping = multi_region.validate(selected, config)
+    component = model.source_component(selected[0])
+    validate(config, component.parentDesign)
+    config = dict(config, _source_count=len(selected), _body_map=mapping)
+    if config['operation'] == 'body':
+        config['bodies'] = []  # Hidden Objects must not become unused dependencies.
+    data = component.features.customFeatures.createInput(register())
+    dependencies = [('source' + str(i), dependency_entity(s, component)) for i, s in enumerate(selected)]
+    dependencies.extend(('body' + str(i), dependency_entity(body, component)) for i, body in enumerate(config['bodies']))
+    if config.get('center_point') is not None:
+        dependencies.append(('center_point', model.point_reference(config['center_point'], component)))
+    for identifier, entity in dependencies:
+        if not data.addDependency(identifier, entity):
+            raise ValueError('Unable to create Feature dependency: ' + identifier)
+    expressions = config.get('_expressions', {})
+    for key, (label, unit) in PARAMETERS.items():
+        val = expressions.get(key)
+        if val is None:
+            val = getattr(settings, key) if key in settings.__dict__ else config[key]
+        vi = model.value(val) if isinstance(val, str) else adsk.core.ValueInput.createByReal(val)
+        if not data.addCustomParameter(key, label, vi, unit, True):
+            raise ValueError('Unable to create Feature parameter: ' + label)
+    owned, frames, bases, combines = [], [], [], []
+    previous_busy = _busy
+    _busy = True
+    try:
+        custom = component.features.customFeatures.add(data)
+        owned.append(custom)
+        custom.customNamedValues.addOrSetValue('perfora', json.dumps(metadata(settings, config)))
+        for index, source in enumerate(selected):
+            frame = model.new_source_sketch(source)
+            owned.append(frame)
+            frames.append(frame)
+            frame.name = 'Perfora Reference %d' % (index+1)
+        plans = multi_region.prepare(selected, settings, config, cache, frames)
+        # All temporary solids must succeed before the first persistent body is added.
+        bodies = [multi_region.make_body(plan, config) for plan in plans]
+        for index, body in enumerate(bodies):
+            base = component.features.baseFeatures.add()
+            owned.append(base)
+            bases.append(base)
+            base.name = 'Perfora Geometry %d' % (index+1)
+            if not base.startEdit():
+                raise ValueError('Unable to create the Perfora Feature geometry.')
+            try:
+                if not component.bRepBodies.add(body, base):
+                    raise ValueError('Unable to add the Perfora Feature body.')
+            finally:
+                if not base.finishEdit():
+                    raise ValueError('Unable to finish the Perfora Feature geometry.')
+        if config['operation'] in ('cut', 'intersect', 'join'):
+            operations = dict(cut=adsk.fusion.FeatureOperations.CutFeatureOperation,
+                              join=adsk.fusion.FeatureOperations.JoinFeatureOperation,
+                              intersect=adsk.fusion.FeatureOperations.IntersectFeatureOperation)
+            for plan, base in zip(plans, bases):
+                tool = base.bodies.item(0)
+                for index in plan.body_indices:
+                    tools = adsk.core.ObjectCollection.create()
+                    tools.add(tool)
+                    data = component.features.combineFeatures.createInput(model.native(config['bodies'][index]), tools)
+                    data.operation, data.isKeepToolBodies = operations[config['operation']], True
+                    combine = component.features.combineFeatures.add(data)
+                    if combine is None:
+                        raise ValueError('Unable to create the Perfora Feature operation.')
+                    owned.append(combine)
+                    combines.append(combine)
+                    if combine.healthState == adsk.fusion.FeatureHealthStates.ErrorFeatureHealthState:
+                        raise ValueError(combine.errorOrWarningMessage or 'Feature operation failed.')
+                tool.isVisible = False
+        custom.timelineObject.rollTo(True)
+        if not custom.setStartAndEndFeatures(frames[0], combines[-1] if combines else bases[-1]):
+            raise ValueError('Unable to group the Perfora Feature.')
+        custom.timelineObject.rollTo(False)
+        for frame in frames:
+            frame.isVisible = False
+        return frames[0], custom, sum(len(plan.cells) for plan in plans)
+    except Exception:
+        multi_region.cleanup(owned, activate=True)
+        raise
+    finally:
+        _busy = previous_busy
+
+
+def rebuild_many(custom, selected, settings, config, cache=None):
+    from . import multi_region
+    validate(config, custom.parentComponent.parentDesign)
+    features = list(custom.features)
+    frames = [f for f in features if isinstance(f, adsk.fusion.Sketch)]
+    bases = [f for f in features if isinstance(f, adsk.fusion.BaseFeature)]
+    if len(frames) != len(selected) or len(bases) != len(selected):
+        raise ValueError('The Feature region geometry is missing. Restore the owned reference sketches and bases.')
+    plans = multi_region.prepare(selected, settings, config, cache, frames)
+    bodies = [multi_region.make_body(plan, config) for plan in plans]
+    manager = adsk.fusion.TemporaryBRepManager.get()
+    backups = []
+    try:
+        for base, body in zip(bases, bodies):
+            if not base.startEdit():
+                raise ValueError('Unable to update the Perfora Feature.')
+            try:
+                previous = manager.copy(base.bodies.item(0))
+                if not previous:
+                    raise ValueError('Unable to back up the Perfora Feature geometry.')
+                backups.append((base, previous))
+                if not base.updateBody(base.bodies.item(0), body):
+                    raise ValueError('Fusion could not update a Perfora Feature region.')
+            finally:
+                if not base.finishEdit():
+                    raise ValueError('Unable to finish the Perfora Feature update.')
+    except Exception:
+        # Compute callbacks have no command transaction. Restore every attempted
+        # base update, including one whose failed update may have mutated its body.
+        errors = []
+        for base, previous in reversed(backups):
+            try:
+                if not base.startEdit():
+                    raise ValueError('Unable to restore a Perfora Feature region.')
+                try:
+                    if not base.updateBody(base.bodies.item(0), previous):
+                        raise ValueError('Unable to restore a Perfora Feature body.')
+                finally:
+                    if not base.finishEdit():
+                        raise ValueError('Unable to finish restoring a Perfora Feature region.')
+            except Exception as error:
+                errors.append(str(error))
+        if errors:
+            raise RuntimeError('Feature rollback failed: ' + '; '.join(errors))
+        raise
+    return sum(len(plan.cells) for plan in plans)
+
+
 def rebuild(custom, cache=None):
     source, settings, config = read(custom)
+    if isinstance(source, list):
+        return rebuild_many(custom, source, settings, config, cache)
     features = custom.features
     sketches = [f for f in features if isinstance(f, adsk.fusion.Sketch)]
     base = next(f for f in features if isinstance(f, adsk.fusion.BaseFeature))
@@ -380,7 +533,7 @@ def update(custom, settings, config, cache=None):
     try:
         config = dict(config)
         original = stored(custom)['config']
-        for key in ('_origin_plane',):
+        for key in ('_origin_plane', '_source_count', '_body_map'):
             if key in original:
                 config[key] = original[key]
         center = config.get('center_point')
