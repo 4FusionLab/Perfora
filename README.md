@@ -19,7 +19,37 @@
 
 Select a planar face, a closed sketch profile, or a construction plane. Choose a hole shape, set the spacing and edge clearance, and preview the result. Perfora creates ordinary sketch profiles, a native Fusion Extrude, or a parametric Perfora timeline feature.
 
-![Twelve supported hole shapes](docs/assets/hole-shapes.svg)
+## Made with Perfora
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/assets/examples/honeycomb-panel.jpg"><img src="docs/assets/examples/honeycomb-panel.jpg" alt="Blue rectangular grille with hexagonal perforation and four mounting holes" width="100%"></a>
+      <p><strong>Honeycomb grille</strong><br>Hexagonal cells, an outer frame, and mounting holes.</p>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/assets/examples/voronoi-panel.jpg"><img src="docs/assets/examples/voronoi-panel.jpg" alt="Green rectangular panel with rounded Voronoi perforation" width="100%"></a>
+      <p><strong>Rounded Voronoi</strong><br>An irregular pattern with rounded corners and a defined edge.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/assets/examples/slotted-disc.jpg"><img src="docs/assets/examples/slotted-disc.jpg" alt="Orange circular plate with diagonal slots and a central opening" width="100%"></a>
+      <p><strong>Slots on a circular boundary</strong><br>Partial slots follow the outer edge and central opening.</p>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/assets/examples/hole-shapes.jpg"><img src="docs/assets/examples/hole-shapes.jpg" alt="Six colored panels showing circular, triangular, star, elliptical, diamond, and cross perforations" width="100%"></a>
+      <p><strong>A shape for every pattern</strong><br>Circles, triangles, stars, ellipses, diamonds, and crosses.</p>
+    </td>
+  </tr>
+</table>
+
+<details>
+<summary>View the twelve regular hole shapes</summary>
+
+![Twelve supported regular hole shapes](docs/assets/hole-shapes.svg)
+
+</details>
 
 | Control | What you can do |
 | --- | --- |

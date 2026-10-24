@@ -19,7 +19,37 @@
 
 Выберите плоскую грань, замкнутый профиль эскиза или конструкционную плоскость. Настройте форму отверстий, перемычки и отступ от края, затем проверьте предпросмотр. Perfora создаст обычные профили эскиза, штатную операцию Extrude или параметрическую фичу Perfora в таймлайне.
 
-![Двенадцать форм отверстий](docs/assets/hole-shapes.svg)
+## Примеры Perfora
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/assets/examples/honeycomb-panel.jpg"><img src="docs/assets/examples/honeycomb-panel.jpg" alt="Синяя прямоугольная решётка с шестигранной перфорацией и четырьмя крепёжными отверстиями" width="100%"></a>
+      <p><strong>Сотовая решётка</strong><br>Шестигранные ячейки, рамка и крепёжные отверстия.</p>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/assets/examples/voronoi-panel.jpg"><img src="docs/assets/examples/voronoi-panel.jpg" alt="Зелёная прямоугольная панель со скруглённой перфорацией Вороного" width="100%"></a>
+      <p><strong>Вороной со скруглением</strong><br>Нерегулярный узор со скруглёнными углами и рамкой.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/assets/examples/slotted-disc.jpg"><img src="docs/assets/examples/slotted-disc.jpg" alt="Оранжевая круглая пластина с диагональными прорезями и центральным отверстием" width="100%"></a>
+      <p><strong>Щели в круглой области</strong><br>Частичные прорези обрезаны по внешнему и внутреннему контурам.</p>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/assets/examples/hole-shapes.jpg"><img src="docs/assets/examples/hole-shapes.jpg" alt="Шесть цветных панелей с круглыми, треугольными, звёздчатыми, эллиптическими, ромбическими и крестообразными отверстиями" width="100%"></a>
+      <p><strong>Разные формы отверстий</strong><br>Круги, треугольники, звёзды, эллипсы, ромбы и кресты.</p>
+    </td>
+  </tr>
+</table>
+
+<details>
+<summary>Посмотреть двенадцать регулярных форм отверстий</summary>
+
+![Двенадцать регулярных форм отверстий](docs/assets/hole-shapes.svg)
+
+</details>
 
 | Настройка | Возможности |
 | --- | --- |
