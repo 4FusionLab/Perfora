@@ -11,7 +11,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="Лицензия GPL-3.0"></a>
 </p>
 
-<p align="center"><a href="https://github.com/4FusionLab/Perfora/releases/tag/v1.0.0"><strong>Скачать v1.0.0</strong></a> · <a href="README.md">English</a> · <a href="https://github.com/4FusionLab/Perfora/issues">Сообщить о проблеме</a></p>
+<p align="center"><a href="https://github.com/4FusionLab/Perfora/releases/tag/v1.0.1"><strong>Скачать v1.0.1</strong></a> · <a href="README.md">English</a> · <a href="https://github.com/4FusionLab/Perfora/issues">Сообщить о проблеме</a></p>
 
 
 ## Задайте узор. Получите обычную модель Fusion.
@@ -20,7 +20,7 @@
 
 Чтобы перфорировать часть существующей грани, нарисуйте на ней замкнутый эскиз, завершите его и выберите закрашенную область профиля в **Profiles**. Split Face не требуется. Для **Cut** или **Intersect** тело опорной грани автоматически выбирается в **Objects**; перед подтверждением проверьте направление и протяжённость. Для профилей на конструкционных плоскостях Objects по-прежнему задаются явно.
 
-**Perfora 1.0 — первый стабильный релиз.** Параметрические узоры, круговая раскладка, ограничение радиуса и ускоренный предпросмотр. [Что нового →](docs/releases/v1.0.0.md)
+**Perfora 1.0.1 исправляет пересчёт Feature Cut после изменения исходной геометрии.** Параметрические узоры, круговая раскладка, ограничение радиуса и ускоренный предпросмотр. [Что нового →](docs/releases/v1.0.1.md)
 
 ## Примеры Perfora
 
@@ -115,7 +115,7 @@ Cell Spacing задаёт номинальный шаг исходных точ�
 
 Для редактирования и пересчёта дополнение должно быть запущено. Значительные изменения топологии могут нарушить ссылки последующих операций на грани и рёбра. Режим использует [Custom Feature API Autodesk](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/CustomFeatures_UM.htm), который остаётся в статусе Preview.
 
-В неопубликованной рабочей копии исправлена потеря целевого тела у Feature Cut при уменьшении исходной грани с **Trim to Boundary** и ненулевым **Edge Offset**. Регрессионная проверка охватывает изменение высоты коробки с 70 до 20 мм и обратно, в том числе со скруглёнными отверстиями Вороного. В опубликованном архиве 1.0.0 этого исправления нет.
+Начиная с **1.0.1**, Feature Cut сохраняет целевое тело при уменьшении исходной грани с **Trim to Boundary** и ненулевым **Edge Offset**. Регрессионная проверка охватывает изменение высоты коробки с 70 до 20 мм и обратно, в том числе со скруглёнными отверстиями Вороного.
 
 ## Начальная точка и радиус заполнения
 
@@ -149,7 +149,7 @@ Fast Preview и окончательное создание используют
 
 ### Основной способ: добавить папку через Fusion
 
-1. Скачайте **[Perfora-1.0.0.zip](https://github.com/4FusionLab/Perfora/releases/download/v1.0.0/Perfora-1.0.0.zip)** со [страницы релиза](https://github.com/4FusionLab/Perfora/releases/tag/v1.0.0) и распакуйте в постоянный каталог.
+1. Скачайте **[Perfora-1.0.1.zip](https://github.com/4FusionLab/Perfora/releases/download/v1.0.1/Perfora-1.0.1.zip)** со [страницы релиза](https://github.com/4FusionLab/Perfora/releases/tag/v1.0.1) и распакуйте в постоянный каталог.
 2. В Fusion откройте **Utilities → Scripts and Add-Ins**.
 3. Нажмите **+ → Script or add-in from device**.
 4. Выберите вложенную папку **`Perfora`**, содержащую **`Perfora.py`** и **`Perfora.manifest`**, а не общий каталог распакованного архива.
@@ -204,7 +204,7 @@ python3 -m unittest discover -s tests -v
 python3 install.py --zip
 ```
 
-Результат сборки — `dist/Perfora-1.0.0.zip` и файл `.sha256`. Версия берётся из manifest дополнения. CI проверяет геометрию и установку на macOS, Windows и Linux, затем публикует проверенные версии 1.x как стабильные релизы с отметкой Latest. Ранние версии 0.x остаются prerelease. CAD-проверки выполняются отдельно в Fusion.
+Результат сборки — `dist/Perfora-1.0.1.zip` и файл `.sha256`. Версия берётся из manifest дополнения. CI проверяет геометрию и установку на macOS, Windows и Linux, затем публикует проверенные версии 1.x как стабильные релизы с отметкой Latest. Ранние версии 0.x остаются prerelease. CAD-проверки выполняются отдельно в Fusion.
 
 [Участие в разработке и CAD-проверки](CONTRIBUTING.md) · [Изменения](CHANGELOG.md) · [Выпуск релизов](docs/PUBLISHING.md)
 

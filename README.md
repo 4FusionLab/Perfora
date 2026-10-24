@@ -11,7 +11,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="GPL-3.0 license"></a>
 </p>
 
-<p align="center"><a href="https://github.com/4FusionLab/Perfora/releases/tag/v1.0.0"><strong>Download v1.0.0</strong></a> · <a href="README.ru.md">Русский</a> · <a href="https://github.com/4FusionLab/Perfora/issues">Report a problem</a></p>
+<p align="center"><a href="https://github.com/4FusionLab/Perfora/releases/tag/v1.0.1"><strong>Download v1.0.1</strong></a> · <a href="README.ru.md">Русский</a> · <a href="https://github.com/4FusionLab/Perfora/issues">Report a problem</a></p>
 
 
 ## Make the pattern. Keep the native model.
@@ -20,7 +20,7 @@ Select a planar face, a closed sketch profile, or a construction plane. Choose a
 
 To perforate part of an existing face, draw a closed sketch on that face, finish the sketch, and select its shaded profile in **Profiles**. No Split Face is required. For **Cut** or **Intersect**, the supporting body is selected automatically in **Objects**; check the direction and extent before confirming. Profiles on construction planes still require explicit Objects.
 
-**Perfora 1.0 is the first stable release.** Parametric patterns, circular placement, bounded spread, and faster previews. [What is new →](docs/releases/v1.0.0.md)
+**Perfora 1.0.1 fixes Feature Cut recompute after upstream resizing.** Parametric patterns, circular placement, bounded spread, and faster previews. [Release notes →](docs/releases/v1.0.1.md)
 
 ## Made with Perfora
 
@@ -115,7 +115,7 @@ All 13 shapes, exact trimming, rounded Voronoi holes, Fast/Full Preview, and **J
 
 Keep Perfora running to edit or recompute the feature. Large topology changes can invalidate downstream face/edge references. The mode uses Autodesk's [Custom Feature API](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/CustomFeatures_UM.htm), which remains in Preview.
 
-The unreleased working copy fixes Feature Cut losing its target when an upstream face shrinks with **Trim to Boundary** and a nonzero **Edge Offset**. The regression covers a box height change from 70 mm to 20 mm and back, including rounded Voronoi holes. This fix is not included in the published 1.0.0 archive.
+Since **1.0.1**, Feature Cut preserves its target when an upstream face shrinks with **Trim to Boundary** and a nonzero **Edge Offset**. The regression covers a box height change from 70 mm to 20 mm and back, including rounded Voronoi holes.
 
 ## Pattern origin and spread
 
@@ -149,7 +149,7 @@ The optimizations preserve hole contours, clearance checks, Voronoi Seed, and ex
 
 ### Recommended: add the folder in Fusion
 
-1. Download **[Perfora-1.0.0.zip](https://github.com/4FusionLab/Perfora/releases/download/v1.0.0/Perfora-1.0.0.zip)** from the [release page](https://github.com/4FusionLab/Perfora/releases/tag/v1.0.0) and extract it to a permanent location.
+1. Download **[Perfora-1.0.1.zip](https://github.com/4FusionLab/Perfora/releases/download/v1.0.1/Perfora-1.0.1.zip)** from the [release page](https://github.com/4FusionLab/Perfora/releases/tag/v1.0.1) and extract it to a permanent location.
 2. In Fusion, open **Utilities → Scripts and Add-Ins**.
 3. Click **+ → Script or add-in from device**.
 4. Select the inner **`Perfora`** folder containing **`Perfora.py`** and **`Perfora.manifest`**, not the top-level extracted folder.
@@ -204,7 +204,7 @@ python3 -m unittest discover -s tests -v
 python3 install.py --zip
 ```
 
-The build produces `dist/Perfora-1.0.0.zip` and its `.sha256` file. Version comes from the add-in manifest. CI checks geometry and installation on macOS, Windows, and Linux, then publishes verified 1.x versions as stable releases marked Latest. The earlier 0.x versions remain prereleases. Native Fusion checks run separately.
+The build produces `dist/Perfora-1.0.1.zip` and its `.sha256` file. Version comes from the add-in manifest. CI checks geometry and installation on macOS, Windows, and Linux, then publishes verified 1.x versions as stable releases marked Latest. The earlier 0.x versions remain prereleases. Native Fusion checks run separately.
 
 [Contributing and CAD checks](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Release process](docs/PUBLISHING.md)
 
