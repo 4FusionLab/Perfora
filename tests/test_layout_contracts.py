@@ -50,7 +50,8 @@ class BRepEdge(Entity):
     pass
 
 
-ADSK=NS(fusion=NS(ConstructionPlane=Plane,SketchCurve=SketchCurve,BRepEdge=BRepEdge),core=NS())
+ADSK=NS(fusion=NS(ConstructionPlane=Plane,SketchCurve=SketchCurve,BRepEdge=BRepEdge),core=NS(Cylinder=type('Cylinder',(),{}),Cone=type('Cone',(),{})))
+SURFACE=NS(ZONE_PARAMETERS={},is_curved=lambda source:False,supported=lambda source:False)
 
 
 def model_definitions():
@@ -59,7 +60,7 @@ def model_definitions():
 
 def feature_definitions(model=None):
     return definitions('feature.py',dict(Settings=Settings,VARIANT_PARAMETERS=VARIANT_PARAMETERS,
-        model=model or NS(native=lambda x:x),replace=replace,json=json,math=math,Path=Path,adsk=ADSK))
+        surface=SURFACE,model=model or NS(native=lambda x:x),replace=replace,json=json,math=math,Path=Path,adsk=ADSK))
 
 
 class Collection:
@@ -94,8 +95,8 @@ class AdapterAndFeatureTests(unittest.TestCase):
         config=dict(guide1=Entity(),guide2=Entity(),bodies=[Entity()],center_point=Entity(),
                     target1=Entity(),target2=Entity(),_expressions={'size':'5 mm'},result='profiles')
         snapshot=json.loads(json.dumps(m.sketch_metadata(s,config)))
-        self.assertEqual(snapshot['guide1'],[[0,0],[1,0]])
-        self.assertEqual(snapshot['guide2'],[[0,1],[1,1]])
+        self.assertNotIn('guide1',snapshot)
+        self.assertNotIn('guide2',snapshot)
         self.assertEqual(snapshot['result'],'profiles')
         self.assertNotIn('center_point',snapshot)
 
@@ -215,17 +216,20 @@ class DialogContractTests(unittest.TestCase):
                  guide_reference=lambda *args:None,source_support_body=lambda x:None)
         ui=definitions('Perfora.py',dict(math=math,Path=Path,Settings=Settings,LENGTH_SHAPES=LENGTH_SHAPES,
                        VARIANT_PARAMETERS=VARIANT_PARAMETERS,LAYOUT_PARAMETERS=LAYOUT_PARAMETERS,
-                       parametric=f,model=model,adsk=ADSK),
+                       surface=SURFACE,parametric=f,model=model,adsk=ADSK),
                        methods=('chosen','selected_source','dimension_id','update_visibility','read','restore_feature'))
         s=ui.Session()
         s.updating=False
         s._extrude_inputs=None
+        s._planar_material=None
+        s.edited_feature=None
+        s.surface_choices=ui.SURFACE_LAYOUTS
         s.inputs={}
         s.numeric_inputs={}
         # Extract constructor declarations so new/missing controls cannot be
         # silently absent in the offline fixture. No constructor/API execution.
         for key in ('area_group','height','shape','shape_angle','result','material','operation','direction','boundary',
-                    'layout','orientation','source','clip_boundary','round_corners','seed','new_pattern','irregularity',
+                    'cylinder_group','surface_layout','path','path_reverse','path_orientation','layout','orientation','source','clip_boundary','round_corners','seed','new_pattern','irregularity',
                     'center_point','guide1','guide2','guide_reverse','start_mode','reverse','side2','bodies','output_group',
                     'preview','preview_mode','preview_color','distance1','distance2','taper1','taper2','start','target1',
                     'target2','extent1','extent2','object_offset1','object_offset2'):

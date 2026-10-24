@@ -16,6 +16,7 @@ import unittest
 from unittest.mock import patch
 
 from test_curve_layout import CubicLine
+from Perfora.distributions import VARIANT_PARAMETERS
 
 
 class XYZ:
@@ -243,6 +244,7 @@ class CurveIntegrationTests(unittest.TestCase):
 
     def session(self,layout='path',shape='slot',result='feature'):
         e=self.entry;s=e.Session.__new__(e.Session)
+        s._planar_material=None;s.surface_choices=e.SURFACE_LAYOUTS
         s.updating=False;s._extrude_inputs={} if result=='feature' else None;s.edited_feature=None
         s.units=NS(evaluateExpression=lambda expression,unit:float(expression))
         numeric=dict(size=.3,size_flats=.3,size_side=.3,size_width=.3,size_diagonal=.3,size_minor=.3,
@@ -250,7 +252,8 @@ class CurveIntegrationTests(unittest.TestCase):
             gap=.1,margin=.05,grid_angle=0,shape_angle=.21,offset_x=0,offset_y=0,limit=1500,
             spread_radius=0,start_radius=0,path_spacing=.8,path_start=.1,path_end=.2,path_position=.3,
             width=4,area_diameter=4,height=3,taper1=0,taper2=0,distance1=.2,distance2=.2,start=0,
-            object_offset1=0,object_offset2=0,arm_width=.15,star_ratio=45,star_points=5,irregularity=80,seed=1,corner_radius=.05)
+            cylinder_start=0,cylinder_sweep=6.283185307179586,axial_start=0,axial_length=0,object_offset1=0,object_offset2=0,arm_width=.15,star_ratio=45,star_points=5,irregularity=80,seed=1,corner_radius=.05)
+        numeric.update({key:getattr(self.settings,key) for key in VARIANT_PARAMETERS})
         s.numeric_inputs={k:Number(v) for k,v in numeric.items()};s.inputs=dict(s.numeric_inputs)
         d=s.inputs
         for key,options,value in (('shape',e.SHAPES,shape),('layout',e.LAYOUTS,layout),('result',e.RESULTS,result),
@@ -261,7 +264,7 @@ class CurveIntegrationTests(unittest.TestCase):
             d[key]=Dropdown(options,value)
         for key,value in (('clip_boundary',False),('reverse',False),('path_reverse',True),('round_corners',False),('preview',True)):
             d[key]=NS(value=value,isVisible=True)
-        for key in ('area_group','output_group','side2','new_pattern','preview_color'):
+        for key in ('area_group','cylinder_group','surface_layout','guide1','guide2','guide_reverse','output_group','side2','new_pattern','preview_color'):
             d[key]=NS(isVisible=True)
         d['source']=Select(self.source);d['path']=Select(self.path);d['center_point']=Select()
         d['bodies']=Select();d['target1']=Select();d['target2']=Select()

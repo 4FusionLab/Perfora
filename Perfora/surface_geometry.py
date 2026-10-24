@@ -7,6 +7,19 @@ from . import geometry as geo
 from .cylindrical_geometry import enclosing_radius, tool_cell, generate_voronoi, CylinderRegion
 
 
+# A distribution is offered only where its chart retains a readable motif.
+SURFACE_DISTRIBUTIONS = {
+    'cylinder': ('grid', 'running_bond', 'poisson'),
+    'cone': ('grid', 'running_bond'),
+    'freeform': ('grid', 'running_bond', 'poisson', 'wave', 'chevron'),
+}
+
+
+def validate_distribution(kind, settings):
+    if settings.layout not in SURFACE_DISTRIBUTIONS[kind]:
+        raise ValueError('This Distribution is not available on ' + kind + ' faces. Select a compatible Distribution.')
+
+
 def add(a, b):
     return tuple(x+y for x,y in zip(a,b))
 
@@ -67,7 +80,7 @@ def conical_cells(region, settings, low, high, anchor=None):
     slant = math.hypot(1., region.slope)
     cell = tool_cell(settings)
     r = enclosing_radius(cell)
-    spacing = 2*r + settings.gap + 1e-8
+    spacing = max(2*r + settings.gap + 1e-8, settings.row_spacing if settings.layout == 'running_bond' else 0)
     closed = abs(region.sweep-math.tau) < 1e-8
     width = region.reference_radius*region.sweep
     oy = settings.offset_y + (anchor[1] if anchor is not None else region.height/2)
@@ -89,19 +102,23 @@ def conical_cells(region, settings, low, high, anchor=None):
         rho = radius+min(low, high, -lead)/slant
         if rho <= spacing/2:
             continue
-        angular = 2*math.asin(spacing/(2*rho))
+        along = max(2*r+settings.gap+1e-8, settings.along_spacing if settings.layout == 'running_bond' else 0)
+        if rho <= along/2: continue
+        angular = 2*math.asin(along/(2*rho))
         if closed:
             count = math.floor(region.sweep/angular)
             count -= count % 2
             if count < 2:
                 continue
             angular = region.sweep/count
-            start = angular/2 if settings.staggered and row%2 else 0.
+            start = ((row*settings.bond_shift)%1)*angular if settings.layout == 'running_bond' else angular/2 if settings.staggered and row%2 else 0.
             columns = range(count)
         else:
             count = math.floor(region.sweep/angular)+1
             start = (region.sweep-(count-1)*angular)/2
-            if settings.staggered and row%2:
+            if settings.layout == 'running_bond':
+                start += ((row*settings.bond_shift)%1)*angular
+            elif settings.staggered and row%2:
                 start += angular/2
             columns = range(-1, count+1)
         for col in columns:

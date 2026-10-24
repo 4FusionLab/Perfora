@@ -569,10 +569,10 @@ def new_source_sketch(source):
 
 def sketch_metadata(settings, config):
     """Frozen result snapshot; live references must never enter sketch JSON."""
-    result = dict(settings.__dict__)
+    result = {key: val for key, val in settings.__dict__.items() if key not in ('path_samples', 'guide1', 'guide2')}
     result.update({key: val for key, val in config.items()
                    if key not in ('bodies', 'target1', 'target2', 'center_point',
-                                  'guide1', 'guide2', '_expressions')})
+                                  'guide1', 'guide2', 'path', '_expressions')})
     return result
 
 

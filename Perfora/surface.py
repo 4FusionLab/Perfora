@@ -314,6 +314,7 @@ class Chart:
 def validate(source, settings, config, chart=None):
     settings.validate()
     chart = chart or Chart(source)
+    sg.validate_distribution(chart.kind, settings)
     if config['result']!='profiles' and model.source_component(source).parentDesign.designType!=adsk.fusion.DesignTypes.ParametricDesignType:
         raise ValueError('Curved solid operations require Capture Design History.')
     if config['material']!='cells':

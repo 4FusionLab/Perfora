@@ -64,7 +64,7 @@ LAYOUTS = [('staggered', 'Staggered'), ('rows', 'Rectangular'), ('circular', 'Ci
 LAYOUTS += [('contour', 'Contour'), ('fan', 'Fan'), ('phyllotaxis', 'Phyllotaxis'),
             ('poisson', 'Poisson Disk'), ('wave', 'Wave'), ('chevron', 'Chevron'),
             ('running_bond', 'Running Bond'), ('between_curves', 'Between Curves')]
-SURFACE_LAYOUTS = LAYOUTS[:2]  # Local rows; planar concentric rings do not wrap.
+SURFACE_LAYOUTS = LAYOUTS[:2] + [(key, label) for key, label in LAYOUTS if key in ('running_bond', 'poisson', 'wave', 'chevron')]
 PATH_ORIENTATIONS = [('fixed', 'Fixed'), ('tangent', 'Tangent')]
 ORIENTATIONS = [('fixed', 'Fixed'), ('radial', 'Radial'), ('tangential', 'Tangential')]
 PREVIEW_MODES = [('fast', 'Fast'), ('exact', 'Full')]
@@ -95,6 +95,7 @@ class Session:
         self.preview_error = ''
         self._status_text = None
         self.renderer = Renderer()
+        self.surface_choices = SURFACE_LAYOUTS
         self.cylinder_source = None
         self.cylinder_frame = None
         self.cylinder_layout_key = None
@@ -284,7 +285,10 @@ class Session:
             for key in VARIANT_PARAMETERS:
                 d[key].value = settings.get(key, getattr(defaults, key))
             d['guide_reverse'].value = settings.get('guide_reverse', False)
-            d['surface_layout'].listItems.item(0 if settings['staggered'] else 1).isSelected = True
+            if surface.supported(self.selected_source()): self.sync_surface_layouts(self.selected_source())
+            choices = getattr(self, 'surface_choices', SURFACE_LAYOUTS)
+            if layout in dict(choices):
+                d['surface_layout'].listItems.item(next(i for i, item in enumerate(choices) if item[0] == layout)).isSelected = True
             d['path_orientation'].listItems.item(1 if settings.get('path_orientation') == 'tangent' else 0).isSelected = True
             d['path_reverse'].value = settings.get('path_reverse', False)
             for key, fallback in (('path_spacing', .8), ('path_start', 0), ('path_end', 0), ('path_position', 0)):
@@ -456,6 +460,23 @@ class Session:
                 finally:self.updating=previous
         return self.cylinder_frame
 
+    def sync_surface_layouts(self, source):
+        kind = ('cylinder' if isinstance(source.geometry, adsk.core.Cylinder) else
+                'cone' if isinstance(source.geometry, adsk.core.Cone) else 'freeform')
+        allowed = surface.sg.SURFACE_DISTRIBUTIONS[kind]
+        choices = [item for item in SURFACE_LAYOUTS if item[0] in ('staggered', 'rows') or item[0] in allowed]
+        previous = getattr(self, 'surface_choices', SURFACE_LAYOUTS)
+        if choices != previous:
+            key = self.chosen('surface_layout', previous)
+            items = self.inputs['surface_layout'].listItems
+            items.clear()
+            if key not in dict(choices): key = 'staggered'
+            for value, label in choices:
+                items.add(label, value == key, '')
+            self.surface_choices = choices
+        self.inputs['surface_layout'].tooltip = ('Distributions suited to this surface. '
+            'Centered motifs and planar guide layouts require planar Profiles.')
+
     def update_visibility(self):
         if self.updating:
             return
@@ -464,7 +485,9 @@ class Session:
             d = self.inputs
             source = self.selected_source()
             is_curved = surface.is_curved(source)
-            if surface.supported(source):self.capture_surface(source)
+            if surface.supported(source):
+                self.capture_surface(source)
+                self.sync_surface_layouts(source)
             is_plane = isinstance(source, adsk.fusion.ConstructionPlane)
             def visible(identifier, enabled):
                 if d[identifier].isVisible != enabled:
@@ -501,7 +524,7 @@ class Session:
             visible('arm_width', shape == 'cross')
             visible('star_points', shape == 'star')
             visible('star_ratio', shape == 'star')
-            layout = (self.chosen('surface_layout', SURFACE_LAYOUTS) if is_curved else self.chosen('layout', LAYOUTS)) if shape != 'voronoi' else 'grid'
+            layout = (self.chosen('surface_layout', self.surface_choices) if is_curved else self.chosen('layout', LAYOUTS)) if shape != 'voronoi' else 'grid'
             for identifier in ('irregularity', 'round_corners'):
                 visible(identifier, shape == 'voronoi')
             for identifier in ('seed', 'new_pattern'):
@@ -601,7 +624,7 @@ class Session:
         if not is_curved: required.append('grid_angle')
         if is_curved and isinstance(source.geometry,(adsk.core.Cylinder,adsk.core.Cone)):
             required += list(surface.ZONE_PARAMETERS)
-        layout = (self.chosen('surface_layout', SURFACE_LAYOUTS) if is_curved else self.chosen('layout', LAYOUTS)) if shape != 'voronoi' else 'grid'
+        layout = (self.chosen('surface_layout', self.surface_choices) if is_curved else self.chosen('layout', LAYOUTS)) if shape != 'voronoi' else 'grid'
         circular = layout == 'circular'
         variant_keys = [key for key in LAYOUT_PARAMETERS.get(layout, ()) if d[key].isVisible]
         required += variant_keys

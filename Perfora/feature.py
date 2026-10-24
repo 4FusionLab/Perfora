@@ -86,7 +86,7 @@ def parameters(config):
 
 
 def metadata(settings, config):
-    return dict(schema=SCHEMA, settings={k: v for k, v in settings.__dict__.items() if k != 'path_samples'},
+    return dict(schema=SCHEMA, settings={k: v for k, v in settings.__dict__.items() if k not in ('path_samples', 'guide1', 'guide2')},
                 config={k: v for k, v in config.items()
                         if k not in ('bodies', 'target1', 'target2', '_expressions', 'center_point', 'guide1', 'guide2', 'path')},
                 center_selected=config.get('center_point') is not None,
