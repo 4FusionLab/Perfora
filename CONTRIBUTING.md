@@ -4,6 +4,8 @@ Keep geometry independent of Fusion. `Perfora/geometry.py` contains layout and c
 
 Run `python3 -m unittest discover -s tests -v` for geometry changes. Run `python3 install.py --zip` to check packaging. No pip dependencies are required.
 
+Run `tests/fusion_height_regression.py` with the tested add-in running for upstream face resizing: a 2 mm shell with side perforation and `h` changing 70 → 20 → 70 → 20 mm. Cover rounded/unrounded Voronoi, Trim to Boundary on/off, nonzero Edge Offset, Circle, and native Extrude/Cut. Check every owned feature (especially Combine), the visible body's validity, solid volume and height, natural recompute, and `computeAll`; a Healthy Custom Feature alone does not establish a valid result.
+
 CAD changes also require real Fusion checks. Install the add-in and run `PerforaSmokeTest` from Scripts and Add-Ins. From Fusion's Python console, use an absolute path into your checkout or extracted ZIP:
 
 ```python

@@ -115,6 +115,8 @@ All 13 shapes, exact trimming, rounded Voronoi holes, Fast/Full Preview, and **J
 
 Keep Perfora running to edit or recompute the feature. Large topology changes can invalidate downstream face/edge references. The mode uses Autodesk's [Custom Feature API](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/CustomFeatures_UM.htm), which remains in Preview.
 
+The unreleased working copy fixes Feature Cut losing its target when an upstream face shrinks with **Trim to Boundary** and a nonzero **Edge Offset**. The regression covers a box height change from 70 mm to 20 mm and back, including rounded Voronoi holes. This fix is not included in the published 1.0.0 archive.
+
 ## Pattern origin and spread
 
 **Start Point** is available for Staggered, Rectangular, Circular, and Voronoi. Use the native Select control to pick a sketch point, model vertex, or construction point; points on other planes are projected onto Profiles. Clear the selection for automatic placement. X/Y Offset add displacement from this point (in pattern axes for grids/Voronoi, sketch axes for Circular).

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Parametric Perfora timeline node; compute edits only owned sketch/base geometry."""
+"""Parametric Perfora timeline node; compute updates owned base geometry."""
 from dataclasses import replace
 import json
 import math
@@ -170,7 +170,6 @@ def make_body(source, settings, config, frame, scratch, cache=None):
     candidates = cache.resolve(region, settings, context) if cache is not None else None
     original = clipping.source_body(source, frame, config, region)
     if settings.clip_boundary:
-        clear_sketch(scratch)
         trimmed = clipping.inset_body(source, original, settings.margin, scratch)
         trimmed = clipping.apply_spread(trimmed, region, settings)
         layout = clipping.layout(original, trimmed, region, settings, candidates)

@@ -175,55 +175,63 @@ def apply_spread(body, region, settings):
 
 
 def inset_body(source, original, margin, scratch=None):
+    """Offset temporary wires without editing the parametric design.
+
+    Keep source/scratch arguments for callers and existing Feature documents.
+    Editing an owned face-supported sketch during CustomFeature compute can
+    invalidate the target of its downstream Combine after an upstream resize.
+    """
     if margin <= 1e-9:
         return original
-    # Custom features reuse an owned sketch: compute cannot create timeline nodes.
-    owned = scratch is None
-    scratch = scratch or model.new_source_sketch(source)
-    try:
-        wires = []
-        for geometries, _ in body_loops(original):
-            curves = [model.copy_curve(scratch, g, 'cell') for g in geometries]
-            evaluator = curves[0].geometry.evaluator
-            ok, start, end = evaluator.getParameterExtents()
-            if not ok:
-                raise ValueError('Unable to determine the Edge Offset direction.')
-            parameter = (start + end) / 2
-            ok_p, midpoint = evaluator.getPointAtParameter(parameter)
-            ok_t, tangent = evaluator.getFirstDerivative(parameter)
-            if not (ok_p and ok_t) or tangent.length < 1e-12:
-                raise ValueError('Unable to determine the Edge Offset direction.')
-            step = min(margin * 0.01, 0.0001) / tangent.length
-            probe = adsk.core.Point3D.create(midpoint.x + tangent.y * step,
-                                            midpoint.y - tangent.x * step, 0)
-            right_inside = any(f.isPointOnFace(probe, 1e-7) for f in original.faces)
-            data = scratch.geometricConstraints.createOffsetInput(
-                curves, adsk.core.ValueInput.createByReal(margin if right_inside else -margin))
-            data.isTopologyMatched = False
-            try:
-                constraint = scratch.geometricConstraints.addOffset2(data)
-            except RuntimeError as error:
-                raise ValueError('Unable to offset the boundary. Reduce Edge Offset.') from error
-            if not constraint or not constraint.childCurves:
-                raise ValueError('Edge Offset leaves no region for perforation.')
-            wires.append([c.geometry for c in constraint.childCurves])
-        result = sheet(wires)
-        # An invalid oversized inward offset can turn through itself. Never
-        # silently accept an expanded or inverted trimming region.
-        if result.area >= original.area:
-            raise ValueError('Edge Offset is too large for this region.')
-        original_region = body_region(original)
-        original_segments = original_region.segments
-        for loop in body_region(result).loops:
-            for p in loop.points:
-                if (not original_region.contains(p)
-                        or min(point_segment_distance(p, a, b) for a, b in original_segments)
-                        < margin - model.TOLERANCE * 3):
-                    raise ValueError('Edge Offset creates a degenerate or self-intersecting boundary.')
-        return result
-    finally:
-        if owned:
-            scratch.deleteMe()
+    manager = adsk.fusion.TemporaryBRepManager.get()
+    wires = []
+    for geometries, _ in body_loops(original):
+        wire_body, _ = manager.createWireFromCurves(list(geometries))
+        if not wire_body or wire_body.wires.count != 1:
+            raise ValueError('Unable to close the Edge Offset boundary.')
+        wire = wire_body.wires.item(0)
+        coedge = wire.coEdges.item(0)
+        edge = coedge.edge
+        evaluator = edge.geometry.evaluator
+        ok, start, end = evaluator.getParameterExtents()
+        if not ok:
+            raise ValueError('Unable to determine the Edge Offset direction.')
+        parameter = (start + end) / 2
+        ok_p, midpoint = evaluator.getPointAtParameter(parameter)
+        ok_t, tangent = evaluator.getFirstDerivative(parameter)
+        if not (ok_p and ok_t) or tangent.length < 1e-12:
+            raise ValueError('Unable to determine the Edge Offset direction.')
+        # offsetPlanarWire uses wire traversal, which can oppose curve geometry.
+        if coedge.isOpposedToEdge != edge.isParamReversed:
+            tangent.scaleBy(-1)
+        step = min(margin * 0.01, 0.0001) / tangent.length
+        probe = adsk.core.Point3D.create(midpoint.x + tangent.y * step,
+                                        midpoint.y - tangent.x * step, 0)
+        right_inside = any(f.isPointOnFace(probe, 1e-7) for f in original.faces)
+        try:
+            offset = wire.offsetPlanarWire(adsk.core.Vector3D.create(0, 0, 1),
+                margin if right_inside else -margin,
+                adsk.fusion.OffsetCornerTypes.ExtendedOffsetCornerType)
+        except RuntimeError as error:
+            raise ValueError('Unable to offset the boundary. Reduce Edge Offset.') from error
+        if not offset or not offset.wires.count:
+            raise ValueError('Edge Offset leaves no region for perforation.')
+        # A narrow region can split into several wires; preserve every island.
+        wires.extend([[e.geometry.copy() for e in w.edges] for w in offset.wires])
+    result = sheet(wires)
+    # An invalid oversized inward offset can turn through itself. Never
+    # silently accept an expanded or inverted trimming region.
+    if result.area >= original.area:
+        raise ValueError('Edge Offset is too large for this region.')
+    original_region = body_region(original)
+    original_segments = original_region.segments
+    for loop in body_region(result).loops:
+        for p in loop.points:
+            if (not original_region.contains(p)
+                    or min(point_segment_distance(p, a, b) for a, b in original_segments)
+                    < margin - model.TOLERANCE * 3):
+                raise ValueError('Edge Offset creates a degenerate or self-intersecting boundary.')
+    return result
 
 
 class Layout:

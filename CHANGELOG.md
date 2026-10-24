@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Fix Feature Cut losing its target body when an upstream face shrinks with Trim to Boundary and a nonzero Edge Offset. Compute the exact offset on temporary BRep wires without editing the face-supported scratch sketch during recompute.
+- Add a real Fusion regression for shell height changes of 70 → 20 → 70 → 20 mm, checking nested Combine health and visible solid geometry.
+
 ## 1.0.0 — 2026-10-24
 
 First stable release of Perfora. Published as a normal GitHub release and marked Latest.
