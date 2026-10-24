@@ -4,13 +4,16 @@ import html
 import math
 from pathlib import Path
 import traceback
+from threading import Timer
+from uuid import uuid4
 
 import adsk.core
 import adsk.fusion
 
 from .geometry import Settings, LENGTH_SHAPES
 from . import model, ui_resources, feature as parametric
-from .preview import Renderer
+from .preview import Renderer, PREVIEW_COLORS
+from .numeric_inputs import NumericInput
 
 COMMAND_ID = 'DiegoV_Perforator'  # Stable ID for existing installations.
 PANEL_ID = 'SolidCreatePanel'
@@ -56,7 +59,8 @@ OPERATIONS = [('join', 'Join'), ('cut', 'Cut'), ('intersect', 'Intersect'),
 DIRECTIONS = [('one', 'One Side'), ('two', 'Two Sides'), ('symmetric', 'Symmetric')]
 EXTENTS = [('distance', 'Distance'), ('object', 'To Object'), ('all', 'All')]
 STARTS = [('profile', 'Profile Plane'), ('offset', 'Offset')]
-LAYOUTS = [('staggered', 'Staggered'), ('rows', 'Rectangular')]
+LAYOUTS = [('staggered', 'Staggered'), ('rows', 'Rectangular'), ('circular', 'Circular')]
+ORIENTATIONS = [('fixed', 'Fixed'), ('radial', 'Radial'), ('tangential', 'Tangential')]
 PREVIEW_MODES = [('fast', 'Fast'), ('exact', 'Full')]
 
 
@@ -71,7 +75,14 @@ class Session:
         self.edited_feature = edited_feature
         self.restore_marker = None
         self._extrude_inputs = None
+        self.initial_defaults_applied = False
         self.inputs = {}
+        self.numeric_inputs = {}
+        self.app = adsk.core.Application.get()
+        self.units = adsk.fusion.Design.cast(self.app.activeProduct).unitsManager
+        self.defaults_timer = None
+        self.defaults_closed = False
+        self.defaults_event_id = None
         self.handlers = []
         self.updating = False
         self.preview_error = ''
@@ -82,7 +93,7 @@ class Session:
         command.isRepeatable = True
         root = command.commandInputs
         self.button_row(root, 'result', 'Type', RESULTS)
-        self.inputs['result'].listItems.item(2 if edited_feature else 1).isSelected = True
+        self.inputs['result'].listItems.item(2).isSelected = True
         self.selection(root, 'source', 'Profiles', ['PlanarFaces', 'Profiles', 'ConstructionPlanes'], 1, 1,
                        'Select a planar face, a closed sketch profile, or a construction plane.')
 
@@ -99,13 +110,12 @@ class Session:
         for identifier, (label, _) in LENGTH_FIELDS.items():
             self.number(pattern, identifier, label, '12 mm')
         self.number(pattern, 'arm_width', 'Arm Width', '1.5 mm')
-        self.inputs['star_points'] = pattern.addIntegerSpinnerCommandInput('star_points', 'Points', 3, 12, 1, 5)
+        self.integer(pattern, 'star_points', 'Points', 3, 12, 5)
         self.number(pattern, 'star_ratio', 'Inner Radius (%)', '45', '')
-        self.inputs['irregularity'] = pattern.addIntegerSpinnerCommandInput(
-            'irregularity', 'Irregularity (%)', 0, 100, 5, 80)
+        self.integer(pattern, 'irregularity', 'Irregularity (%)', 0, 100, 80)
         self.inputs['irregularity'].tooltip = ('0% creates regular square cells. Higher values create more varied '
             'Voronoi polygons while keeping the minimum Web Thickness.')
-        self.inputs['seed'] = pattern.addIntegerSpinnerCommandInput('seed', 'Seed', 0, 2147483647, 1, 1)
+        self.integer(pattern, 'seed', 'Seed', 0, 2147483647, 1)
         self.inputs['seed'].tooltip = 'The same Seed and settings reproduce the same pattern.'
         self.inputs['new_pattern'] = pattern.addBoolValueInput('new_pattern', '', False, '', False)
         self.inputs['new_pattern'].text = 'New Pattern'
@@ -123,14 +133,28 @@ class Session:
         self.check(pattern, 'clip_boundary', 'Trim to Boundary', False)
         self.inputs['clip_boundary'].tooltip = ('Trim intersecting holes to the boundary after applying Edge Offset. '
             'Clear this option to keep only complete holes.')
-        self.button_row(pattern, 'layout', 'Distribution', LAYOUTS)
+        self.dropdown(pattern, 'layout', 'Distribution', LAYOUTS, icons=True)
+        self.selection(pattern, 'center_point', 'Start Point',
+                       ['SketchPoints', 'Vertices', 'ConstructionPoints'], 0, 1,
+                       'Select a sketch point, vertex, or construction point. Leave empty for the boundary center. '
+                       'Points off the Profiles plane are projected onto it. X/Y Offset move the pattern from this point.')
+        self.inputs['center_point'].isUseCurrentSelections = False
+        self.number(pattern, 'spread_radius', 'Spread Radius', '0 mm')
+        self.inputs['spread_radius'].tooltip = ('Limit perforation to a radius around Start Point, including X/Y Offset. '
+            '0 fills the selected boundary. Edge Offset also applies to this limit; Trim to Boundary keeps partial holes.')
+        self.number(pattern, 'start_radius', 'Start Radius', '0 mm')
+        self.inputs['start_radius'].tooltip = ('Radius of the first ring, measured to hole centers. '
+            '0 starts with a center hole. Ring spacing and holes per ring are automatic to preserve Web Thickness.')
+        self.dropdown(pattern, 'orientation', 'Orientation', ORIENTATIONS)
+        self.inputs['orientation'].tooltip = ('Fixed keeps all holes parallel. Radial rotates each hole with its '
+            'position around the center. Tangential follows the circumference. Hole Angle adds a rotation.')
 
         more = self.group(root, 'more_group', 'Placement', False)
         self.number(more, 'grid_angle', 'Pattern Angle', '0 deg', 'deg')
         self.number(more, 'shape_angle', 'Hole Angle', '0 deg', 'deg')
         self.number(more, 'offset_x', 'X Offset', '0 mm')
         self.number(more, 'offset_y', 'Y Offset', '0 mm')
-        self.inputs['limit'] = more.addIntegerSpinnerCommandInput('limit', 'Maximum Holes', 1, 5000, 100, 1500)
+        self.integer(more, 'limit', 'Maximum Holes', 1, 5000, 1500)
 
         self.dropdown(root, 'material', 'Profile Type', MATERIALS)
         self.inputs['material'].tooltip = ('Holes creates the hole profiles. Perforated Panel creates the surrounding '
@@ -160,6 +184,9 @@ class Session:
         self.dropdown(root, 'preview_mode', 'Preview Type', PREVIEW_MODES)
         self.inputs['preview_mode'].tooltip = ('Fast displays cached contours on the profile plane. Full previews the '
             'complete extrusion. OK always creates the exact sketch or Extrude feature.')
+        self.dropdown(root, 'preview_color', 'Preview Color', PREVIEW_COLORS)
+        self.inputs['preview_color'].tooltip = ('Color of Fast Preview contours. Gold is the default. '
+            'Full Preview uses the Fusion model appearance.')
         self.inputs['status'] = root.addTextBoxCommandInput('status', '', '', 2, True)
         self.inputs['status'].isFullWidth = True
         self.inputs['status'].isVisible = False
@@ -175,6 +202,10 @@ class Session:
             for key in ('source', 'operation', 'bodies'):
                 self.inputs[key].isEnabled = False
             command.isRepeatable = False
+        self.connect(command.activate, ActivateDefaults(self))
+        self.connect(command.keyUp, CommitDefaults(self))
+        self.defaults_event_id = COMMAND_ID + '.defaults.' + uuid4().hex
+        self.connect(self.app.registerCustomEvent(self.defaults_event_id), DefaultValues(self))
         self.update_visibility()
         command.setDialogSize(320, 0)
 
@@ -190,7 +221,11 @@ class Session:
                                  ('boundary', [('rectangle', 'Rectangle'), ('circle', 'Circle')])):
                 chosen = settings[key] if key == 'shape' else config[key]
                 d[key].listItems.item(next(i for i, (k, _) in enumerate(options) if k == chosen)).isSelected = True
-            d['layout'].listItems.item(0 if settings['staggered'] else 1).isSelected = True
+            d['layout'].listItems.item(2 if settings.get('layout') == 'circular' else (0 if settings['staggered'] else 1)).isSelected = True
+            d['orientation'].listItems.item(2 if settings.get('tangential_orientation') else
+                (1 if settings.get('radial_orientation') else 0)).isSelected = True
+            d['start_radius'].value = settings.get('start_radius', 0)
+            d['spread_radius'].value = settings.get('spread_radius', 0)
             for key in ('clip_boundary',):
                 d[key].value = settings[key]
             d['reverse'].value = config['reverse']
@@ -199,8 +234,10 @@ class Session:
             d['irregularity'].value = round(custom.parameters.itemById('irregularity').value * 100)
             d['round_corners'].value = custom.parameters.itemById('corner_radius').value > 0
             for key in parametric.PARAMETERS:
-                if key in d and isinstance(d[key], adsk.core.ValueCommandInput):
-                    d[key].expression = custom.parameters.itemById(key).expression
+                if key in self.numeric_inputs and key not in ('star_points', 'seed', 'limit', 'irregularity'):
+                    parameter = custom.parameters.itemById(key)
+                    if parameter:
+                        d[key].expression = parameter.expression
             d['star_ratio'].expression = '(' + custom.parameters.itemById('star_ratio').expression + ') * 100'
             for key in SIZE_FIELDS:
                 d[key].expression = custom.parameters.itemById('size').expression
@@ -242,7 +279,60 @@ class Session:
         self.inputs[identifier] = control
 
     def number(self, parent, identifier, title, expression, unit='mm'):
-        self.inputs[identifier] = parent.addValueInput(identifier, title, unit, model.value(expression))
+        evaluator = parent.addValueInput('_numeric_' + identifier, title, unit, model.value(expression))
+        evaluator.isVisible = False
+        control = parent.addStringValueInput(identifier, title, expression)
+        self.inputs[identifier] = self.numeric_inputs[identifier] = NumericInput(control, evaluator, self, expression, unit)
+
+    def integer(self, parent, identifier, title, minimum, maximum, default):
+        self.number(parent, identifier, title, str(default), '')
+        self.inputs[identifier].integer_bounds = (minimum, maximum)
+
+    def schedule_defaults(self):
+        if self.defaults_timer:
+            self.defaults_timer.cancel()
+        self.defaults_timer = Timer(1.0, self.post_defaults)
+        self.defaults_timer.daemon = True
+        self.defaults_timer.start()
+
+    def post_defaults(self):
+        # Only enqueue an event from the worker; all UI/CAD access stays on
+        # Fusion's main thread. A cancelled command cannot retain a callback.
+        event_id = self.defaults_event_id
+        if event_id and not self.defaults_closed:
+            try:
+                self.app.fireCustomEvent(event_id)
+            except RuntimeError:
+                pass  # The command may have unregistered the event meanwhile.
+
+    def restore_empty_inputs(self, exclude=None):
+        if self.defaults_closed:
+            return []
+        restored = []
+        previous = self.updating
+        self.updating = True
+        try:
+            for identifier, control in self.numeric_inputs.items():
+                if identifier != exclude and not control.expression.strip():
+                    control.expression = control.default_expression
+                    control.isValueError = False
+                    restored.append(identifier)
+        finally:
+            self.updating = previous
+        for identifier in restored:
+            self.sync_dimensions(identifier)
+        if any(k in restored for k in ('width', 'area_diameter', 'height')):
+            self.renderer.reset()
+        return restored
+
+    def close_defaults(self):
+        self.defaults_closed = True
+        if self.defaults_timer:
+            self.defaults_timer.cancel()
+            self.defaults_timer = None
+        if self.defaults_event_id:
+            self.app.unregisterCustomEvent(self.defaults_event_id)
+            self.defaults_event_id = None
 
     def check(self, parent, identifier, title, default, icon=''):
         resource = ui_resources.icon(icon)
@@ -313,6 +403,13 @@ class Session:
                 visible(identifier, shape == 'voronoi')
             visible('corner_radius', shape == 'voronoi' and d['round_corners'].value)
             visible('layout', shape != 'voronoi')
+            circular = shape != 'voronoi' and self.chosen('layout', LAYOUTS) == 'circular'
+            visible('center_point', True)
+            visible('start_radius', circular)
+            visible('orientation', circular and shape != 'circle')
+            for identifier, axis in (('offset_x', 'X'), ('offset_y', 'Y')):
+                d[identifier].tooltip = (axis + ' offset from Start Point, or the boundary center when no point is selected, in sketch axes.'
+                    if circular else axis + ' offset from Start Point, or the automatic center, in pattern axes. Without a spread limit, offsets are periodic.')
             visible('shape_angle', shape not in ('circle', 'voronoi'))
             is_feature = self.chosen('result', RESULTS) == 'feature'
             is_extrude = self.chosen('result', RESULTS) in ('extrude', 'feature')
@@ -347,10 +444,13 @@ class Session:
                                        or (is_feature and self.chosen('operation', OPERATIONS) == 'join'))
             visible('bodies', uses_bodies)
             visible('preview_mode', d['preview'].value)
-            if uses_bodies and isinstance(source, adsk.fusion.BRepFace) and not d['bodies'].selectionCount:
-                # The selection API expects the visible assembly proxy when present.
-                visible_face = d['source'].selection(0).entity
-                d['bodies'].addSelection(visible_face.body)
+            visible('preview_color', d['preview'].value and self.chosen('preview_mode', PREVIEW_MODES) == 'fast')
+            if uses_bodies and source is not None and not d['bodies'].selectionCount:
+                # Profiles on a solid face use that face's body too. Preserve
+                # the visible assembly proxy expected by the selection API.
+                body = model.source_support_body(d['source'].selection(0).entity)
+                if body is not None:
+                    d['bodies'].addSelection(body)
         finally:
             self.updating = False
 
@@ -363,7 +463,10 @@ class Session:
         shape = self.chosen('shape', SHAPES)
         size_id = self.dimension_id(SIZE_FIELDS, shape)
         length_id = self.dimension_id(LENGTH_FIELDS, shape)
-        required = [size_id, 'gap', 'margin', 'grid_angle', 'offset_x', 'offset_y']
+        required = [size_id, 'gap', 'margin', 'grid_angle', 'offset_x', 'offset_y', 'limit', 'spread_radius']
+        circular = shape != 'voronoi' and self.chosen('layout', LAYOUTS) == 'circular'
+        if circular:
+            required.append('start_radius')
         if shape not in ('circle', 'voronoi'):
             required.append('shape_angle')
         if shape in LENGTH_SHAPES:
@@ -371,7 +474,9 @@ class Session:
         if shape == 'cross':
             required.append('arm_width')
         if shape == 'star':
-            required.append('star_ratio')
+            required += ['star_ratio', 'star_points']
+        if shape == 'voronoi':
+            required += ['irregularity', 'seed']
         if shape == 'voronoi' and d['round_corners'].value:
             required.append('corner_radius')
         boundary = self.chosen('boundary', [('rectangle', ''), ('circle', '')])
@@ -395,6 +500,8 @@ class Session:
                         raise ValueError('Select an Object for Side ' + side + '.')
             if direction == 'two':
                 required.append('taper2')
+        for identifier, control in self.numeric_inputs.items():
+            control.isValueError = identifier in required and bool(control.expression.strip()) and not control.isValidExpression
         for identifier in required:
             if not d[identifier].isValidExpression:
                 raise ValueError('Check the value of ' + d[identifier].name + '.')
@@ -414,19 +521,34 @@ class Session:
                             irregularity=d['irregularity'].value / 100 if shape == 'voronoi' else 0.8,
                             seed=d['seed'].value if shape == 'voronoi' else 1,
                             corner_radius=d['corner_radius'].value
-                                if shape == 'voronoi' and d['round_corners'].value else 0)
+                                if shape == 'voronoi' and d['round_corners'].value else 0,
+                            layout='circular' if circular else 'grid',
+                            start_radius=d['start_radius'].value if circular else 0,
+                            spread_radius=d['spread_radius'].value,
+                            radial_orientation=circular and shape != 'circle' and
+                                self.chosen('orientation', ORIENTATIONS) == 'radial',
+                            tangential_orientation=circular and shape != 'circle' and
+                                self.chosen('orientation', ORIENTATIONS) == 'tangential')
         settings.validate()
         config = {
-            'boundary': boundary, 'width': d[width_id].value, 'height': d['height'].value,
+            'center_point': d['center_point'].selection(0).entity
+                if d['center_point'].selectionCount else None,
+            'boundary': boundary,
+            'width': d[width_id].value if width_id in required else
+                self.units.evaluateExpression(d[width_id].default_expression, d[width_id].unit),
+            'height': d['height'].value if 'height' in required else
+                self.units.evaluateExpression(d['height'].default_expression, d['height'].unit),
             'result': result, 'material': self.chosen('material', MATERIALS),
             'operation': self.chosen('operation', OPERATIONS), 'direction': direction,
             'reverse': d['reverse'].value,
-            'start': d['start'].expression if self.chosen('start_mode', STARTS) == 'offset' else '0 mm',
+            'start': d['start'].model_expression if self.chosen('start_mode', STARTS) == 'offset' else '0 mm',
             'bodies': [d['bodies'].selection(i).entity for i in range(d['bodies'].selectionCount)],
         }
+        if config['center_point'] is not None:
+            model.point_position(config['center_point'], model.source_component(source))
         for side in ('1', '2'):
             for key in ('distance', 'taper', 'object_offset'):
-                config[key + side] = d[key + side].expression
+                config[key + side] = d[key + side].model_expression
             config['extent' + side] = self.chosen('extent' + side, EXTENTS)
             control = d['target' + side]
             config['target' + side] = control.selection(0).entity if control.selectionCount else None
@@ -442,11 +564,11 @@ class Session:
                 raise ValueError('Taper Angle must be between -90 deg and 90 deg.')
         if result == 'feature':
             parametric.validate(config)
-            expressions = {k: d[k].expression for k in parametric.PARAMETERS if k in d
-                           and isinstance(d[k], adsk.core.ValueCommandInput)}
-            expressions.update(size=d[size_id].expression,
-                               slot_length=d[length_id].expression if length_id else d[size_id].expression,
-                               width=d[width_id].expression,
+            expressions = {k: d[k].model_expression for k in parametric.PARAMETERS
+                           if k in self.numeric_inputs and k not in ('star_points', 'seed', 'limit', 'irregularity')}
+            expressions.update(size=d[size_id].model_expression,
+                               slot_length=d[length_id].model_expression if length_id else d[size_id].model_expression,
+                               width=d[width_id].model_expression,
                                start=config['start'])
             if shape == 'star':
                 expressions['star_ratio'] = '(' + d['star_ratio'].expression + ') / 100'
@@ -466,12 +588,17 @@ class Changed(adsk.core.InputChangedEventHandler):
         self.session = session
 
     def notify(self, args):
-        if self.session.updating or args.input.id == 'status':
+        if self.session.updating or args.input.id == 'status' or args.input.id.startswith('_numeric_'):
             return
         # Folding sections changes presentation, not perforation parameters.
         if isinstance(args.input, adsk.core.GroupCommandInput):
             return
         try:
+            self.session.restore_empty_inputs(exclude=args.input.id)
+            control = self.session.numeric_inputs.get(args.input.id)
+            if control and not control.expression.strip():
+                self.session.schedule_defaults()
+                return  # Let Select All -> type replace a value without interruption.
             if args.input.id == 'new_pattern':
                 self.session.updating = True
                 try:
@@ -500,12 +627,58 @@ class Validate(adsk.core.ValidateInputsEventHandler):
         self.session = session
 
     def notify(self, args):
+        if self.session.updating:
+            return
         try:
             self.session.read()
             args.areInputsValid = True
         except Exception as error:
             args.areInputsValid = False
             self.session.status(str(error))
+
+
+class DefaultValues(adsk.core.CustomEventHandler):
+    def __init__(self, session):
+        super().__init__()
+        self.session = session
+
+    def notify(self, args):
+        if self.session.defaults_closed:
+            return
+        try:
+            if self.session.restore_empty_inputs():
+                self.session.command.doExecutePreview()
+        except Exception:
+            log_error()
+
+
+class ActivateDefaults(adsk.core.CommandEventHandler):
+    def __init__(self, session):
+        super().__init__()
+        self.session = session
+
+    def notify(self, args):
+        # Fusion restores remembered command values after commandCreated.
+        # Apply the requested default once, without resetting later user edits.
+        if not self.session.initial_defaults_applied:
+            self.session.initial_defaults_applied = True
+            self.session.inputs['result'].listItems.item(2).isSelected = True
+        self.session.restore_empty_inputs()
+
+
+class CommitDefaults(adsk.core.KeyboardEventHandler):
+    def __init__(self, session):
+        super().__init__()
+        self.session = session
+
+    def notify(self, args):
+        if args.keyCode in (adsk.core.KeyCodes.TabKeyCode, adsk.core.KeyCodes.ReturnKeyCode,
+                            adsk.core.KeyCodes.EnterKeyCode):
+            try:
+                if self.session.restore_empty_inputs():
+                    self.session.command.doExecutePreview()
+            except Exception:
+                log_error()
 
 
 class Execute(adsk.core.CommandEventHandler):
@@ -515,6 +688,8 @@ class Execute(adsk.core.CommandEventHandler):
         self.preview = preview
 
     def notify(self, args):
+        if not self.preview:
+            self.session.restore_empty_inputs()
         if self.preview:
             args.isValidResult = False
             if not self.session.inputs['preview'].value:
@@ -523,19 +698,20 @@ class Execute(adsk.core.CommandEventHandler):
         try:
             source, settings, config = self.session.read()
             if self.preview and self.session.chosen('preview_mode', PREVIEW_MODES) == 'fast':
-                count = self.session.renderer.show(source, settings, config)
+                count = self.session.renderer.show(source, settings, config,
+                    color=self.session.chosen('preview_color', PREVIEW_COLORS))
                 self.session.status('%d holes. Fast preview.' % count)
                 return
             self.session.renderer.clear()
             if self.session.edited_feature:
-                count = parametric.update(self.session.edited_feature, settings, config)
+                count = parametric.update(self.session.edited_feature, settings, config, cache=self.session.renderer.geometry_cache)
                 feature = self.session.edited_feature
                 if self.session.restore_marker is not None:
                     feature.parentComponent.parentDesign.timeline.markerPosition = self.session.restore_marker
             elif config['result'] == 'feature':
-                sketch, feature, count = parametric.build(source, settings, config)
+                sketch, feature, count = parametric.build(source, settings, config, cache=self.session.renderer.geometry_cache)
             else:
-                sketch, feature, count = model.build(source, settings, config)
+                sketch, feature, count = model.build(source, settings, config, cache=self.session.renderer.geometry_cache)
             message = '%d holes. %s' % (count, 'Sketch ready.' if feature is None else ('Feature ready.' if config['result'] == 'feature' else 'Extrude ready.'))
             if feature and feature.healthState == adsk.fusion.FeatureHealthStates.WarningFeatureHealthState:
                 message += '\n' + feature.errorOrWarningMessage
@@ -561,6 +737,7 @@ class Destroy(adsk.core.CommandEventHandler):
         self.session = session
 
     def notify(self, args):
+        self.session.close_defaults()
         self.session.renderer.reset()
         if self.session.edited_feature and self.session.restore_marker is not None:
             self.session.edited_feature.parentComponent.parentDesign.timeline.markerPosition = self.session.restore_marker
@@ -587,6 +764,9 @@ class EditActivate(adsk.core.CommandEventHandler):
             s.updating = True
             try:
                 s.inputs['source'].addSelection(parametric.source_entity(custom))
+                center = parametric.center_entity(custom)
+                if center is not None:
+                    s.inputs['center_point'].addSelection(center)
                 data = parametric.stored(custom)
                 for i in range(data['body_count']):
                     s.inputs['bodies'].addSelection(custom.dependencies.itemById('body' + str(i)).entity)

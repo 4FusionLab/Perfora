@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Publish a verified experimental release from the tested GitHub Actions commit."""
+"""Publish a verified stable or experimental release from the tested GitHub Actions commit."""
 import hashlib
 import json
 import os
@@ -21,6 +21,9 @@ def main():
     version = json.loads((ROOT / 'Perfora/Perfora.manifest').read_text(encoding='utf-8'))['version']
     if not re.fullmatch(r'\d+\.\d+\.\d+', version):
         raise SystemExit('Manifest version must be MAJOR.MINOR.PATCH.')
+    stable = int(version.split('.')[0]) >= 1
+    prerelease = not stable
+    title = 'Perfora ' + version + (' · First stable release' if version == '1.0.0' else ('' if stable else ' · Experimental'))
     tag = 'v' + version
     archive = ROOT / ('dist/Perfora-' + version + '.zip')
     checksum = archive.with_suffix('.zip.sha256')
@@ -42,7 +45,7 @@ def main():
             raise SystemExit('Existing draft belongs to a different commit; refusing to overwrite it.')
     else:
         gh('release', 'create', tag, '--repo', repository, '--target', commit,
-           '--draft', '--prerelease', '--title', 'Perfora ' + version + ' · Experimental',
+           '--draft', '--prerelease=' + str(prerelease).lower(), '--title', title,
            '--notes-file', str(notes))
     gh('release', 'upload', tag, str(archive), str(checksum), '--repo', repository, '--clobber')
     # Read back the uploaded files before making the release visible.
@@ -52,10 +55,12 @@ def main():
         for path in (archive, checksum):
             if (Path(temporary) / path.name).read_bytes() != path.read_bytes():
                 raise SystemExit('Uploaded asset differs from the build: ' + path.name)
-    gh('release', 'edit', tag, '--repo', repository, '--draft=false', '--prerelease', '--latest=false')
+    gh('release', 'edit', tag, '--repo', repository, '--draft=false',
+       '--prerelease=' + str(prerelease).lower(), '--latest=' + str(stable).lower(),
+       '--title', title, '--notes-file', str(notes))
     result = json.loads(gh('release', 'view', tag, '--repo', repository,
                           '--json', 'isDraft,isPrerelease,assets,url').stdout)
-    if result['isDraft'] or not result['isPrerelease']:
+    if result['isDraft'] or result['isPrerelease'] != prerelease:
         raise SystemExit('Release publication state is incorrect.')
     if {asset['name'] for asset in result['assets']} != {archive.name, checksum.name}:
         raise SystemExit('Unexpected release assets.')

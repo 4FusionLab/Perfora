@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Fusion adapter. No UI or filesystem changes; called inside command transactions."""
+from dataclasses import replace
 import json
 import math
 
@@ -35,6 +36,87 @@ def source_component(source):
     if isinstance(source, adsk.fusion.ConstructionPlane):
         return source.component
     raise ValueError('Select a planar face, sketch profile, or construction plane.')
+
+
+def source_revision(source):
+    """Cheap invalidation for an edited source, even when its identity survives."""
+    if isinstance(source, adsk.fusion.BRepFace):
+        return source.body.revisionId
+    if isinstance(source, adsk.fusion.Profile):
+        return source.parentSketch.revisionId
+    return tuple(source.transform.asArray())  # Construction-plane basis/origin.
+
+
+def point_component(entity):
+    """Owner of a supported point; preserve proxies until coordinates are resolved."""
+    entity = native(entity)
+    if isinstance(entity, adsk.fusion.SketchPoint):
+        return entity.parentSketch.parentComponent
+    if isinstance(entity, adsk.fusion.BRepVertex):
+        return entity.body.parentComponent
+    if isinstance(entity, adsk.fusion.ConstructionPoint):
+        return entity.component
+    raise ValueError('Select a sketch point, vertex, or construction point for Start Point.')
+
+
+def point_reference(entity, component):
+    """Assembly reference suitable for a Custom Feature dependency."""
+    owner = point_component(entity)
+    root = component.parentDesign.rootComponent
+    if entity.assemblyContext or owner == root:
+        return entity
+    occurrences = root.allOccurrencesByComponent(owner)
+    if occurrences.count != 1:
+        raise ValueError('Select Start Point on a visible component occurrence.')
+    return native(entity).createForAssemblyContext(occurrences.item(0))
+
+
+def point_position(entity, component):
+    if not entity or not entity.isValid:
+        raise ValueError('Start Point is missing. Select another point or clear the selection.')
+    local = native(entity)
+    owner = point_component(local)
+    position = (local.worldGeometry if isinstance(local, adsk.fusion.SketchPoint) else local.geometry).copy()
+    # Native coordinates of a point in the source component are unambiguous,
+    # including reused components. Cross-component references retain context.
+    if owner != component:
+        root = component.parentDesign.rootComponent
+        if owner != root:
+            position.transformBy(point_reference(entity, component).assemblyContext.transform2)
+        if component != root:
+            occurrences = root.allOccurrencesByComponent(component)
+            if occurrences.count != 1:
+                raise ValueError('Select Start Point in the Profiles component when it has multiple occurrences.')
+            inverse = occurrences.item(0).transform2.copy()
+            inverse.invert()
+            position.transformBy(inverse)
+    if not all(math.isfinite(v) for v in position.asArray()):
+        raise ValueError('Start Point must have finite coordinates.')
+    return position
+
+
+def sketch_frame(sketch):
+    origin = sketch.sketchToModelSpace(point((0, 0)))
+    x = sketch.sketchToModelSpace(point((1, 0)))
+    y = sketch.sketchToModelSpace(point((0, 1)))
+    return (tuple(origin.asArray()), tuple(origin.vectorTo(x).asArray()),
+            tuple(origin.vectorTo(y).asArray()))
+
+
+def layout_settings(settings, config, region, frame, component):
+    """Resolve a live anchor once for every CAD/preview path, without API in geometry.
+
+    Orthogonal projection onto the Profiles plane lets points on other sketches
+    locate the pattern too. Stored offsets remain relative to the selected point.
+    """
+    center = config.get('center_point')
+    if center is None:
+        return settings
+    position = point_position(center, component)
+    origin, u, v = frame
+    delta = [position.asArray()[i] - origin[i] for i in range(3)]
+    x, y = sum(a*b for a, b in zip(delta, u)), sum(a*b for a, b in zip(delta, v))
+    return replace(settings, origin_x=x, origin_y=y)
 
 
 def strokes(evaluator, convert):
@@ -275,6 +357,42 @@ def extrude(component, profiles, config):
     return feature
 
 
+def sketch_reference_plane(sketch):
+    """Resolve a face-backed sketch at its historical position, then restore it.
+
+    Fusion raises when reading referencePlane for a BRepFace after the sketch.
+    Keep the caller's exact marker (including an edit rollback), even on failure.
+    The returned native support remains usable at the restored position.
+    """
+    try:
+        return sketch.referencePlane
+    except RuntimeError:
+        if not sketch.isParametric:
+            raise
+        timeline = sketch.parentComponent.parentDesign.timeline
+        marker = timeline.markerPosition
+        try:
+            if not sketch.timelineObject.rollTo(True):
+                raise ValueError('Unable to resolve the sketch support face.')
+            return sketch.referencePlane
+        finally:
+            timeline.markerPosition = marker
+
+
+def source_support_body(source):
+    """Infer Objects from a face or a profile sketched directly on a solid face."""
+    selected = source
+    source = native(source)
+    support = (sketch_reference_plane(source.parentSketch)
+               if isinstance(source, adsk.fusion.Profile) else source)
+    if not isinstance(support, adsk.fusion.BRepFace):
+        return None
+    body = native(support.body)
+    if selected.assemblyContext:
+        return body.createForAssemblyContext(selected.assemblyContext)
+    return body
+
+
 def new_source_sketch(source):
     """Create an empty sketch with exactly the frame used by final geometry."""
     source = native(source)
@@ -282,7 +400,7 @@ def new_source_sketch(source):
     if isinstance(source, adsk.fusion.Profile):
         if not source.isOnSketchPlane:
             raise ValueError('Select a profile on the sketch plane.')
-        plane = source.parentSketch.referencePlane
+        plane = sketch_reference_plane(source.parentSketch)
         if not plane:
             raise ValueError('This profile has no reference plane. Select a planar face or construction plane.')
     else:
@@ -293,7 +411,7 @@ def new_source_sketch(source):
     return sketch
 
 
-def build(source, settings, config):
+def build(source, settings, config, cache=None):
     """Must run within a Fusion command transaction (execute/executePreview)."""
     source = native(source)
     component = source_component(source)
@@ -302,15 +420,19 @@ def build(source, settings, config):
     try:
         sketch.name = 'Perforation - ' + settings.shape.title()
         region = get_region(source, sketch, config)
+        frame = sketch_frame(sketch)
+        layout = layout_settings(settings, config, region, frame, component)
+        candidates = cache.resolve(region, layout, frame) if cache is not None else None
         clipped = None
         if settings.clip_boundary:
             from . import clipping
             original = clipping.source_body(source, sketch, config, region)
             trimmed = clipping.inset_body(source, original, settings.margin)
-            clipped = clipping.layout(original, trimmed, region, settings)
+            trimmed = clipping.apply_spread(trimmed, region, layout)
+            clipped = clipping.layout(original, trimmed, region, layout, candidates)
             cells = clipped.cells
         else:
-            cells = generate(region, settings)
+            cells = generate(region, layout) if candidates is None else candidates
         # project(edge) returns an empty collection while compute is deferred,
         # although the curves appear later. Project and tag the boundary first.
         if config['material'] == 'panel' and clipped is None:
@@ -328,7 +450,7 @@ def build(source, settings, config):
         if not settings.clip_boundary and config['material'] == 'cells' and profiles.count != len(cells):
             raise ValueError('The profile count differs from the hole count. Increase Web Thickness.')
         metadata = dict(settings.__dict__)
-        metadata.update({key: val for key, val in config.items() if key not in ('bodies', 'target1', 'target2')})
+        metadata.update({key: val for key, val in config.items() if key not in ('bodies', 'target1', 'target2', 'center_point')})
         sketch.attributes.add(ATTRIBUTE_GROUP, 'settings', json.dumps(metadata, ensure_ascii=False))
         if config['result'] == 'extrude':
             feature = extrude(component, profiles, config)

@@ -21,6 +21,8 @@ _busy = False
 # Internal units are cm/rad. UI expressions (including user parameters) are kept.
 PARAMETERS = {
     'size': ('Hole Size / Cell Spacing', 'mm'),
+    'start_radius': ('Start Radius', 'mm'),
+    'spread_radius': ('Spread Radius', 'mm'),
     'slot_length': ('Hole Length', 'mm'), 'gap': ('Web Thickness', 'mm'),
     'margin': ('Edge Offset', 'mm'), 'grid_angle': ('Pattern Angle', 'deg'),
     'shape_angle': ('Hole Angle', 'deg'), 'offset_x': ('X Offset', 'mm'),
@@ -71,7 +73,8 @@ def validate(config, design=None):
 def metadata(settings, config):
     return dict(schema=SCHEMA, settings=dict(settings.__dict__),
                 config={k: v for k, v in config.items()
-                        if k not in ('bodies', 'target1', 'target2', '_expressions')},
+                        if k not in ('bodies', 'target1', 'target2', '_expressions', 'center_point')},
+                center_selected=config.get('center_point') is not None,
                 body_count=len(config['bodies']))
 
 
@@ -103,14 +106,26 @@ def source_entity(custom):
     return getattr(custom.parentComponent, axis + 'ConstructionPlane')
 
 
+def center_entity(custom):
+    dependency = custom.dependencies.itemById('center_point')
+    entity = dependency.entity if dependency else None
+    if stored(custom).get('center_selected') and (entity is None or not entity.isValid):
+        raise ValueError('Start Point is missing. Edit the Perfora Feature to select another point.')
+    return entity
+
+
 def read(custom):
     data = stored(custom)
     settings = Settings(**data['settings'])
     config = dict(data['config'])
+    config['center_point'] = center_entity(custom)
     values = {}
     for key in PARAMETERS:
         p = custom.parameters.itemById(key)
         if not p:
+            if key in ('start_radius', 'spread_radius'):
+                values[key] = getattr(settings, key)
+                continue  # Existing 0.2.0 nodes predate the optional radius parameter.
             raise ValueError('The Feature is missing parameter: ' + key)
         values[key] = p.value
     for key in INTEGER_PARAMETERS:
@@ -143,23 +158,27 @@ def clear_sketch(sketch):
             p.deleteMe()
 
 
-def make_body(source, settings, config, frame, scratch):
+def make_body(source, settings, config, frame, scratch, cache=None):
     validate(config, frame.parentComponent.parentDesign)
     if isinstance(source, adsk.fusion.ConstructionPlane):
         keys = ('width', 'height') if config['boundary'] == 'rectangle' else ('width',)
         if any(not math.isfinite(config[k]) or config[k] <= 0 for k in keys):
             raise ValueError('Boundary dimensions must be positive and finite.')
     region = model.get_region(source, frame, config)
+    context = model.sketch_frame(frame)
+    settings = model.layout_settings(settings, config, region, context, frame.parentComponent)
+    candidates = cache.resolve(region, settings, context) if cache is not None else None
     original = clipping.source_body(source, frame, config, region)
     if settings.clip_boundary:
         clear_sketch(scratch)
         trimmed = clipping.inset_body(source, original, settings.margin, scratch)
-        layout = clipping.layout(original, trimmed, region, settings)
+        trimmed = clipping.apply_spread(trimmed, region, settings)
+        layout = clipping.layout(original, trimmed, region, settings, candidates)
         cells = layout.cells
         sheets = [clipping.sheet([clipping.cell_curves(cell)]) for cell in layout.whole]
         sheets.extend(layout.partial_bodies)
     else:
-        cells = generate(region, settings)
+        cells = generate(region, settings) if candidates is None else candidates
         sheets = [clipping.sheet([clipping.cell_curves(cell)]) for cell in cells]
     if config['material'] == 'panel':
         panel = adsk.fusion.TemporaryBRepManager.get().copy(original)
@@ -191,7 +210,7 @@ def make_body(source, settings, config, frame, scratch):
     return body, len(cells)
 
 
-def build(source, settings, config):
+def build(source, settings, config, cache=None):
     global _busy
     component = model.source_component(source)
     validate(config, component.parentDesign)
@@ -203,6 +222,8 @@ def build(source, settings, config):
         config['_origin_plane'] = origin
     else:
         data.addDependency('source', dependency_entity(source, component))
+    if config.get('center_point') is not None:
+        data.addDependency('center_point', model.point_reference(config['center_point'], component))
     for i, target in enumerate(config['bodies']):
         data.addDependency('body' + str(i), dependency_entity(target, component))
     expressions = config.get('_expressions', {})
@@ -227,7 +248,7 @@ def build(source, settings, config):
         frame.name = 'Perfora Reference'
         scratch = model.new_source_sketch(source)
         scratch.name = 'Perfora Edge Offset'
-        body, count = make_body(source, settings, config, frame, scratch)
+        body, count = make_body(source, settings, config, frame, scratch, cache)
         base = component.features.baseFeatures.add()
         base.name = 'Perfora Geometry'
         base.startEdit()
@@ -269,12 +290,12 @@ def build(source, settings, config):
         _busy = previous_busy
 
 
-def rebuild(custom):
+def rebuild(custom, cache=None):
     source, settings, config = read(custom)
     features = custom.features
     sketches = [f for f in features if isinstance(f, adsk.fusion.Sketch)]
     base = next(f for f in features if isinstance(f, adsk.fusion.BaseFeature))
-    body, count = make_body(source, settings, config, sketches[0], sketches[1])
+    body, count = make_body(source, settings, config, sketches[0], sketches[1], cache)
     if not base.startEdit():
         raise ValueError('Unable to update the Perfora Feature.')
     try:
@@ -285,7 +306,7 @@ def rebuild(custom):
     return count
 
 
-def update(custom, settings, config):
+def update(custom, settings, config, cache=None):
     """Called in an edit transaction; intermediate parameter writes cannot compute."""
     global _busy
     _busy = True
@@ -295,6 +316,16 @@ def update(custom, settings, config):
         for key in ('_origin_plane',):
             if key in original:
                 config[key] = original[key]
+        center = config.get('center_point')
+        dependency = custom.dependencies.itemById('center_point')
+        if center is not None:
+            reference = model.point_reference(center, custom.parentComponent)
+            if dependency:
+                dependency.entity = reference
+            else:
+                custom.dependencies.add('center_point', reference)
+        elif dependency:
+            dependency.deleteMe()
         custom.customNamedValues.addOrSetValue('perfora', json.dumps(metadata(settings, config)))
         expressions = config.get('_expressions', {})
         for key, (_, unit) in PARAMETERS.items():
@@ -302,11 +333,13 @@ def update(custom, settings, config):
             if val is None:
                 val = getattr(settings, key) if key in settings.__dict__ else config[key]
             parameter = custom.parameters.itemById(key)
+            if not parameter and key in ('start_radius', 'spread_radius'):
+                continue  # Older nodes retain this value in their versioned settings.
             if isinstance(val, str):
                 parameter.expression = val
             else:
                 parameter.value = val
-        return rebuild(custom)
+        return rebuild(custom, cache)
     finally:
         _busy = False
 

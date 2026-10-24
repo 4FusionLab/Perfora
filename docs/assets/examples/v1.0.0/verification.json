@@ -1,0 +1,57 @@
+{
+  "fusion": "2706.1.14",
+  "images": [
+    "circular-tangential.jpg",
+    "radial-and-tangential.jpg",
+    "point-scoped-perforation.jpg",
+    "profile-region.jpg",
+    "parametric-spread.jpg"
+  ],
+  "models": [
+    {
+      "name": "Circular Tangential Grille",
+      "holes": 38,
+      "source_type": "adsk::fusion::Profile",
+      "volume_cm3": 18.67478470582381
+    },
+    {
+      "name": "Radial Slots",
+      "holes": 38,
+      "source_type": "adsk::fusion::Profile",
+      "volume_cm3": 9.939338446361527
+    },
+    {
+      "name": "Tangential Slots",
+      "holes": 38,
+      "source_type": "adsk::fusion::Profile",
+      "volume_cm3": 10.20228726828663
+    },
+    {
+      "name": "Point and Spread Radius",
+      "holes": 43,
+      "source_type": "adsk::fusion::BRepFace",
+      "volume_cm3": 26.223706414711092
+    },
+    {
+      "name": "Sketch Profile Without Split Face",
+      "holes": 60,
+      "source_type": "adsk::fusion::Profile",
+      "volume_cm3": 20.954541419313397
+    },
+    {
+      "name": "Spread Radius 16 mm",
+      "holes": 37,
+      "source_type": "adsk::fusion::BRepFace",
+      "volume_cm3": 17.565510440111154
+    },
+    {
+      "name": "Spread Radius 26 mm",
+      "holes": 37,
+      "source_type": "adsk::fusion::BRepFace",
+      "volume_cm3": 17.565510440111154,
+      "compute_all_returned": false,
+      "recomputed_spread_mm": 26,
+      "volume_after_cm3": 15.74864640259096
+    }
+  ]
+}

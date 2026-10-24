@@ -7,17 +7,20 @@
 
 <p align="center">
   <a href="https://github.com/4FusionLab/Perfora/actions/workflows/ci.yml"><img src="https://github.com/4FusionLab/Perfora/actions/workflows/ci.yml/badge.svg" alt="Build and release checks"></a>
-  <a href="https://github.com/4FusionLab/Perfora/releases"><img src="https://img.shields.io/github/v/release/4FusionLab/Perfora?include_prereleases&amp;color=2077bd" alt="Release"></a>
+  <a href="https://github.com/4FusionLab/Perfora/releases"><img src="https://img.shields.io/github/v/release/4FusionLab/Perfora?color=2077bd" alt="Release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="GPL-3.0 license"></a>
 </p>
 
-<p align="center"><a href="https://github.com/4FusionLab/Perfora/releases/tag/v0.2.0"><strong>Download v0.2.0</strong></a> · <a href="README.ru.md">Русский</a> · <a href="https://github.com/4FusionLab/Perfora/issues">Report a problem</a></p>
+<p align="center"><a href="https://github.com/4FusionLab/Perfora/releases/tag/v1.0.0"><strong>Download v1.0.0</strong></a> · <a href="README.ru.md">Русский</a> · <a href="https://github.com/4FusionLab/Perfora/issues">Report a problem</a></p>
 
-> **Experimental release.** Use copies of working designs. Native Windows CAD behavior and complex assemblies still need acceptance testing. Feature archive reopen and subsequent recompute were checked in Fusion on macOS.
 
 ## Make the pattern. Keep the native model.
 
 Select a planar face, a closed sketch profile, or a construction plane. Choose a hole shape, set the spacing and edge clearance, and preview the result. Perfora creates ordinary sketch profiles, a native Fusion Extrude, or a parametric Perfora timeline feature.
+
+To perforate part of an existing face, draw a closed sketch on that face, finish the sketch, and select its shaded profile in **Profiles**. No Split Face is required. For **Cut** or **Intersect**, the supporting body is selected automatically in **Objects**; check the direction and extent before confirming. Profiles on construction planes still require explicit Objects.
+
+**Perfora 1.0 is the first stable release.** Parametric patterns, circular placement, bounded spread, and faster previews. [What is new →](docs/releases/v1.0.0.md)
 
 ## Made with Perfora
 
@@ -42,6 +45,32 @@ Select a planar face, a closed sketch profile, or a construction plane. Choose a
       <p><strong>A shape for every pattern</strong><br>Circles, triangles, stars, ellipses, diamonds, and crosses.</p>
     </td>
   </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/assets/examples/v1.0.0/circular-tangential.jpg"><img src="docs/assets/examples/v1.0.0/circular-tangential.jpg" alt="Gold circular grille with tangential slots on concentric rings" width="100%"></a>
+      <p><strong>Slots that follow the circle</strong><br>Circular distribution, Tangential orientation, and a clean center opening.</p>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/assets/examples/v1.0.0/radial-and-tangential.jpg"><img src="docs/assets/examples/v1.0.0/radial-and-tangential.jpg" alt="Two circular grilles comparing radial and tangential slots" width="100%"></a>
+      <p><strong>Choose the direction</strong><br>Radial on the left, Tangential on the right. Fixed orientation is available too.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <a href="docs/assets/examples/v1.0.0/point-scoped-perforation.jpg"><img src="docs/assets/examples/v1.0.0/point-scoped-perforation.jpg" alt="Green plate perforated only inside an off-center circular zone" width="100%"></a>
+      <p><strong>Start here. Stop at this radius.</strong><br>Pick a point and limit the spread without drawing a boundary profile.</p>
+    </td>
+    <td width="50%" valign="top">
+      <a href="docs/assets/examples/v1.0.0/profile-region.jpg"><img src="docs/assets/examples/v1.0.0/profile-region.jpg" alt="Blue plate with rounded Voronoi perforation confined to a sketch profile" width="100%"></a>
+      <p><strong>Your sketch is the boundary</strong><br>Perforate a profile directly on a solid face. No Split Face.</p>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" valign="top">
+      <a href="docs/assets/examples/v1.0.0/parametric-spread.jpg"><img src="docs/assets/examples/v1.0.0/parametric-spread.jpg" alt="Two panels showing a parametric spread radius change from 16 to 26 millimeters" width="100%"></a>
+      <p><strong>Change the parameter. Rebuild the pattern.</strong><br>Spread Radius 16 mm and 26 mm; the right-hand Feature recomputes after editing its model parameter.</p>
+    </td>
+  </tr>
 </table>
 
 <details>
@@ -53,14 +82,22 @@ Select a planar face, a closed sketch profile, or a construction plane. Choose a
 
 | Control | What you can do |
 | --- | --- |
-| Pattern | Rectangular or staggered distribution; web thickness; independent hole and grid rotation; X/Y placement |
+| Pattern | Rectangular, staggered, or circular distribution; web thickness; independent hole and grid rotation; X/Y placement |
 | Boundary | Keep complete holes or trim them to the boundary, with an edge offset and clearance around existing openings |
-| Output | Hole profiles or a perforated panel; Sketch, native Extrude, or parametric Feature |
+| Output | Hole profiles or a perforated panel; Sketch, native Extrude, or parametric Feature (default) |
 | Operation | Join, Cut, Intersect, New Body, New Component |
 | Extent | One Side, Two Sides, Symmetric; distance, through-all, or to-object where supported |
 | Preview | Cached fast contours for layout; full CAD preview to inspect the extrusion |
 
 See [hole dimensions and geometry notes](docs/PERFORATIONS.md). The interface is in English, using Fusion's native operation names. No third-party Python packages are required.
+
+Every numeric field has a default. Leaving a field empty restores its default after about a second, while allowing you to clear and immediately type a replacement. Explicit zero values are preserved, and nonempty invalid expressions are not replaced. Units, equations, and parameters from the current Fusion document are supported; integer fields retain their range limits.
+
+**Type → Feature** is selected by default when opening Perfora. Sketch and Extrude remain available.
+
+**Preview Color** changes Fast Preview contours: Gold (default), Cyan, Magenta, Green, White, or Black. Switch colors to keep contours visible over selected profiles. Color changes reuse the existing graphics and hole layout. Full Preview uses the Fusion model appearance.
+
+Fusion selection highlighting can tint or cover custom graphics while an entity is selected; the thicker contours improve contrast, but Preview Color does not override Fusion selection colors.
 
 ## Voronoi
 
@@ -78,13 +115,39 @@ All 13 shapes, exact trimming, rounded Voronoi holes, Fast/Full Preview, and **J
 
 Keep Perfora running to edit or recompute the feature. Large topology changes can invalidate downstream face/edge references. The mode uses Autodesk's [Custom Feature API](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/CustomFeatures_UM.htm), which remains in Preview.
 
+## Pattern origin and spread
+
+**Start Point** is available for Staggered, Rectangular, Circular, and Voronoi. Use the native Select control to pick a sketch point, model vertex, or construction point; points on other planes are projected onto Profiles. Clear the selection for automatic placement. X/Y Offset add displacement from this point (in pattern axes for grids/Voronoi, sketch axes for Circular).
+
+**Spread Radius** limits perforation to a circular zone around that origin, including the offsets. **0 mm** fills the selected boundary. Positive values need no additional sketch profile: select a face or construction plane, pick a point, and enter a radius. The source boundary and existing openings still constrain the result. Edge Offset also applies to the spread boundary. With Trim to Boundary off, only whole holes fit; with it on, partial holes are trimmed exactly to the zone. Perforated Panel retains the source panel outside the perforation zone.
+
+New Feature nodes expose Spread Radius as a Fusion model parameter, including expressions. Point dependencies and the radius drive recompute. Older nodes remain editable but cannot gain additional native model parameters through the current API; recreate a node if it needs the new parameter in Fusion's Parameters dialog.
+
+## Circular distribution
+
+**Distribution → Circular** places holes on concentric rings. It supports all 12 repeating shapes; Voronoi keeps its own distribution. Available in the stable 1.0 release.
+
+- **Start Radius** measures the first ring to hole centers. At 0, the pattern starts with one center hole; a positive value omits that hole. This does not specify a solid central zone: holes may extend inside the first ring.
+- Holes per ring and radial spacing are automatic, based on the shape size and **Web Thickness**. Chord spacing preserves the web across each ring's closing seam. Noncircular shapes use conservative enclosing bounds, so actual webs can be wider than requested.
+- **Orientation → Fixed** keeps holes parallel; **Radial** rotates each hole with its radial position. **Tangential** follows the circumference. **Hole Angle** adds a rotation in all three modes. Orientation is hidden for circles.
+- **Start Point** uses Fusion's native Select control: pick a sketch point, model vertex, or construction point. Points on other planes are projected onto the Profiles plane. Clear the selection to use the outer boundary's bounding-box center. **X Offset / Y Offset** move the pattern relative to the selected point or automatic center, in sketch axes without periodic wrapping. **Pattern Angle** rotates the pattern about this center without moving the center itself.
+- **Edge Offset**, internal openings, **Trim to Boundary**, Fast/Full Preview, profiles and Extrude operations remain available. In Feature mode, the selected point is a dependency: moving it recomputes the pattern, and Edit Feature can replace or clear it. Ring radii and spacing are set before trimming; changing the boundary can move the pattern with its bounding-box center.
+
+## Performance
+
+Measured before/after results include **3.424 → 0.262 s** for a 45-hole elliptical Fast Preview and **1.148 → 0.104 s** for 253 hexagons in a circular region. These are paired measurements in Fusion on macOS, not universal speed guarantees. [Benchmark data, scenarios, and methodology →](docs/BENCHMARKS.md)
+
+Fast Preview and final creation reuse the current command's prepared hole layout. Changing extrusion settings still applies the current values to the final result. Changes to the source geometry, plane, point, radius, or layout invalidate the corresponding data. Clipped hole previews defer panel-only Boolean work until Perforated Panel is selected. Small simple patterns keep a direct clearance-check path.
+
+The optimizations preserve hole contours, clearance checks, Voronoi Seed, and exact trimming. Building many native sketch curves and profiles can still dominate the total time; geometry-generation speedups do not apply uniformly to the whole command.
+
 ## Install
 
 **Requires Autodesk Fusion on macOS or Windows. No terminal or separate Python installation is needed for the recommended method.** Perfora runs using the Python runtime included with Fusion. Linux is supported for tests and packaging only.
 
 ### Recommended: add the folder in Fusion
 
-1. Download **[Perfora-0.2.0.zip](https://github.com/4FusionLab/Perfora/releases/download/v0.2.0/Perfora-0.2.0.zip)** from the [release page](https://github.com/4FusionLab/Perfora/releases/tag/v0.2.0) and extract it to a permanent location.
+1. Download **[Perfora-1.0.0.zip](https://github.com/4FusionLab/Perfora/releases/download/v1.0.0/Perfora-1.0.0.zip)** from the [release page](https://github.com/4FusionLab/Perfora/releases/tag/v1.0.0) and extract it to a permanent location.
 2. In Fusion, open **Utilities → Scripts and Add-Ins**.
 3. Click **+ → Script or add-in from device**.
 4. Select the inner **`Perfora`** folder containing **`Perfora.py`** and **`Perfora.manifest`**, not the top-level extracted folder.
@@ -124,6 +187,9 @@ On a construction plane, Boundary defines a centered rectangle or circle. **Trim
 
 ## Know the limits
 
+Native CAD acceptance is recorded for Fusion 2706.1.14 on macOS 27.0.1, including local F3D reopen. Windows CI checks Python code and installation; native Windows Fusion CAD, cloud save/reopen, and complex assemblies are not claimed as tested.
+
+- Edge Offset must leave a valid inset; touching or intersecting offset loops can be rejected by Fusion.
 - Planar geometry and solid bodies only; curved faces and mesh bodies are unsupported.
 - Sketch and Extrude outputs keep a fixed hole layout. Use Feature to regenerate the pattern.
 - Native Extrude parameters remain editable in Fusion. Source and Cut/Intersect target bodies must belong to the same component. Editing a component affects all its occurrences.
@@ -136,7 +202,7 @@ python3 -m unittest discover -s tests -v
 python3 install.py --zip
 ```
 
-The build produces `dist/Perfora-0.2.0.zip` and its `.sha256` file. Version comes from the add-in manifest. CI checks geometry and installation on macOS, Windows, and Linux, then publishes new versions as prereleases. Native Fusion checks run separately.
+The build produces `dist/Perfora-1.0.0.zip` and its `.sha256` file. Version comes from the add-in manifest. CI checks geometry and installation on macOS, Windows, and Linux, then publishes verified 1.x versions as stable releases marked Latest. The earlier 0.x versions remain prereleases. Native Fusion checks run separately.
 
 [Contributing and CAD checks](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Release process](docs/PUBLISHING.md)
 

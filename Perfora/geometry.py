@@ -44,7 +44,9 @@ def segment_distance(a, b, c, d):
 def point_in_polygon(p, polygon):
     inside = False
     for a, b in edges(polygon):
-        if point_segment_distance(p, a, b) <= EPS:
+        if (min(a[0], b[0])-EPS <= p[0] <= max(a[0], b[0])+EPS
+                and min(a[1], b[1])-EPS <= p[1] <= max(a[1], b[1])+EPS
+                and point_segment_distance(p, a, b) <= EPS):
             return True
         if (a[1] > p[1]) != (b[1] > p[1]):
             if p[0] < a[0] + (p[1] - a[1]) * (b[0] - a[0]) / (b[1] - a[1]):
@@ -86,18 +88,49 @@ class Loop:
     outer: bool = True
 
 
+class BoundaryIndex:
+    """Conservative edge bounds; exact predicates still decide every contact."""
+    def __init__(self, segments):
+        self.segments = segments
+        self.bounds = tuple((a, b, min(a[0], b[0]), max(a[0], b[0]),
+                             min(a[1], b[1]), max(a[1], b[1])) for a, b in segments)
+
+    def __iter__(self):
+        return iter(self.segments)
+
+    def nearby(self, points, padding):
+        low_x, high_x = min(p[0] for p in points)-padding, max(p[0] for p in points)+padding
+        low_y, high_y = min(p[1] for p in points)-padding, max(p[1] for p in points)+padding
+        return tuple((a, b) for a, b, x0, x1, y0, y1 in self.bounds
+                     if x1 >= low_x and x0 <= high_x and y1 >= low_y and y0 <= high_y)
+
+
 @dataclass(frozen=True)
 class Region:
     loops: tuple
     tolerance: float = 0.0001  # 0.001 mm; applied as an extra boundary clearance.
+    scope_center: tuple = None
+    scope_radius: float = 0.0
 
     def contains(self, p):
-        return (any(point_in_polygon(p, l.points) for l in self.loops if l.outer)
+        return ((self.scope_center is None or dist(p, self.scope_center) <= self.scope_radius)
+                and any(point_in_polygon(p, l.points) for l in self.loops if l.outer)
                 and not any(point_in_polygon(p, l.points) for l in self.loops if not l.outer))
 
-    @property
+    @cached_property
     def segments(self):
         return tuple(edge for loop in self.loops for edge in edges(loop.points))
+
+    @cached_property
+    def _boundary_index(self):
+        return BoundaryIndex(self.segments)
+
+    def indexed_segments(self, candidates):
+        # Avoid preparing bounds for tiny simple patterns. Preparation is owned
+        # by this Region, so replacing it cannot retain historical contours.
+        if candidates >= 64 or len(self.segments) >= 16 and candidates >= 4:
+            return self._boundary_index
+        return self.segments
 
 
 @dataclass(frozen=True)
@@ -120,10 +153,31 @@ class Settings:
     irregularity: float = 0.8
     seed: int = 1
     corner_radius: float = 0.0
+    layout: str = 'grid'
+    start_radius: float = 0.0
+    radial_orientation: bool = False
+    tangential_orientation: bool = False
+    spread_radius: float = 0.0
+    origin_x: float = None
+    origin_y: float = None
 
     def validate(self):
+        if not math.isfinite(self.spread_radius) or self.spread_radius < 0:
+            raise ValueError('Spread Radius must be finite and nonnegative. Use 0 to fill the boundary.')
+        if self.spread_radius > 0 and self.spread_radius <= self.margin:
+            raise ValueError('Spread Radius must be larger than Edge Offset.')
+        if ((self.origin_x is None) != (self.origin_y is None)
+                or self.origin_x is not None and not all(math.isfinite(v) for v in (self.origin_x, self.origin_y))):
+            raise ValueError('Start Point must have finite coordinates.')
         if self.shape not in SHAPE_IDS:
             raise ValueError('Unknown hole shape.')
+        if self.layout not in ('grid', 'circular'):
+            raise ValueError('Unknown distribution.')
+        if self.layout == 'circular':
+            if self.shape == 'voronoi':
+                raise ValueError('Circular distribution is not available for Voronoi.')
+            if not math.isfinite(self.start_radius) or self.start_radius < 0:
+                raise ValueError('Start Radius must be finite and nonnegative.')
         values = (self.size, self.slot_length, self.gap, self.margin, self.grid_angle,
                   self.shape_angle, self.offset_x, self.offset_y)
         if not all(math.isfinite(v) for v in values):
@@ -441,10 +495,19 @@ def fits(cell, region, segments, margin):
     clearance = margin + region.tolerance + EPS
     if not region.contains(cell.center):
         return False
-    if cell.shape in ('circle', 'slot'):
-        a, b = cell.spine
+    rounded = cell.shape in ('circle', 'slot')
+    points = (cell.spine if rounded else
+              cell.ellipse_points(enclosing=True) if cell.shape == 'ellipse' else cell.vertices)
+    if region.scope_center is not None:
+        reach = max(dist(p, region.scope_center) for p in points) + (cell.size/2 if rounded else 0)
+        if reach + clearance > region.scope_radius:
+            return False
+    if isinstance(segments, BoundaryIndex):
+        padding = margin + region.tolerance + 2*EPS + (cell.size/2 if rounded else 0)
+        segments = segments.nearby(points, padding)
+    if rounded:
+        a, b = points
         return all(segment_distance(a, b, c, d) >= cell.size / 2 + clearance for c, d in segments)
-    points = cell.ellipse_points(enclosing=True) if cell.shape == 'ellipse' else cell.vertices
     if not all(region.contains(p) for p in points):
         return False
     if any(segment_distance(a, b, c, d) < clearance for a, b in edges(points) for c, d in segments):
@@ -486,6 +549,18 @@ def pitch(settings):
 
 def overlaps(cell, region, segments):
     """Conservative positive-area candidates; exact trimming is done by Fusion."""
+    if region.scope_center is not None:
+        # Conservative disk rejection before exact BRep intersection. A hole
+        # may overlap each constraint separately without overlapping both.
+        if cell.shape in ('circle', 'slot'):
+            if point_segment_distance(region.scope_center, *cell.spine) >= region.scope_radius + cell.size/2:
+                return False
+        else:
+            points = cell.ellipse_points(enclosing=True) if cell.shape == 'ellipse' else cell.vertices
+            if (not point_in_polygon(region.scope_center, points)
+                    and min(point_segment_distance(region.scope_center, a, b) for a, b in edges(points)) >= region.scope_radius):
+                return False
+        return overlaps(cell, Region(region.loops, region.tolerance), segments)
     if region.contains(cell.center):
         return True
     if cell.shape in ('circle', 'slot'):
@@ -499,19 +574,57 @@ def overlaps(cell, region, segments):
                    for a, b in edges(points) for c, d in segments))
 
 
+def boundary_center(region):
+    points = [p for loop in region.loops if loop.outer for p in loop.points]
+    if not points:
+        raise ValueError('The selected region has no outer boundary.')
+    return ((min(p[0] for p in points) + max(p[0] for p in points))/2,
+            (min(p[1] for p in points) + max(p[1] for p in points))/2)
+
+
+def placement_center(region, settings):
+    origin = (settings.origin_x, settings.origin_y) if settings.origin_x is not None else boundary_center(region)
+    offset = ((settings.offset_x, settings.offset_y) if settings.layout == 'circular' else
+              rotate((settings.offset_x, settings.offset_y), settings.grid_angle))
+    return origin[0]+offset[0], origin[1]+offset[1]
+
+
+def candidate_points(region, angle=0):
+    points = [rotate(p, -angle) for loop in region.loops if loop.outer for p in loop.points]
+    if not points or region.scope_center is None:
+        return points
+    x,y = rotate(region.scope_center, -angle)
+    r = region.scope_radius
+    low_x, high_x = max(min(p[0] for p in points), x-r), min(max(p[0] for p in points), x+r)
+    low_y, high_y = max(min(p[1] for p in points), y-r), min(max(p[1] for p in points), y+r)
+    if low_x >= high_x or low_y >= high_y:
+        raise ValueError('Spread Radius does not overlap the selected boundary.')
+    return [(low_x, low_y), (high_x, low_y), (high_x, high_y), (low_x, high_y)]
+
+
 def generate(region, settings):
     settings.validate()
+    if settings.spread_radius > 0:
+        from dataclasses import replace
+        if settings.origin_x is None:
+            x,y = boundary_center(region)
+            settings = replace(settings, origin_x=x, origin_y=y)
+        region = Region(region.loops, region.tolerance, placement_center(region, settings), settings.spread_radius)
     if settings.shape == 'voronoi':
         return generate_voronoi(region, settings)
-    outer = [rotate(p, -settings.grid_angle) for loop in region.loops if loop.outer for p in loop.points]
+    if settings.layout == 'circular':
+        return generate_circular(region, settings)
+    outer = candidate_points(region, settings.grid_angle)
     if not outer:
         raise ValueError('The selected region has no outer boundary.')
     min_x, max_x = min(p[0] for p in outer), max(p[0] for p in outer)
     min_y, max_y = min(p[1] for p in outer), max(p[1] for p in outer)
     sx, sy = pitch(settings)
     # Offsets are periodic. Reducing them also avoids enormous row indices.
-    ox = (min_x + max_x) / 2 + math.remainder(settings.offset_x, sx)
-    oy = (min_y + max_y) / 2 + math.remainder(settings.offset_y, 2 * sy)
+    origin = (rotate((settings.origin_x, settings.origin_y), -settings.grid_angle)
+              if settings.origin_x is not None else ((min_x + max_x)/2, (min_y + max_y)/2))
+    ox = origin[0] + math.remainder(settings.offset_x, sx)
+    oy = origin[1] + math.remainder(settings.offset_y, 2 * sy)
     if settings.clip_boundary:
         # A cell can overlap even with its centre outside the boundary.
         probe = Cell((0, 0), settings.shape, settings.size, settings.slot_length, 0,
@@ -525,7 +638,7 @@ def generate(region, settings):
     if (last_row - first_row + 1) * columns > 100000:
         raise ValueError('The pattern is too dense. Increase the hole size or Web Thickness.')
     result = []
-    segments = region.segments
+    segments = region.indexed_segments((last_row-first_row+1)*columns)
     for row in range(first_row, last_row + 1):
         shift = sx / 2 if settings.staggered and row % 2 else 0.0
         for col in range(math.floor((min_x - ox - shift) / sx), math.ceil((max_x - ox - shift) / sx) + 1):
@@ -540,6 +653,64 @@ def generate(region, settings):
                     raise ValueError('The hole count exceeds the limit of %d. Adjust the pattern or Maximum Holes.' % settings.limit)
     if not result:
         raise ValueError('No holes fit in the region. Reduce the hole size or Edge Offset.')
+    return result
+
+
+def enclosing_radius(settings):
+    """Rotation-independent bound about Cell.center, including asymmetric shapes."""
+    if settings.shape in ('circle', 'slot', 'ellipse'):
+        return (settings.size if settings.shape == 'circle' else
+                max(settings.size, settings.slot_length)) / 2
+    probe = Cell((0, 0), settings.shape, settings.size, settings.slot_length, 0,
+                 settings.arm_width, settings.star_ratio, settings.star_points)
+    return max(math.hypot(*p) for p in probe.vertices)
+
+
+def generate_circular(region, settings):
+    """Concentric rings with chord spacing, bounded work and guaranteed web.
+
+    Enclosing disks keep holes separated within and between rings, even when
+    each hole follows its radial direction. The center is fixed in sketch axes;
+    Pattern Angle rotates the pattern without moving that center.
+    """
+    s = settings
+    outer = candidate_points(region)
+    if not outer:
+        raise ValueError('The selected region has no outer boundary.')
+    low_x, high_x = min(p[0] for p in outer), max(p[0] for p in outer)
+    low_y, high_y = min(p[1] for p in outer), max(p[1] for p in outer)
+    ox, oy = placement_center(region, s)
+    radius = enclosing_radius(s)
+    step = 2 * radius + s.gap
+    reach = max(math.hypot(x - ox, y - oy) for x, y in outer) + radius
+    nearest = math.hypot(max(low_x - ox, 0, ox - high_x),
+                         max(low_y - oy, 0, oy - high_y)) - radius
+    first = max(0, math.ceil((nearest - s.start_radius) / step))
+    last = math.floor((reach - s.start_radius) / step)
+    # Bound full-ring candidates before allocating/iterating. A remote center
+    # must not cause millions of angular samples even for a tiny source region.
+    if last >= first and (last - first + 1) * (math.tau * reach / step + 1) > 100000:
+        raise ValueError('The circular pattern is too dense. Increase the hole size or Web Thickness, or move its center closer.')
+    result = []
+    segments = region.indexed_segments(max(0, last-first+1)*(math.tau*reach/step+1))
+    for ring in range(first, last + 1):
+        r = s.start_radius + ring * step
+        count = (1 if r < step / 2 else
+                 max(2, math.floor(math.pi / math.asin(min(1.0, step / (2 * r))) + 1e-12)))
+        for index in range(count):
+            angle = s.grid_angle + index * math.tau / count
+            center = (ox + r * math.cos(angle), oy + r * math.sin(angle))
+            cell = Cell(center, s.shape, s.size, s.slot_length,
+                        (angle if s.radial_orientation or s.tangential_orientation else s.grid_angle)
+                        + (math.pi / 2 if s.tangential_orientation else 0) + s.shape_angle,
+                        s.arm_width, s.star_ratio, s.star_points)
+            if (overlaps(cell, region, segments) if s.clip_boundary
+                    else fits(cell, region, segments, s.margin)):
+                result.append(cell)
+                if len(result) > s.limit:
+                    raise ValueError('The hole count exceeds the limit of %d. Adjust the pattern or Maximum Holes.' % s.limit)
+    if not result:
+        raise ValueError('No holes fit in the region. Reduce Start Radius, the hole size, or Edge Offset.')
     return result
 
 
@@ -570,6 +741,14 @@ def _site_random(seed, row, col, axis):
     return ((value ^ (value >> 16)) / 4294967296.0 - 0.5) * 2
 
 
+def _clip_voronoi(points, nx, ny, bound):
+    # Voronoi polygons are already cleaned by the preceding clip. The shared
+    # clipping primitive used for fillets keeps its original cleanup semantics.
+    if all(nx*p[0]+ny*p[1]-bound <= 0 for p in points):
+        return points
+    return _clip_halfplane(points, nx, ny, bound)
+
+
 def generate_voronoi(region, settings):
     """Jittered-lattice Voronoi with a metric inset of half the minimum web.
 
@@ -580,14 +759,16 @@ def generate_voronoi(region, settings):
     This bounds work per cell independently of total pattern density.
     """
     s = settings
-    outer = [rotate(p, -s.grid_angle) for loop in region.loops if loop.outer for p in loop.points]
+    outer = candidate_points(region, s.grid_angle)
     if not outer:
         raise ValueError('The selected region has no outer boundary.')
     low_x, high_x = min(p[0] for p in outer), max(p[0] for p in outer)
     low_y, high_y = min(p[1] for p in outer), max(p[1] for p in outer)
     # Keep the same centred, periodic placement convention as regular patterns.
-    ox = (low_x + high_x) / 2 + math.remainder(s.offset_x, s.size)
-    oy = (low_y + high_y) / 2 + math.remainder(s.offset_y, s.size)
+    origin = (rotate((s.origin_x, s.origin_y), -s.grid_angle) if s.origin_x is not None
+              else ((low_x + high_x)/2, (low_y + high_y)/2))
+    ox = origin[0] + math.remainder(s.offset_x, s.size)
+    oy = origin[1] + math.remainder(s.offset_y, s.size)
     first_col, last_col = math.floor((low_x - ox) / s.size) - 2, math.ceil((high_x - ox) / s.size) + 2
     first_row, last_row = math.floor((low_y - oy) / s.size) - 2, math.ceil((high_y - oy) / s.size) + 2
     if (last_col - first_col + 1) * (last_row - first_row + 1) > 25000:
@@ -601,7 +782,7 @@ def generate_voronoi(region, settings):
                           row + .45 * s.irregularity * _site_random(s.seed, row, col, 1))
         return sites[key]
 
-    result, segments = [], region.segments
+    result, segments = [], region.indexed_segments((last_row-first_row+1)*(last_col-first_col+1))
     for row in range(first_row, last_row + 1):
         for col in range(first_col, last_col + 1):
             x, y = site(row, col)
@@ -617,7 +798,7 @@ def generate_voronoi(region, settings):
                         neighbours.append((distance, dx, dy))
             # Nearby constraints shrink the working polygon first.
             for distance, dx, dy in sorted(neighbours):
-                polygon = _clip_halfplane(polygon, dx / distance, dy / distance,
+                polygon = _clip_voronoi(polygon, dx / distance, dy / distance,
                                           distance / 2 - s.gap / (2 * s.size))
                 if len(polygon) < 3:
                     break

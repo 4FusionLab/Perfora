@@ -1,0 +1,102 @@
+{
+  "version": "1.0.0",
+  "date": "2026-10-24",
+  "fusion": "2706.1.14",
+  "os": "macOS 27.0.1 arm64",
+  "native_windows_tested": false,
+  "cloud_save_tested": false,
+  "python_tests": 67,
+  "native_suites": [
+    {
+      "suite": "shapes",
+      "passed": true,
+      "cases": 34
+    },
+    {
+      "suite": "clipping",
+      "passed": true,
+      "cases": 35
+    },
+    {
+      "suite": "voronoi",
+      "passed": true,
+      "cases": 12
+    },
+    {
+      "suite": "circular",
+      "passed": true,
+      "cases": 19
+    },
+    {
+      "suite": "center",
+      "passed": true,
+      "cases": 7
+    },
+    {
+      "suite": "feature",
+      "passed": true,
+      "cases": 45
+    },
+    {
+      "suite": "profile-face",
+      "passed": true,
+      "cases": 10
+    },
+    {
+      "suite": "optimization",
+      "passed": true,
+      "cases": 5
+    },
+    {
+      "suite": "preview",
+      "passed": true,
+      "cases": 12
+    }
+  ],
+  "native_cases": 179,
+  "acceptance": {
+    "feature": {
+      "passed": true,
+      "fusion": "2706.1.14",
+      "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+      "result_mode": "feature",
+      "created_volume_cm3": 4.659376880524904,
+      "created_timeline": 5,
+      "created": true,
+      "undo": true,
+      "redo": true,
+      "compute_all_after_edit": false,
+      "parameter_edit": true,
+      "compute_all_after_reopen": false,
+      "local_f3d_reopen": true,
+      "recompute_after_reopen": true,
+      "original_unchanged": true
+    },
+    "extrude": {
+      "passed": true,
+      "fusion": "2706.1.14",
+      "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+      "result_mode": "extrude",
+      "created_volume_cm3": 4.659376880524904,
+      "created_timeline": 6,
+      "created": true,
+      "undo": true,
+      "redo": true,
+      "compute_all_after_edit": true,
+      "parameter_edit": true,
+      "compute_all_after_reopen": true,
+      "local_f3d_reopen": true,
+      "recompute_after_reopen": true,
+      "original_unchanged": true
+    },
+    "edit_cancel": {
+      "passed": true,
+      "stage": "ready",
+      "restored_point": true,
+      "restored_tangential": true,
+      "transaction": "Cancel",
+      "transaction_passed": true,
+      "original_unchanged": true
+    }
+  }
+}

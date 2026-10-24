@@ -6,13 +6,26 @@ import adsk.core
 import adsk.fusion
 
 from . import model
-from .geometry import generate, outline_coordinates
+from .geometry import outline_coordinates, placement_center
+from .cache import GeometryCache
+
+
+# Presentation only: never part of Settings or the prepared geometry cache.
+PREVIEW_COLORS = [('gold', 'Gold'), ('cyan', 'Cyan'), ('magenta', 'Magenta'),
+                  ('green', 'Green'), ('white', 'White'), ('black', 'Black')]
+COLOR_RGB = {'gold': (255, 191, 0), 'cyan': (0, 170, 240),
+             'magenta': (255, 70, 210), 'green': (100, 255, 100),
+             'white': (255, 255, 255), 'black': (0, 0, 0)}
 
 
 class Renderer:
     def __init__(self):
         self.graphics = None
+        self.lines = None
+        self.color_key = None
         self.source_key = 0
+        self.source_revision = None
+        self.geometry_cache = GeometryCache()
         self.source = None
         self.region = None
         self.component = None
@@ -28,80 +41,97 @@ class Renderer:
         self.original_body = None
         self.trimmed_body = None
         self.trim_margin = None
+        self.inset_body = None
+        self.trim_key = None
         self.clipped_layout = None
 
     def clear(self):
         if self.graphics and self.graphics.isValid:
             self.graphics.deleteMe()
         self.graphics = None
+        self.lines = None
+        self.color_key = None
         self.drawn_key = None
 
     def reset(self):
         self.clear()
         self.source_key += 1
         self.source = None
+        self.source_revision = None
         self.region = None
+        self.component = None
+        self.frame = None
         self.settings = None
         self.cells = None
         self.coordinate_key = None
         self.coordinates = None
         self.original_body = None
+        self.inset_body = None
         self.trimmed_body = None
         self.trim_margin = None
+        self.trim_key = None
         self.clipped_layout = None
+        self.geometry_cache.clear()
 
-    def show(self, source, settings, config):
+    def show(self, source, settings, config, color='gold'):
         started = perf_counter()
+        rgb = COLOR_RGB[color]
         source = model.native(source)
-        if self.source is None or source != self.source:
+        revision = model.source_revision(source)
+        boundary_key = (config['boundary'], config['width'], config['height'])
+        if (self.source is not None and (source != self.source or revision != self.source_revision
+                or isinstance(source, adsk.fusion.ConstructionPlane)
+                and boundary_key != self.boundary_key)):
             self.reset()
-            # One empty sketch obtains Fusion's own plane frame. It is deleted
-            # immediately; there are no persistent sketch entities in fast mode.
+        if self.source is None:
             sketch = model.new_source_sketch(source)
             try:
                 self.region = model.get_region(source, sketch, config)
-                # Use the same explicit coordinate conversion as final CAD.
-                # Sketch.transform conventions differ from graphics transforms;
-                # an inverse matrix can rotate/translate outlines off the face.
-                origin = sketch.sketchToModelSpace(adsk.core.Point3D.create(0, 0, 0))
-                x_point = sketch.sketchToModelSpace(adsk.core.Point3D.create(1, 0, 0))
-                y_point = sketch.sketchToModelSpace(adsk.core.Point3D.create(0, 1, 0))
-                self.frame = (tuple(origin.asArray()), tuple(origin.vectorTo(x_point).asArray()),
-                              tuple(origin.vectorTo(y_point).asArray()))
+                # Same explicit basis as final CAD, including moved/rotated planes.
+                self.frame = model.sketch_frame(sketch)
                 self.component = sketch.parentComponent
             finally:
                 sketch.deleteMe()
             self.source = source
-        elif isinstance(source, adsk.fusion.ConstructionPlane):
-            # On an infinite plane the explicit boundary is part of the source.
-            boundary_key = (config['boundary'], config['width'], config['height'])
-            if getattr(self, 'boundary_key', None) != boundary_key:
-                sketch = model.new_source_sketch(source)
-                try:
-                    self.region = model.get_region(source, sketch, config)
-                finally:
-                    sketch.deleteMe()
-                self.settings = None
-                self.original_body = None
-                self.trimmed_body = None
-                self.trim_margin = None
-        self.boundary_key = (config['boundary'], config['width'], config['height'])
+            self.source_revision = model.source_revision(source)
+        self.boundary_key = boundary_key
+        settings = model.layout_settings(settings, config, self.region, self.frame, self.component)
+        if settings.clip_boundary and self.original_body is not None and not self.original_body.isValid:
+            self.original_body = self.inset_body = self.trimmed_body = None
+            self.trim_key = self.trim_margin = None
+            self.settings = None
+            self.clear()
         if settings != self.settings:
-            self.clipped_layout = None
+            candidates = self.geometry_cache.resolve(self.region, settings, self.frame)
+            clipped = None
             if settings.clip_boundary:
                 from . import clipping
-                if self.original_body is None or self.trim_margin != settings.margin:
+                if self.original_body is None:
                     sketch = model.new_source_sketch(source)
                     try:
                         self.original_body = clipping.source_body(source, sketch, config, self.region)
-                        self.trimmed_body = clipping.inset_body(source, self.original_body, settings.margin)
-                        self.trim_margin = settings.margin
                     finally:
                         sketch.deleteMe()
-                self.clipped_layout = clipping.layout(self.original_body, self.trimmed_body, self.region, settings)
-                self.cells = self.clipped_layout.cells
+                if self.inset_body is None or self.trim_margin != settings.margin:
+                    inset = clipping.inset_body(source, self.original_body, settings.margin)
+                    self.inset_body = inset
+                    self.trim_margin = settings.margin
+                    self.trim_key = None
+                trim_key = (settings.margin, settings.spread_radius,
+                            placement_center(self.region, settings) if settings.spread_radius > 0 else None)
+                if self.trim_key != trim_key:
+                    trimmed = clipping.apply_spread(self.inset_body, self.region, settings)
+                    self.trimmed_body = trimmed
+                    self.trim_key = trim_key
+                clipped = clipping.layout(self.original_body, self.trimmed_body,
+                                          self.region, settings, candidates)
+                cells = clipped.cells
             else:
-                self.cells = generate(self.region, settings)
+                cells = candidates
+            # Publish the layout only after preparation succeeds. Native bodies
+            # are owned by this renderer; only immutable cells enter the cache.
+            self.clipped_layout = clipped
+            self.cells = cells
             self.settings = settings
             self.coordinate_key = None
             self.layout_builds += 1
@@ -124,10 +154,18 @@ class Renderer:
                 lines = group.addLines(adsk.fusion.CustomGraphicsCoordinates.create(self.coordinates), [], False)
                 lines.isSelectable = False
                 lines.depthPriority = 1
-                lines.weight = 1.5
-                lines.color = adsk.fusion.CustomGraphicsSolidColorEffect.create(adsk.core.Color.create(0, 170, 240, 255))
+                lines.weight = 3.0
+                self.lines = lines
                 self.drawn_key = coordinate_key
                 self.draws += 1
+            except Exception:
+                self.clear()
+                raise
+        if self.color_key != rgb:
+            try:
+                self.lines.color = adsk.fusion.CustomGraphicsSolidColorEffect.create(
+                    adsk.core.Color.create(*rgb, 255))
+                self.color_key = rgb
             except Exception:
                 self.clear()
                 raise

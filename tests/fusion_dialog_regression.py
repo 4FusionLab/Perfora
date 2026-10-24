@@ -13,7 +13,7 @@ import traceback
 
 import adsk.core
 
-_dialog_entry = next(module for module in tuple(sys.modules.values())
+_dialog_entry = globals().get('entry') or next(module for module in tuple(sys.modules.values())
                      if str(getattr(module, '__file__', '')).endswith('/Perfora/Perfora.py'))
 _dialog_report = Path.home() / 'Library/Logs/Perfora/dialog-regression.json'
 _dialog_report.parent.mkdir(parents=True, exist_ok=True)
@@ -25,8 +25,21 @@ class PerforaDialogRegression(adsk.core.CommandCreatedEventHandler):
         report = {'passed': False}
         try:
             session = _dialog_entry.Session(args.command)
+            session.inputs['preview'].value = False
+            session.update_visibility()
+            assert session.chosen('preview_color', _dialog_entry.PREVIEW_COLORS) == 'gold'
+            assert not session.inputs['preview_color'].isVisible
+            session.inputs['preview'].value = True
+            session.update_visibility()
+            assert session.inputs['preview_color'].isVisible
+            session.inputs['preview_mode'].listItems.item(1).isSelected = True
+            session.update_visibility()
+            assert not session.inputs['preview_color'].isVisible
+            session.inputs['preview'].value = False
+            session.inputs['preview_mode'].listItems.item(0).isSelected = True
+            session.update_visibility()
             _dialog_lifetime.append(session)
-            assert len(session.handlers) == 5, 'Missing command handlers'
+            assert len(session.handlers) == 8, 'Missing command handlers'
             assert all(key in session.inputs for key in ('status', 'bodies', 'distance2', 'preview'))
             assert 'clip_boundary' in session.inputs and not session.inputs['clip_boundary'].value
             session.inputs['clip_boundary'].value = True
@@ -61,8 +74,25 @@ class PerforaDialogRegression(adsk.core.CommandCreatedEventHandler):
                 assert session.inputs[size_id].tooltip == _dialog_entry.SIZE_HELP[shape]
             session.inputs['shape'].listItems.item(0).isSelected = True
             session.update_visibility()
+            session.inputs['layout'].listItems.item(2).isSelected = True
+            session.update_visibility()
+            assert session.inputs['center_point'].isVisible
+            assert session.inputs['start_radius'].isVisible
+            assert not session.inputs['orientation'].isVisible
+            session.inputs['shape'].listItems.item(3).isSelected = True
+            session.update_visibility()
+            assert session.inputs['orientation'].isVisible
+            session.inputs['orientation'].listItems.item(2).isSelected = True
+            assert session.chosen('orientation', _dialog_entry.ORIENTATIONS) == 'tangential'
+            session.inputs['shape'].listItems.item(12).isSelected = True
+            session.update_visibility()
+            assert session.inputs['center_point'].isVisible
+            assert not session.inputs['start_radius'].isVisible and not session.inputs['orientation'].isVisible
+            session.inputs['shape'].listItems.item(0).isSelected = True
+            session.inputs['layout'].listItems.item(0).isSelected = True
+            session.update_visibility()
             for identifier, options in (('result', _dialog_entry.RESULTS), ('layout', _dialog_entry.LAYOUTS)):
-                expected = (adsk.core.ButtonRowCommandInput if all(_dialog_entry.ui_resources.icon(k) for k, _ in options)
+                expected = (adsk.core.ButtonRowCommandInput if identifier != 'layout' and all(_dialog_entry.ui_resources.icon(k) for k, _ in options)
                             else adsk.core.DropDownCommandInput)
                 assert isinstance(session.inputs[identifier], expected), identifier
             for identifier in ('result', 'layout', 'direction', 'extent1', 'operation', 'start_mode'):

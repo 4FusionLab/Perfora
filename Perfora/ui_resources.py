@@ -29,6 +29,7 @@ _paths = {
     'reverse': ('fusion', 'Modeling/FlipDirection'),
     'staggered': ('fusion', 'pattern/distribution/hex'),
     'rows': ('fusion', 'pattern/distribution/square'),
+    'circular': ('base', 'PatternCmd/circular'),
 }
 
 

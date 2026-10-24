@@ -39,8 +39,11 @@ try:
     _preview_config = dict(boundary='rectangle', width=12.0, height=25.0, material='cells', result='profiles')
     _renderer = _preview_module.Renderer()
     _preview_shapes = []
-    for _shape in ('circle', 'hexagon', 'square', 'slot', 'voronoi', 'voronoi_rounded', 'voronoi_rounded_trimmed'):
-        _settings = _preview_geometry.Settings(shape='voronoi' if _shape.startswith('voronoi') else _shape,
+    for _shape in ('circle', 'hexagon', 'square', 'slot', 'voronoi', 'voronoi_rounded', 'voronoi_rounded_trimmed',
+                   'circular_circle', 'circular_slot'):
+        _settings = _preview_geometry.Settings(shape='voronoi' if _shape.startswith('voronoi') else _shape.removeprefix('circular_'),
+                                              layout='circular' if _shape.startswith('circular_') else 'grid',
+                                              radial_orientation=_shape == 'circular_slot',
                                               corner_radius=.05 if 'rounded' in _shape else 0,
                                               clip_boundary='trimmed' in _shape,
                                               size=0.5, gap=0.15, margin=0.3,
@@ -58,10 +61,39 @@ try:
         _cached_elapsed = perf_counter() - _start
         assert _renderer.layout_builds == _layouts_before, 'Menu/layout changes rebuilt cells'
         assert _preview_comp.customGraphicsGroups.count == 1
+        _graphics, _lines = _renderer.graphics, _renderer.lines
+        _coordinates, _cells = _renderer.coordinates, _renderer.cells
+        _draws = _renderer.draws
+        _start_color = perf_counter()
+        for _color, _ in _preview_module.PREVIEW_COLORS:
+            assert _renderer.show(_preview_comp.xYConstructionPlane, _settings, _preview_config, color=_color) == _count
+            _native_color = _renderer.lines.color.color
+            assert (_native_color.red, _native_color.green, _native_color.blue) == _preview_module.COLOR_RGB[_color]
+            assert _renderer.graphics == _graphics and _renderer.lines == _lines
+            assert _renderer.coordinates is _coordinates and _renderer.cells is _cells
+            assert _renderer.layout_builds == _layouts_before and _renderer.draws == _draws
+            assert _preview_design.timeline.count == 0 and _preview_comp.sketches.count == 0
+        _colors_elapsed = perf_counter() - _start_color
         _preview_shapes.append(dict(shape=_shape, cells=_count, first_seconds=_elapsed,
-                                    hundred_cached_seconds=_cached_elapsed))
+                                    hundred_cached_seconds=_cached_elapsed, six_colors_seconds=_colors_elapsed))
         _renderer.reset()
         assert _preview_comp.customGraphicsGroups.count == 0
+    for _shape, _layout in (('circle', 'grid'), ('slot', 'circular'), ('voronoi', 'grid')):
+        _bounded_config = dict(_preview_config, width=100000., height=100000.)
+        _bounded = _preview_geometry.Settings(shape=_shape, layout=_layout, size=.35,
+            slot_length=.7, gap=.15, margin=.1, spread_radius=1.6, origin_x=1234., origin_y=-2134.)
+        _start = perf_counter()
+        _count = _renderer.show(_preview_comp.xYConstructionPlane, _bounded, _bounded_config)
+        _elapsed = perf_counter() - _start
+        assert 0 < _count < 100
+        _builds = _renderer.layout_builds
+        _start = perf_counter()
+        for _i in range(100):
+            _renderer.show(_preview_comp.xYConstructionPlane, _bounded, _bounded_config)
+        assert _renderer.layout_builds == _builds
+        _preview_shapes.append(dict(shape='bounded_' + _shape, cells=_count, first_seconds=_elapsed,
+                                    hundred_cached_seconds=perf_counter() - _start))
+        _renderer.reset()
     # Compare the actual rendered vertex (including the graphics transform) with
     # Fusion's independent sketchToModelSpace, on a translated, rotated plane.
     _plane_input = _preview_comp.constructionPlanes.createInput()

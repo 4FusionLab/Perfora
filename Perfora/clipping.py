@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Exact planar clipping with temporary BRep; no persistent Boolean features."""
-from dataclasses import dataclass
 import math
 
 import adsk.core
@@ -8,7 +7,7 @@ import adsk.fusion
 
 from . import model
 from .geometry import (Loop, Region, ContourEdge, POLYGON_SHAPES, dist, edges, fits, generate,
-                       overlaps, point_segment_distance, round_contour, stitch)
+                       overlaps, placement_center, point_segment_distance, round_contour, stitch)
 
 
 def polygon_curves(points):
@@ -157,6 +156,24 @@ def source_body(source, sketch, config, region):
     return sheet([polygon_curves(region.loops[0].points)])
 
 
+def apply_spread(body, region, settings):
+    if settings.spread_radius <= 0:
+        return body
+    radius = settings.spread_radius - settings.margin
+    if radius <= model.TOLERANCE:
+        raise ValueError('Spread Radius must be larger than Edge Offset.')
+    center = placement_center(region, settings)
+    disk = sheet([[adsk.core.Circle3D.createByCenter(model.point(center),
+                  adsk.core.Vector3D.create(0, 0, 1), radius)]])
+    manager = adsk.fusion.TemporaryBRepManager.get()
+    result = manager.copy(body)
+    if not manager.booleanOperation(result, disk, adsk.fusion.BooleanTypes.IntersectionBooleanType):
+        raise ValueError('Unable to limit the pattern to Spread Radius.')
+    if not result.faces.count or result.area <= 1e-10:
+        raise ValueError('Spread Radius leaves no region for perforation.')
+    return result
+
+
 def inset_body(source, original, margin, scratch=None):
     if margin <= 1e-9:
         return original
@@ -209,13 +226,35 @@ def inset_body(source, original, margin, scratch=None):
             scratch.deleteMe()
 
 
-@dataclass
 class Layout:
-    cells: list
-    whole: list
-    partial_loops: list
-    panel_loops: list
-    partial_bodies: tuple = ()
+    def __init__(self, cells, whole, partial_loops, original, partial_bodies):
+        self.cells = cells
+        self.whole = whole
+        self.partial_loops = partial_loops
+        self.partial_bodies = tuple(partial_bodies)
+        # The caller owns this temporary source and treats it as read-only.
+        self._original = original
+        self._panel_loops = None
+        self._panel_body = None
+        self.panel_builds = 0
+        self.panel_subtractions = 0
+
+    @property
+    def panel_loops(self):
+        if self._panel_loops is None:
+            manager = adsk.fusion.TemporaryBRepManager.get()
+            panel = manager.copy(self._original)
+            for cut in self.partial_bodies:
+                self.panel_subtractions += 1
+                if not manager.booleanOperation(panel, cut, adsk.fusion.BooleanTypes.DifferenceBooleanType):
+                    raise ValueError('Fusion could not create the panel boundary.')
+            # Publish only a complete panel. A failed Boolean may mutate its
+            # target, so a retry must start from a fresh copy of the source.
+            loops = body_loops(panel)
+            self._panel_body = panel
+            self._panel_loops = loops
+            self.panel_builds += 1
+        return self._panel_loops
 
     def outlines(self, region, panel):
         from .geometry import outline_coordinates
@@ -229,13 +268,13 @@ class Layout:
         return coordinates
 
 
-def layout(original, trimmed, region, settings):
+def layout(original, trimmed, region, settings, candidates=None):
     manager = adsk.fusion.TemporaryBRepManager.get()
     trim_region = body_region(trimmed)
-    trim_segments = trim_region.segments
+    candidates = generate(region, settings) if candidates is None else candidates
+    trim_segments = trim_region.indexed_segments(len(candidates))
     cells, whole, partial, partial_bodies = [], [], [], []
-    panel = manager.copy(original)
-    for cell in generate(region, settings):
+    for cell in candidates:
         if fits(cell, trim_region, trim_segments, 0):
             cells.append(cell)
             whole.append(cell)
@@ -249,11 +288,9 @@ def layout(original, trimmed, region, settings):
                 cells.append(cell)
                 partial.extend(body_loops(cut))
                 partial_bodies.append(cut)
-                if not manager.booleanOperation(panel, cut, adsk.fusion.BooleanTypes.DifferenceBooleanType):
-                    raise ValueError('Fusion could not create the panel boundary.')
     if not cells:
         raise ValueError('No holes remain after applying Edge Offset.')
-    return Layout(cells, whole, partial, body_loops(panel), tuple(partial_bodies))
+    return Layout(cells, whole, partial, original, partial_bodies)
 
 
 def draw(sketch, result, material):

@@ -15,7 +15,7 @@ import adsk.core
 import adsk.fusion
 
 root = Path(__file__).resolve().parents[1]
-entry = next(m for m in tuple(sys.modules.values())
+entry = globals().get('entry') or next(m for m in tuple(sys.modules.values())
              if str(getattr(m, '__file__', '')).endswith(('/Perfora/Perfora.py', '/Perforator/Perforator.py')))
 app = adsk.core.Application.get()
 original = app.activeDocument
@@ -31,6 +31,15 @@ spec = importlib.util.spec_from_file_location('_ui_fixture', root / 'PerforaSmok
 fixture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixture)
 body, face = fixture.plate(comp)
+source_profile = globals().get('source_profile', False)
+selected_source = face
+if source_profile:
+    boundary_sketch = comp.sketches.addWithoutEdges(face)
+    boundary_sketch.sketchCurves.sketchCircles.addByCenterRadius(adsk.core.Point3D.create(), 1.1)
+    selected_source = boundary_sketch.profiles.item(0)
+anchor_sketch = comp.sketches.addWithoutEdges(comp.xYConstructionPlane)
+anchor = anchor_sketch.sketchPoints.add(adsk.core.Point3D.create(.35, .2, 0))
+design.userParameters.add('PerforaDefaultProbe', adsk.core.ValueInput.createByString('7 mm'), 'mm', '')
 timeline = design.timeline.count
 volume = body.volume
 report = {'passed': False}
@@ -41,6 +50,10 @@ output.parent.mkdir(parents=True, exist_ok=True)
 
 def save():
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+
+
+def model_body(body):
+    return entry.model.native(body)
 
 
 def choose(s, identifier, options, key):
@@ -60,10 +73,62 @@ class Activate(adsk.core.CommandEventHandler):
         self.done = True
         s = self.session
         try:
-            s.inputs['source'].addSelection(face)
+            # Fusion can restore remembered values after commandCreated. Keep
+            # bulk UI contract edits from launching intermediate CAD previews.
+            s.inputs['preview'].value = False
+            assert s.chosen('preview_color', entry.PREVIEW_COLORS) == 'gold'
+            if hasattr(entry, 'parametric'):
+                assert s.chosen('result', entry.RESULTS) == 'feature'
+            choose(s, 'result', entry.RESULTS, 'extrude')
+            choose(s, 'preview_mode', entry.PREVIEW_MODES, 'fast')
+            s.inputs['source'].addSelection(selected_source)
             s.update_visibility()
             assert s.chosen('operation', entry.OPERATIONS) == 'cut'
-            assert s.read()[2]['bodies']
+            assert model_body(s.read()[2]['bodies'][0]) == body
+            defaults = {k: (v.default_expression, v.value) for k, v in s.numeric_inputs.items()}
+            assert all(expression.strip() for expression, _ in defaults.values())
+            # Exercise every numeric field, including linked/hidden dimensions,
+            # degrees, unitless percentages and all former integer spinners.
+            s.updating = True
+            try:
+                for control in s.numeric_inputs.values():
+                    control.expression = ''
+            finally:
+                s.updating = False
+            restored = s.restore_empty_inputs()
+            assert set(restored) == set(defaults)
+            for key, (expression, value) in defaults.items():
+                assert s.inputs[key].expression == expression, key
+                assert s.inputs[key].isValidExpression and abs(s.inputs[key].value - value) < 1e-9, key
+            s.inputs['gap'].expression = 'not_a_parameter'
+            assert not s.inputs['gap'].isValidExpression
+            s.restore_empty_inputs()
+            assert s.inputs['gap'].expression == 'not_a_parameter', 'Nonempty errors must remain visible'
+            s.inputs['gap'].expression = '1.5 mm'
+            s.inputs['margin'].expression = '0'
+            s.restore_empty_inputs()
+            assert s.inputs['margin'].value == 0, 'An explicit zero is not an empty value'
+            s.inputs['margin'].expression = '3 mm'
+            s.inputs['grid_angle'].expression = '90 deg'
+            assert abs(s.read()[1].grid_angle - 1.5707963267948966) < 1e-9
+            s.inputs['grid_angle'].expression = '0 deg'
+            s.inputs['size'].expression = '1 in / 2'
+            s.sync_dimensions('size')
+            assert abs(s.read()[1].size - 1.27) < 1e-9
+            s.inputs['size'].expression = '5 mm'
+            s.sync_dimensions('size')
+            s.inputs['distance1'].expression = '2'
+            assert s.read()[2]['distance1'] == '2 mm', 'Bare distances must retain the field units'
+            s.inputs['distance1'].expression = '2 mm'
+            s.inputs['size'].expression = 'PerforaDefaultProbe / 2'
+            s.sync_dimensions('size')
+            assert abs(s.read()[1].size - .35) < 1e-9
+            s.inputs['size'].expression = '5 mm'
+            s.sync_dimensions('size')
+            for key, invalid in (('limit', '5001'), ('star_points', '2.5'), ('seed', '-1')):
+                s.inputs[key].expression = invalid
+                assert not s.inputs[key].isValidExpression, key
+                s.inputs[key].expression = defaults[key][0]
             for shape, _ in entry.SHAPES:
                 choose(s, 'shape', entry.SHAPES, shape)
                 settings, config = s.read()[1:]
@@ -78,6 +143,25 @@ class Activate(adsk.core.CommandEventHandler):
             assert s.read()[1].size == s.inputs['size_side'].value
             s.inputs['size'].expression = '5 mm'
             s.sync_dimensions('size')
+            choose(s, 'shape', entry.SHAPES, 'slot')
+            choose(s, 'layout', entry.LAYOUTS, 'circular')
+            s.inputs['start_radius'].expression = '8 mm'
+            choose(s, 'orientation', entry.ORIENTATIONS, 'radial')
+            circular = s.read()[1]
+            assert circular.layout == 'circular' and circular.radial_orientation
+            assert abs(circular.start_radius - .8) < 1e-9
+            assert s.inputs['start_radius'].isVisible and s.inputs['orientation'].isVisible
+            choose(s, 'shape', entry.SHAPES, 'circle')
+            assert not s.inputs['orientation'].isVisible and not s.read()[1].radial_orientation
+            choose(s, 'shape', entry.SHAPES, 'voronoi')
+            assert not s.inputs['start_radius'].isVisible and s.read()[1].layout == 'grid'
+            s.inputs['start_radius'].expression = '-1 mm'
+            assert s.read()[1].start_radius == 0, 'Inactive circular fields must not block Voronoi'
+            choose(s, 'shape', entry.SHAPES, 'slot')
+            choose(s, 'layout', entry.LAYOUTS, 'rows')
+            assert s.read()[1].layout == 'grid' and not s.inputs['start_radius'].isVisible
+            s.inputs['start_radius'].expression = '8 mm'
+            choose(s, 'layout', entry.LAYOUTS, 'staggered')
             for key, _ in entry.OPERATIONS:
                 choose(s, 'operation', entry.OPERATIONS, key)
                 assert s.read()[2]['operation'] == key
@@ -119,15 +203,42 @@ class Activate(adsk.core.CommandEventHandler):
             s.inputs['corner_radius'].expression = '0.5 mm'
             s.inputs['round_corners'].value = True
             s.update_visibility()
+            choose(s, 'shape', entry.SHAPES, 'slot')
+            s.inputs['slot_length'].expression = '9 mm'
+            s.sync_dimensions('slot_length')
+            choose(s, 'layout', entry.LAYOUTS, 'circular')
+            choose(s, 'orientation', entry.ORIENTATIONS, 'tangential')
+            s.inputs['center_point'].addSelection(anchor)
+            assert s.read()[2]['center_point'] == anchor
+            choose(s, 'layout', entry.LAYOUTS, 'rows')
+            assert s.read()[2]['center_point'] == anchor
+            assert s.inputs['center_point'].isVisible
+            choose(s, 'layout', entry.LAYOUTS, 'circular')
+            assert s.inputs['center_point'].isVisible and s.inputs['center_point'].selectionCount == 1
             choose(s, 'operation', entry.OPERATIONS, 'cut')
             s.inputs['clip_boundary'].value = True
             s.inputs['margin'].expression = '2 mm'
+            s.inputs['spread_radius'].expression = '12 mm'
+            assert abs(s.read()[1].spread_radius-1.2) < 1e-9
+            assert s.read()[1].tangential_orientation
+            assert not s.read()[1].radial_orientation
             s.inputs['preview'].value = True
+            s.update_visibility()
+            assert s.inputs['preview_color'].isVisible
+            for color, _ in entry.PREVIEW_COLORS:
+                choose(s, 'preview_color', entry.PREVIEW_COLORS, color)
+            choose(s, 'preview_color', entry.PREVIEW_COLORS, 'gold')
+            choose(s, 'preview_mode', entry.PREVIEW_MODES, 'exact')
+            assert not s.inputs['preview_color'].isVisible
+            choose(s, 'preview_mode', entry.PREVIEW_MODES, 'fast')
+            assert s.inputs['preview_color'].isVisible
             for key, control in s.inputs.items():
                 assert not re.search('[А-Яа-яЁё]', control.name + control.tooltip), key
             choose(s, 'result', entry.RESULTS, result_mode)
-            report.update(result_mode=result_mode, registered_command=registered_command,
+            report.update(result_mode=result_mode, registered_command=registered_command, source_profile=source_profile,
                           passed=True, stage='ready', shapes=len(entry.SHAPES), operations=5, directions=3,
+                          distributions=len(entry.LAYOUTS), circular_settings=str(s.read()[1]),
+                          numeric_defaults=len(defaults),
                           native_icons=all(entry.ui_resources.icon(k) for k in ('cut','join','body','one','all')),
                           fields=len(s.inputs))
         except Exception:

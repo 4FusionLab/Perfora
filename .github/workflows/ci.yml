@@ -40,7 +40,7 @@ jobs:
           if-no-files-found: error
 
   release:
-    name: Publish experimental release
+    name: Publish verified release
     needs: check
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
