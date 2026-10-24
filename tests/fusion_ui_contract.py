@@ -24,6 +24,8 @@ original_timeline = original_design.timeline.count
 original_volume = sum(b.volume for b in original_design.rootComponent.bRepBodies)
 result_mode = globals().get('result_mode', 'extrude')
 layout_variant = globals().get('layout_variant')
+distribution = globals().get('distribution', 'circular')
+assert distribution in ('circular', 'path')
 registered_command = globals().get('registered_command', False)
 doc = app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
 design = adsk.fusion.Design.cast(app.activeProduct)
@@ -49,6 +51,10 @@ if layout_variant == 'between_curves':
         guide.isConstruction = True
         variant_guides.append(guide)
     guide_sketch.isVisible = False
+path_sketch = comp.sketches.addWithoutEdges(face)
+path_curve = path_sketch.sketchCurves.sketchLines.addByTwoPoints(
+    adsk.core.Point3D.create(-1.4, 0, 0), adsk.core.Point3D.create(1.4, 0, 0))
+path_curve.isConstruction = True
 design.userParameters.add('PerforaDefaultProbe', adsk.core.ValueInput.createByString('7 mm'), 'mm', '')
 timeline = design.timeline.count
 volume = body.volume
@@ -243,6 +249,37 @@ class Activate(adsk.core.CommandEventHandler):
             assert not s.inputs['preview_color'].isVisible
             choose(s, 'preview_mode', entry.PREVIEW_MODES, 'fast')
             assert s.inputs['preview_color'].isVisible
+            choose(s, 'layout', entry.LAYOUTS, 'path')
+            assert s.inputs['path'].isVisible and s.inputs['path_spacing'].isVisible
+            assert s.inputs['path_orientation'].isVisible
+            assert not any(s.inputs[k].isVisible for k in
+                           ('center_point', 'spread_radius', 'grid_angle', 'offset_x', 'offset_y', 'orientation', 'start_radius'))
+            try:
+                s.read()
+                raise AssertionError('Missing Path was accepted')
+            except ValueError as error:
+                assert 'Path' in str(error)
+            s.inputs['path'].addSelection(path_curve)
+            s.inputs['path_spacing'].expression = '12 mm'
+            s.inputs['path_start'].expression = '1 mm'
+            s.inputs['path_end'].expression = '1 mm'
+            s.inputs['path_position'].expression = '0 mm'
+            choose(s, 'path_orientation', entry.PATH_ORIENTATIONS, 'tangent')
+            s.inputs['path_reverse'].value = True
+            path_settings, path_config = s.read()[1:]
+            assert path_settings.layout == 'path' and path_settings.path_reverse
+            assert path_settings.path_orientation == 'tangent'
+            assert abs(path_settings.path_spacing - 1.2) < 1e-9
+            assert path_config['path'] == path_curve and path_config['center_point'] is None
+            choose(s, 'shape', entry.SHAPES, 'circle')
+            assert not s.inputs['path_orientation'].isVisible
+            choose(s, 'shape', entry.SHAPES, 'voronoi')
+            assert not s.inputs['path'].isVisible and s.read()[1].layout == 'grid'
+            choose(s, 'shape', entry.SHAPES, 'slot')
+            choose(s, 'layout', entry.LAYOUTS, distribution)
+            # Path controls retain their values on switching back; old Circular
+            # acceptance still leaves the original circular scenario selected.
+            assert s.read()[1].layout == distribution
             for key, control in s.inputs.items():
                 assert not re.search('[А-Яа-яЁё]', control.name + control.tooltip), key
             choose(s, 'result', entry.RESULTS, result_mode)
@@ -259,7 +296,7 @@ class Activate(adsk.core.CommandEventHandler):
             report.update(result_mode=result_mode, registered_command=registered_command, source_profile=source_profile,
                           layout_variant=layout_variant,
                           passed=True, stage='ready', shapes=len(entry.SHAPES), operations=5, directions=3,
-                          distributions=len(entry.LAYOUTS), circular_settings=str(s.read()[1]),
+                          distributions=len(entry.LAYOUTS), distribution=distribution, settings=str(s.read()[1]),
                           numeric_defaults=len(defaults),
                           native_icons=all(entry.ui_resources.icon(k) for k in ('cut','join','body','one','all')),
                           fields=len(s.inputs))

@@ -30,6 +30,7 @@ _paths = {
     'staggered': ('fusion', 'pattern/distribution/hex'),
     'rows': ('fusion', 'pattern/distribution/square'),
     'circular': ('base', 'PatternCmd/circular'),
+    'path': ('fusion', 'pattern/pattern_path'),
 }
 
 

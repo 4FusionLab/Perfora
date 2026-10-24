@@ -8,6 +8,7 @@ import adsk.core
 import adsk.fusion
 
 from .geometry import Loop, Region, Settings, POLYGON_SHAPES, disk_region, generate, rectangle_region, stitch
+from .curve_layout import sample_path
 
 ATTRIBUTE_GROUP = 'DiegoV.Perforator'  # Preserve attributes in existing documents.
 TOLERANCE = 0.0001
@@ -103,12 +104,108 @@ def sketch_frame(sketch):
             tuple(origin.vectorTo(y).asArray()))
 
 
-def layout_settings(settings, config, region, frame, component):
+def path_entity(entity, component):
+    """First stage: a single path in the source component, without chain guessing."""
+    if entity is None or not entity.isValid:
+        raise ValueError('Select one Path in the Profiles plane.')
+    entity = native(entity)
+    if isinstance(entity, adsk.fusion.BRepEdge):
+        owner = entity.body.parentComponent
+    elif isinstance(entity, adsk.fusion.SketchCurve):
+        owner = entity.parentSketch.parentComponent
+    else:
+        raise ValueError('Select one line, arc, circle, or spline. Path chains are not supported.')
+    if owner != component:
+        raise ValueError('Path and Profiles must belong to the same component.')
+    if not isinstance(entity.geometry, (adsk.core.Line3D, adsk.core.Arc3D,
+                                        adsk.core.Circle3D, adsk.core.NurbsCurve3D)):
+        raise ValueError('Path must be one line, arc, circle, or spline. Other curves and chains are not supported.')
+    return entity
+
+
+def path_reference(entity, component):
+    entity = path_entity(entity, component)
+    root = component.parentDesign.rootComponent
+    if component == root:
+        return entity
+    occurrences = root.allOccurrencesByComponent(component)
+    if occurrences.count != 1:
+        raise ValueError('Feature Path requires an unambiguous source component occurrence.')
+    return entity.createForAssemblyContext(occurrences.item(0))
+
+
+def path_revision(entity):
+    return (entity.body.revisionId if isinstance(entity, adsk.fusion.BRepEdge)
+            else entity.parentSketch.revisionId)
+
+
+def path_samples(entity, settings, frame, component):
+    entity = path_entity(entity, component)
+    geometry = entity.geometry
+    edge = isinstance(entity, adsk.fusion.BRepEdge)
+    evaluator = entity.evaluator if edge else geometry.evaluator
+    # The edge evaluator respects trimmed extents and its own direction. Using
+    # edge.geometry.evaluator would incorrectly sample an entire parent curve.
+    closed = (entity.startVertex == entity.endVertex if edge else
+              isinstance(geometry, adsk.core.Circle3D) or
+              isinstance(geometry, adsk.core.NurbsCurve3D) and geometry.isClosed)
+    origin, u, v = frame
+    n = (u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0])
+    axes = (u, v, n)
+
+    def component_point(p):
+        # Sketch geometry is in sketch space. Avoid worldGeometry: its assembly
+        # convention differs between fitted and control-point splines.
+        return p if edge else entity.parentSketch.sketchToModelSpace(p)
+
+    def project_point(p):
+        xyz = component_point(p).asArray()
+        delta = tuple(xyz[i]-origin[i] for i in range(3))
+        return tuple(sum(a*b for a, b in zip(delta, axis)) for axis in axes)
+
+    def project_vector(vector):
+        xyz = vector.asArray()
+        if not edge:
+            sketch = entity.parentSketch
+            zero = sketch.sketchToModelSpace(point((0, 0))).asArray()
+            tip = sketch.sketchToModelSpace(adsk.core.Point3D.create(*xyz)).asArray()
+            xyz = tuple(tip[i]-zero[i] for i in range(3))
+        return tuple(sum(a*b for a, b in zip(xyz, axis)) for axis in axes)
+
+    return sample_path(evaluator, settings, project_point, project_vector, closed)
+
+
+class PathCache:
+    """Renderer-owned one-entry sampling cache; never used for final CAD reread."""
+    def __init__(self):
+        self.key = self.samples = None
+        self.builds = 0
+
+    def resolve(self, entity, settings, frame, component):
+        entity = path_entity(entity, component)
+        key = (entity, path_revision(entity), frame, settings.path_spacing,
+               settings.path_start, settings.path_end, settings.path_position,
+               settings.path_reverse, settings.path_orientation)
+        if key != self.key:
+            samples = path_samples(entity, settings, frame, component)
+            self.key, self.samples = key, samples
+            self.builds += 1
+        return self.samples
+
+
+def layout_settings(settings, config, region, frame, component, path_cache=None):
     """Resolve a live anchor once for every CAD/preview path, without API in geometry.
 
     Orthogonal projection onto the Profiles plane lets points on other sketches
     locate the pattern too. Stored offsets remain relative to the selected point.
     """
+    if settings.layout == 'path':
+        if config.get('center_point') is not None:
+            raise ValueError('Along Path does not support Start Point. Use Position and path offsets.')
+        entity = config.get('path')
+        samples = (path_cache.resolve(entity, settings, frame, component) if path_cache is not None
+                   else path_samples(entity, settings, frame, component))
+        return replace(settings, path_samples=samples)
     center = config.get('center_point')
     if center is not None:
         position = point_position(center, component)

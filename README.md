@@ -146,6 +146,13 @@ Along Spacing and Row Spacing use automatic enclosing-hole spacing at 0; smaller
 Contour follows approximate signed-distance levels, with explicit Contour Tolerance and a sampling budget; it is not an exact CAD offset, and sub-resolution details can disappear. Between Curves currently requires two separate open planar curves/edges in the Profiles component, matches normalized arc length and endpoints, and rejects crossed, collapsed, folded, closed, nonplanar, or cross-component guides. Arbitrary complex spline strips and curve chains are not promised. For Contour/Between Curves, Start Point and offsets move only a positive Spread Radius scope; Pattern Angle is hidden.
 
 New Feature nodes expose the added model parameters. Older nodes keep missing values as stored snapshots when edited; recreate a Feature to obtain new model parameters and their expression dependencies. [Implementation limits, integration seam, and exact pending CAD/UI acceptance →](docs/LAYOUT_VARIANTS.md)
+## Along Path (development, awaiting Fusion validation)
+
+The `codex/curve-layout` branch adds **Distribution → Along Path** for all 12 repeating shapes: select one coplanar line, arc, circle or spline in the Profiles component. **Path Spacing** measures arc length; **Start Offset**, **End Offset**, **Position** and **Reverse Path** control placement. **Fixed** or **Tangent** orientation adds **Hole Angle**. Closed paths omit duplicate seam centers. Tight turns, nearby sections and the closing seam are checked against Web Thickness using conservative enclosing bounds; conflicts are reported rather than silently skipping holes.
+
+The implementation connects to Fast/Full Preview, existing trimming/inner cutouts/Edge Offset, Sketch, Extrude and Feature. Feature stores a live path dependency and new native path parameters; Edit Feature can replace the path or change distribution. Older nodes remain compatible with existing distributions; recreate them to use Along Path, because existing nodes cannot gain its native parameters. Chains, off-plane/cross-component paths and elliptical paths are unsupported. Start Point, Spread Radius, Pattern Angle and X/Y Offset are inactive in this distribution; Voronoi keeps its own distribution.
+
+**This functionality is unreleased and has not been tested or installed in Fusion.** Local tests do not prove native UI, CAD, Feature recompute/edit, Undo/Redo or archive reopen. [Behavior, API rationale, tolerances, limitations and pending CAD acceptance →](docs/CURVE_LAYOUT.md)
 
 ## Performance
 

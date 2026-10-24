@@ -178,6 +178,14 @@ class Settings:
     guide_reverse: bool = False
     guide1: tuple = ()  # Prepared 2D strokes only; live references stay in config.
     guide2: tuple = ()
+    path_spacing: float = 0.8
+    path_start: float = 0.0
+    path_end: float = 0.0
+    path_position: float = 0.0
+    path_reverse: bool = False
+    path_orientation: str = 'fixed'
+    # Transient, immutable (x, y, tangent angle) samples; never serialized.
+    path_samples: tuple = ()
 
     def validate(self):
         if not math.isfinite(self.spread_radius) or self.spread_radius < 0:
@@ -189,11 +197,24 @@ class Settings:
             raise ValueError('Start Point must have finite coordinates.')
         if self.shape not in SHAPE_IDS:
             raise ValueError('Unknown hole shape.')
-        if self.layout not in ('grid', 'circular') + VARIANT_LAYOUTS:
+        if self.layout not in ('grid', 'circular', 'path') + VARIANT_LAYOUTS:
             raise ValueError('Unknown distribution.')
         if self.layout in VARIANT_LAYOUTS:
             from .distributions import validate
             validate(self)
+        if self.layout == 'path':
+            if self.shape == 'voronoi':
+                raise ValueError('Along Path is not available for Voronoi.')
+            if (not all(math.isfinite(v) and v >= 0 for v in
+                        (self.path_start, self.path_end, self.path_position))
+                    or not math.isfinite(self.path_spacing) or self.path_spacing <= 0):
+                raise ValueError('Path Spacing must be positive; path offsets and Position must be finite and nonnegative.')
+            if self.path_orientation not in ('fixed', 'tangent'):
+                raise ValueError('Path Orientation must be Fixed or Tangent.')
+            if (self.grid_angle or self.offset_x or self.offset_y or self.spread_radius
+                    or self.origin_x is not None or self.origin_y is not None
+                    or self.radial_orientation or self.tangential_orientation or self.start_radius):
+                raise ValueError('Along Path does not support Pattern Angle, X/Y Offset, Start Point, Spread Radius, or circular placement.')
         if self.layout == 'circular':
             if self.shape == 'voronoi':
                 raise ValueError('Circular distribution is not available for Voronoi.')
@@ -630,6 +651,9 @@ def candidate_points(region, angle=0):
 
 def generate(region, settings):
     settings.validate()
+    if settings.layout == 'path':
+        from .curve_layout import generate_path
+        return generate_path(region, settings)
     if settings.spread_radius > 0:
         from dataclasses import replace
         if settings.origin_x is None:

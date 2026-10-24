@@ -26,6 +26,7 @@ class Renderer:
         self.source_key = 0
         self.source_revision = None
         self.geometry_cache = GeometryCache()
+        self.path_cache = model.PathCache()
         self.source = None
         self.region = None
         self.component = None
@@ -74,6 +75,7 @@ class Renderer:
         self.clipped_layout = None
         self.surface_prepared = None
         self.geometry_cache.clear()
+        self.path_cache = model.PathCache()
 
     def show(self, source, settings, config, color='gold'):
         from . import cylindrical
@@ -102,7 +104,7 @@ class Renderer:
             self.source = source
             self.source_revision = model.source_revision(source)
         self.boundary_key = boundary_key
-        settings = model.layout_settings(settings, config, self.region, self.frame, self.component)
+        settings = model.layout_settings(settings, config, self.region, self.frame, self.component, self.path_cache)
         if settings.clip_boundary and self.original_body is not None and not self.original_body.isValid:
             self.original_body = self.inset_body = self.trimmed_body = None
             self.trim_key = self.trim_margin = None

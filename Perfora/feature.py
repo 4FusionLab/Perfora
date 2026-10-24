@@ -24,6 +24,10 @@ PARAMETERS = {
     'size': ('Hole Size / Cell Spacing', 'mm'),
     'start_radius': ('Start Radius', 'mm'),
     'spread_radius': ('Spread Radius', 'mm'),
+    'path_spacing': ('Path Spacing', 'mm'),
+    'path_start': ('Path Start Offset', 'mm'),
+    'path_end': ('Path End Offset', 'mm'),
+    'path_position': ('Path Position', 'mm'),
     'slot_length': ('Hole Length', 'mm'), 'gap': ('Web Thickness', 'mm'),
     'margin': ('Edge Offset', 'mm'), 'grid_angle': ('Pattern Angle', 'deg'),
     'shape_angle': ('Hole Angle', 'deg'), 'offset_x': ('X Offset', 'mm'),
@@ -38,6 +42,8 @@ PARAMETERS = {
 PARAMETERS.update({key: (label, unit) for key, (label, unit, _) in VARIANT_PARAMETERS.items()})
 OPTIONAL_PARAMETERS = ('start_radius', 'spread_radius') + tuple(VARIANT_PARAMETERS)
 INTEGER_PARAMETERS = ('star_points', 'seed', 'limit', 'fan_rays', 'guide_rows')
+PATH_PARAMETERS = ('path_spacing', 'path_start', 'path_end', 'path_position')
+OPTIONAL_PARAMETERS += PATH_PARAMETERS
 
 
 def register():
@@ -80,9 +86,9 @@ def parameters(config):
 
 
 def metadata(settings, config):
-    return dict(schema=SCHEMA, settings=dict(settings.__dict__),
+    return dict(schema=SCHEMA, settings={k: v for k, v in settings.__dict__.items() if k != 'path_samples'},
                 config={k: v for k, v in config.items()
-                        if k not in ('bodies', 'target1', 'target2', '_expressions', 'center_point', 'guide1', 'guide2')},
+                        if k not in ('bodies', 'target1', 'target2', '_expressions', 'center_point', 'guide1', 'guide2', 'path')},
                 center_selected=config.get('center_point') is not None,
                 body_count=len(config['bodies']))
 
@@ -141,9 +147,11 @@ def guide_entities(custom, allow_missing=False):
 def read(custom):
     data = stored(custom)
     settings = Settings(**data['settings'])
+    validate_path_parameters(custom, settings)
     config = dict(data['config'])
     config['center_point'] = center_entity(custom)
     config.update(zip(('guide1', 'guide2'), guide_entities(custom)))
+    config['path'] = path_dependency(custom)
     values = {}
     for key in parameters(config):
         p = custom.parameters.itemById(key)
@@ -171,6 +179,21 @@ def read(custom):
                         for i in range(data['body_count'])]
     config.update(target1=None, target2=None)
     return source, settings, config
+
+
+def path_dependency(custom, strict=True):
+    dependency = custom.dependencies.itemById('path')
+    entity = dependency.entity if dependency else None
+    if entity is not None and not entity.isValid:
+        entity = None
+    if strict and stored(custom)['settings'].get('layout') == 'path' and entity is None:
+        raise ValueError('Path is missing. Edit the Perfora Feature to select another curve.')
+    return entity
+
+
+def validate_path_parameters(custom, settings):
+    if settings.layout == 'path' and any(not custom.parameters.itemById(key) for key in PATH_PARAMETERS):
+        raise ValueError('This older Perfora Feature has no Path parameters. Recreate it to use Along Path.')
 
 
 def clear_sketch(sketch):
@@ -261,6 +284,9 @@ def build(source, settings, config, cache=None):
         for key in ('guide1', 'guide2'):
             if not data.addDependency(key, model.guide_reference(config.get(key), component)):
                 raise ValueError('Unable to capture the guide dependency.')
+    if settings.layout == 'path':
+        if not data.addDependency('path', model.path_reference(config.get('path'), component)):
+            raise ValueError('Unable to create the Path dependency.')
     for i, target in enumerate(config['bodies']):
         data.addDependency('body' + str(i), dependency_entity(target, component))
     expressions = config.get('_expressions', {})
@@ -349,6 +375,7 @@ def rebuild(custom, cache=None):
 def update(custom, settings, config, cache=None):
     """Called in an edit transaction; intermediate parameter writes cannot compute."""
     global _busy
+    validate_path_parameters(custom, settings)
     _busy = True
     try:
         config = dict(config)
@@ -377,6 +404,15 @@ def update(custom, settings, config, cache=None):
                     custom.dependencies.add(key, reference)
             elif dependency:
                 dependency.deleteMe()
+        dependency = custom.dependencies.itemById('path')
+        if settings.layout == 'path':
+            reference = model.path_reference(config.get('path'), custom.parentComponent)
+            if dependency:
+                dependency.entity = reference
+            else:
+                custom.dependencies.add('path', reference)
+        elif dependency:
+            dependency.deleteMe()
         custom.customNamedValues.addOrSetValue('perfora', json.dumps(metadata(settings, config)))
         expressions = config.get('_expressions', {})
         for key, (_, unit) in parameters(config).items():

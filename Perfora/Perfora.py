@@ -60,11 +60,12 @@ OPERATIONS = [('join', 'Join'), ('cut', 'Cut'), ('intersect', 'Intersect'),
 DIRECTIONS = [('one', 'One Side'), ('two', 'Two Sides'), ('symmetric', 'Symmetric')]
 EXTENTS = [('distance', 'Distance'), ('object', 'To Object'), ('all', 'All')]
 STARTS = [('profile', 'Profile Plane'), ('offset', 'Offset')]
-LAYOUTS = [('staggered', 'Staggered'), ('rows', 'Rectangular'), ('circular', 'Circular')]
+LAYOUTS = [('staggered', 'Staggered'), ('rows', 'Rectangular'), ('circular', 'Circular'), ('path', 'Along Path')]
 LAYOUTS += [('contour', 'Contour'), ('fan', 'Fan'), ('phyllotaxis', 'Phyllotaxis'),
             ('poisson', 'Poisson Disk'), ('wave', 'Wave'), ('chevron', 'Chevron'),
             ('running_bond', 'Running Bond'), ('between_curves', 'Between Curves')]
 SURFACE_LAYOUTS = LAYOUTS[:2]  # Local rows; planar concentric rings do not wrap.
+PATH_ORIENTATIONS = [('fixed', 'Fixed'), ('tangent', 'Tangent')]
 ORIENTATIONS = [('fixed', 'Fixed'), ('radial', 'Radial'), ('tangential', 'Tangential')]
 PREVIEW_MODES = [('fast', 'Fast'), ('exact', 'Full')]
 
@@ -172,6 +173,23 @@ class Session:
         self.check(pattern, 'guide_reverse', 'Reverse Guide 2', False)
         self.dropdown(pattern, 'surface_layout', 'Distribution', SURFACE_LAYOUTS, icons=True)
         self.inputs['surface_layout'].tooltip = 'Rectangular aligns rows. Staggered shifts alternate rows by half a pitch.'
+        self.selection(pattern, 'path', 'Path', ['Edges', 'SketchCurves'], 0, 1,
+                       'Select one line, arc, circle, or spline in the Profiles plane and component. '
+                       'Chains and off-plane curves are not supported.')
+        self.inputs['path'].isUseCurrentSelections = False
+        self.number(pattern, 'path_spacing', 'Path Spacing', '8 mm')
+        self.inputs['path_spacing'].tooltip = ('Center spacing measured by arc length. '
+            'Web Thickness is checked at turns, nearby sections, and the closing seam. '
+            'Noncircular holes use conservative enclosing bounds.')
+        self.number(pattern, 'path_start', 'Start Offset', '0 mm')
+        self.number(pattern, 'path_end', 'End Offset', '0 mm')
+        self.number(pattern, 'path_position', 'Position', '0 mm')
+        self.inputs['path_position'].tooltip = ('Additional distance of the first center from Start Offset. '
+            'Offsets measure hole centers, not solid end borders. A closed path uses its curve seam.')
+        self.check(pattern, 'path_reverse', 'Reverse Path', False)
+        self.dropdown(pattern, 'path_orientation', 'Orientation', PATH_ORIENTATIONS)
+        self.inputs['path_orientation'].tooltip = ('Fixed keeps holes parallel to sketch X. '
+            'Tangent follows Path in the chosen direction. Hole Angle adds a rotation.')
         self.selection(pattern, 'center_point', 'Start Point',
                        ['SketchPoints', 'Vertices', 'ConstructionPoints'], 0, 1,
                        'Select a sketch point, vertex, or construction point. Leave empty for the boundary center. '
@@ -267,6 +285,10 @@ class Session:
                 d[key].value = settings.get(key, getattr(defaults, key))
             d['guide_reverse'].value = settings.get('guide_reverse', False)
             d['surface_layout'].listItems.item(0 if settings['staggered'] else 1).isSelected = True
+            d['path_orientation'].listItems.item(1 if settings.get('path_orientation') == 'tangent' else 0).isSelected = True
+            d['path_reverse'].value = settings.get('path_reverse', False)
+            for key, fallback in (('path_spacing', .8), ('path_start', 0), ('path_end', 0), ('path_position', 0)):
+                d[key].value = settings.get(key, fallback)
             d['orientation'].listItems.item(2 if settings.get('tangential_orientation') else
                 (1 if settings.get('radial_orientation') else 0)).isSelected = True
             d['start_radius'].value = settings.get('start_radius', 0)
@@ -494,12 +516,16 @@ class Session:
             visible('layout', shape != 'voronoi' and not is_curved)
             visible('surface_layout', shape != 'voronoi' and is_curved)
             circular = layout == 'circular'
+            along_path = layout == 'path'
+            for identifier in ('path', 'path_spacing', 'path_start', 'path_end', 'path_position', 'path_reverse'):
+                visible(identifier, along_path)
+            visible('path_orientation', along_path and shape != 'circle')
             boundary_anchored = layout in ('contour', 'between_curves')
             scoped = not d['spread_radius'].isValidExpression or d['spread_radius'].value > 0
-            visible('center_point', not boundary_anchored or scoped)
-            visible('grid_angle', not is_curved and not boundary_anchored)
+            visible('center_point', not along_path and (not boundary_anchored or scoped))
+            visible('grid_angle', not is_curved and not along_path and not boundary_anchored)
             for key in ('offset_x', 'offset_y'):
-                visible(key, not boundary_anchored or scoped)
+                visible(key, not along_path and (not boundary_anchored or scoped))
             visible('start_radius', circular or layout == 'fan')
             d['start_radius'].tooltip = ('Radius of the first hole center on each ray. Nearby holes are omitted to preserve Web Thickness.'
                 if layout == 'fan' else 'Radius of the first ring, measured to hole centers. 0 starts with a center hole; ring spacing preserves Web Thickness.')
@@ -584,6 +610,13 @@ class Session:
             if d['spread_radius'].isValidExpression and d['spread_radius'].value == 0:
                 required.remove('offset_x')
                 required.remove('offset_y')
+        along_path = layout == 'path'
+        if along_path:
+            required = [k for k in required if k not in ('grid_angle', 'offset_x', 'offset_y', 'spread_radius')]
+            required += ['path_spacing', 'path_start', 'path_end', 'path_position']
+            if d['path'].selectionCount != 1:
+                raise ValueError('Select one Path in the Profiles plane.')
+            model.path_entity(d['path'].selection(0).entity, model.source_component(source))
         if circular or layout == 'fan':
             required.append('start_radius')
         if shape not in ('circle', 'voronoi'):
@@ -650,7 +683,14 @@ class Session:
                                 if shape == 'voronoi' and d['round_corners'].value else 0,
                             layout='grid' if layout in ('staggered', 'rows') else layout,
                             start_radius=d['start_radius'].value if circular or layout == 'fan' else 0,
-                            spread_radius=d['spread_radius'].value if self.edited_feature else 0,
+                            spread_radius=d['spread_radius'].value if self.edited_feature and not along_path else 0,
+                            path_spacing=d['path_spacing'].value if along_path else .8,
+                            path_start=d['path_start'].value if along_path else 0,
+                            path_end=d['path_end'].value if along_path else 0,
+                            path_position=d['path_position'].value if along_path else 0,
+                            path_reverse=along_path and d['path_reverse'].value,
+                            path_orientation=self.chosen('path_orientation', PATH_ORIENTATIONS)
+                                if along_path and shape != 'circle' else 'fixed',
                             radial_orientation=circular and shape != 'circle' and
                                 self.chosen('orientation', ORIENTATIONS) == 'radial',
                             tangential_orientation=circular and shape != 'circle' and
@@ -658,10 +698,13 @@ class Session:
                             guide_reverse=d['guide_reverse'].value if layout == 'between_curves' else False,
                             **variant_values)
         settings.validate()
+        if self.edited_feature:
+            parametric.validate_path_parameters(self.edited_feature, settings)
         config = {
             'guide1': None, 'guide2': None,
             'center_point': d['center_point'].selection(0).entity
                 if d['center_point'].isVisible and d['center_point'].selectionCount else None,
+            'path': d['path'].selection(0).entity if along_path else None,
             'boundary': boundary,
             'width': d[width_id].value if width_id in required else
                 self.units.evaluateExpression(d[width_id].default_expression, d[width_id].unit),
@@ -729,6 +772,11 @@ class Session:
                 expressions['arm_width'] = '1.5 mm'
             if shape != 'voronoi' or not d['round_corners'].value:
                 expressions['corner_radius'] = '0 mm'
+            # Hidden stale/invalid fields cannot re-enter through model parameters.
+            for key in ('grid_angle', 'offset_x', 'offset_y', 'spread_radius', 'start_radius', 'path_spacing',
+                        'path_start', 'path_end', 'path_position'):
+                if key not in required:
+                    expressions[key] = str(getattr(settings, key)) + (' rad' if key == 'grid_angle' else ' cm')
             if is_curved:expressions['grid_angle']='0 deg'
             config['_expressions'] = expressions
         return source, settings, config
@@ -926,6 +974,9 @@ class EditActivate(adsk.core.CommandEventHandler):
                 for key, entity in zip(('guide1', 'guide2'), parametric.guide_entities(custom, allow_missing=True)):
                     if entity is not None:
                         s.inputs[key].addSelection(entity)
+                path = parametric.path_dependency(custom, strict=False)
+                if path is not None:
+                    s.inputs['path'].addSelection(path)
                 data = parametric.stored(custom)
                 for i in range(data['body_count']):
                     s.inputs['bodies'].addSelection(custom.dependencies.itemById('body' + str(i)).entity)
