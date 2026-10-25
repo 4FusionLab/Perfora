@@ -37,7 +37,10 @@ class OrganicTests(unittest.TestCase):
                     self.assertGreater(e.length,1e-8)
                 self.assertTrue(o._simple(cell.vertices),shape)
                 self.assertGreater(o._area(cell.vertices),0)
-                self.assertTrue(any(e.center is not None for e in contour),shape)
+                self.assertTrue(all(isinstance(e,g.BezierEdge) for e in contour),shape)
+                for i,edge in enumerate(contour):
+                    a,b=edge.tangent(True),contour[(i+1)%len(contour)].tangent()
+                    self.assertGreater(a[0]*b[0]+a[1]*b[1],1-1e-8,shape)
 
     def test_actual_contours_keep_minimum_web(self):
         for shape,cells in self.cells.items():
@@ -67,6 +70,21 @@ class OrganicTests(unittest.TestCase):
         dilated=[v>2.5 for v in field]
         self.assertEqual(o._components(dilated,nx,ny)[1],1)
 
+    def test_additional_bridges_are_opt_in_and_never_cut_an_entire_row(self):
+        self.assertFalse(g.Settings().organic_bridges)
+        nx,ny=24,90
+        mask=[(1<=y<=88 and (4<=x<=6 or 14<=x<=16)) or y==88 and 4<=x<=16
+              for y in range(ny) for x in range(nx)]
+        before=list(mask)
+        o._add_bridges(mask,nx,ny,replace(self.settings,organic_bridges=True))
+        changes=[sum(before[y*nx+x] and not mask[y*nx+x] for x in range(nx)) for y in range(ny)]
+        self.assertGreater(sum(changes),0)
+        self.assertLessEqual(max(changes),3)
+        s=replace(self.settings,shape='directional_fibers')
+        self.assertNotEqual(g.generate(self.region,s),g.generate(self.region,replace(s,organic_bridges=True)))
+        restored=g.Settings(**decode(__import__('json').dumps(metadata(replace(s,organic_bridges=True),dict(bodies=[]))))['settings'])
+        self.assertTrue(restored.organic_bridges)
+
     def test_distance_transform_matches_brute_force(self):
         nx,ny=11,9;solid=((1,1),(8,3),(5,7))
         mask=[(x,y) not in solid for y in range(ny) for x in range(nx)]
@@ -91,10 +109,24 @@ class OrganicTests(unittest.TestCase):
     def test_complete_holes_keep_outer_inner_margin_and_trim_adds_candidates(self):
         region=g.Region(self.region.loops+(g.Loop(g.rectangle_region(.6,.8).loops[0].points,False),))
         for shape in o.SHAPES:
-            s=replace(self.settings,shape=shape,clip_boundary=False)
-            whole=g.generate(region,s);partial=g.generate(region,replace(s,clip_boundary=True))
+            s=replace(self.settings,shape=shape,size=.35,gap=.055,clip_boundary=False)
+            partial=g.generate(region,replace(s,clip_boundary=True))
+            try:whole=g.generate(region,s)
+            except ValueError as error:
+                self.assertIn('No organic holes fit',str(error))
+                self.assertFalse(any(g.fits(c,region,region.segments,s.margin) for c in partial),shape)
+                continue
             self.assertTrue(all(g.fits(c,region,region.segments,s.margin) for c in whole))
             self.assertTrue(set(whole).issubset(set(partial)),shape)
+
+    def test_long_axial_fiber_uses_width_for_surface_axis_guard(self):
+        points=tuple((.1*math.cos(i*math.tau/48),2*math.sin(i*math.tau/48)) for i in range(48))
+        cell=g.Cell((0,0),'directional_fibers',.5,.5,0,polygon=points,curve_tolerance=.001)
+        reach,meridian=sg.organic_axis_envelope(cell)
+        self.assertLess(reach,.12)
+        self.assertGreater(sg.enclosing_radius(cell),1.9)
+        reach,meridian=sg.organic_axis_envelope(cell,-.25,math.hypot(1,.25))
+        self.assertLess(meridian,-.4)
 
     def test_incompatible_distributions_and_bad_values_fail_explicitly(self):
         for shape in o.SHAPES:
@@ -115,7 +147,7 @@ class OrganicTests(unittest.TestCase):
         first=cache.resolve(self.region,s)
         self.assertIs(first,cache.resolve(self.region,s))
         for key in o.PARAMETERS:
-            changed=replace(s,**{key:getattr(s,key)+.1})
+            changed=replace(s,**{key:getattr(s,key)-.1})
             self.assertIsNot(first,cache.resolve(self.region,changed))
         cfg=dict(bodies=[],result='feature')
         restored=g.Settings(**decode(__import__('json').dumps(metadata(s,cfg)))['settings'])

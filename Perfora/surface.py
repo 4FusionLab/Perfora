@@ -23,6 +23,10 @@ ZONE_PARAMETERS = {
 }
 
 
+class LocalProjectionError(ValueError):
+    """One aperture cannot be projected through its local surface fold."""
+
+
 def is_curved(source):
     return isinstance(source,adsk.fusion.BRepFace) and not isinstance(source.geometry,adsk.core.Plane)
 
@@ -282,13 +286,20 @@ class Chart:
         p,u,v,n = frame
         uv = list(seed)
         target = sg.add(p,sg.add(sg.mul(u,x),sg.mul(v,y)))
+        periodic=((self.closed_u,self.closed_v) if self.kind=='freeform' else
+                  tuple(self.closed and i==self.ci for i in (0,1)))
         for _ in range(20):
-            q = self._point(uv)
+            uv=sg.projection_parameters(uv,self.low,self.high,periodic)
+            try:q = self._point(uv)
+            except (RuntimeError,ValueError) as error:
+                raise LocalProjectionError('The local tool crosses a surface fold or parameter boundary. Reduce Pattern Scale or Distance.') from error
             residual = sg.sub(q,target)
             a,b = sg.dot(residual,u),sg.dot(residual,v)
             if math.hypot(a,b)<1e-10:
                 return q,tuple(uv)
-            ok,du,dv=self.evaluator.getFirstDerivative(adsk.core.Point2D.create(*uv))
+            try:ok,du,dv=self.evaluator.getFirstDerivative(adsk.core.Point2D.create(*uv))
+            except RuntimeError as error:
+                raise LocalProjectionError('The local tool crosses a surface fold or parameter boundary. Reduce Pattern Scale or Distance.') from error
             if not ok:
                 break
             du,dv=tuple(du.asArray()),tuple(dv.asArray())
@@ -298,7 +309,7 @@ class Chart:
                 break
             uv[0]-=(dd*a-bb*b)/determinant
             uv[1]-=(-cc*a+aa*b)/determinant
-        raise ValueError('The local tool crosses a surface fold or singularity. Reduce hole size or choose a smaller region.')
+        raise LocalProjectionError('The local tool crosses a surface fold or singularity. Reduce hole size or choose a smaller region.')
 
     def seed(self,x,y):
         if self.kind=='freeform':
@@ -520,6 +531,21 @@ class Prepared:
         return merge(tools)
 
 
+def projected_rim(chart,sheet,frame,seed):
+    rim=[];min_z=max_z=0.
+    for face in sheet.faces:
+        for edge in face.edges:
+            local=model.strokes(edge.evaluator,lambda p:p)
+            previous=None;current_seed=seed
+            for xx,yy in local:
+                world,current_seed=chart.project(frame,xx,yy,current_seed)
+                zz=sg.dot(sg.sub(world,frame[0]),frame[3])
+                min_z,max_z=min(min_z,zz),max(max_z,zz)
+                if previous is not None:rim.extend((*previous,*world))
+                previous=world
+    return rim,min_z,max_z
+
+
 def intervals(chart,config):
     start=config['_start']*chart.material_sign
     d1,d2=config['_distance1'],config['_distance2']
@@ -555,7 +581,8 @@ def prepare(source,settings,config,chart=None):
                 adapted=[]
                 for x,y,cell in candidates:
                     radius_at=chart.radius0+chart.slope*(y+ymin)/chart.slant
-                    if radius_at<=depth+enclosing_radius(cell)+TOLERANCE:continue
+                    reach,meridian=sg.organic_axis_envelope(cell,chart.slope,chart.slant)
+                    if radius_at+meridian<=depth+reach+TOLERANCE:continue
                     if closed:x=(x*chart.radius/radius_at) % (chart.radius*sweep)
                     adapted.append((x,y,cell))
                 candidates=adapted
@@ -634,7 +661,11 @@ def prepare(source,settings,config,chart=None):
         if chart.kind!='freeform':
             z=y/chart.slant
             radius_at=chart.radius0+chart.slope*z
-            if radius_at<=depth+enclosing_radius(cell)+TOLERANCE:
+            # A long axial fiber needs circumferential clearance, not the
+            # enclosing disk of its entire length. Cone tips still act locally.
+            reach,meridian=sg.organic_axis_envelope(cell,chart.slope,chart.slant)
+            radius_at+=meridian
+            if radius_at<=depth+reach+TOLERANCE:
                 continue
         sections.append((frame,seed,cell))
         placements.append((*frame,low,high,enclosing_radius(cell)))
@@ -676,8 +707,13 @@ def prepare(source,settings,config,chart=None):
         # A collapsed boundary inside the local trim box can project to a
         # self-intersecting wire. Omit that local site, not the regular face.
         size=enclosing_radius(cell)+settings.margin+10*TOLERANCE
-        if any(abs(sg.dot(sg.sub(p,frame[0]),frame[1]))<=size and
-               abs(sg.dot(sg.sub(p,frame[0]),frame[2]))<=size and
+        if cell.shape in geo.ORGANIC_FIELDS:
+            padding=settings.margin+cell.curve_tolerance+10*TOLERANCE
+            bounds=(min(p[0] for p in cell.vertices)-padding,max(p[0] for p in cell.vertices)+padding,
+                    min(p[1] for p in cell.vertices)-padding,max(p[1] for p in cell.vertices)+padding)
+        else:bounds=(-size,size,-size,size)
+        if any(bounds[0]<=sg.dot(sg.sub(p,frame[0]),frame[1])<=bounds[1] and
+               bounds[2]<=sg.dot(sg.sub(p,frame[0]),frame[2])<=bounds[3] and
                abs(sg.dot(sg.sub(p,frame[0]),frame[3]))<=2*size for p in chart.singular_points):
             continue
         mask=local_mask(source_body,frame,enclosing_radius(cell),settings.margin,chart.material_sign)
@@ -695,20 +731,10 @@ def prepare(source,settings,config,chart=None):
                 continue
             if cell.shape=='voronoi' and cell.corner_radius>0:
                 sheet=clipping.rounded_body(sheet,cell.corner_radius)
-        rim=[]
-        min_z,max_z=0.,0.
-        for face in sheet.faces:
-            for edge in face.edges:
-                local=model.strokes(edge.evaluator,lambda p:p)
-                previous=None
-                current_seed=seed
-                for xx,yy in local:
-                    world,current_seed=chart.project(frame,xx,yy,current_seed)
-                    zz=sg.dot(sg.sub(world,frame[0]),frame[3])
-                    min_z,max_z=min(min_z,zz),max(max_z,zz)
-                    if previous is not None:
-                        rim.extend((*previous,*world))
-                    previous=world
+        try:rim,min_z,max_z=projected_rim(chart,sheet,frame,seed)
+        except (LocalProjectionError,sg.SingularTangentError):
+            if cell.shape in geo.ORGANIC_FIELDS:continue
+            raise
         a,b=low,high
         if config['_start']==0:
             if a<0 and b==0:

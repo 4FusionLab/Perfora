@@ -255,7 +255,7 @@ class DialogContractTests(unittest.TestCase):
         # Extract constructor declarations so new/missing controls cannot be
         # silently absent in the offline fixture. No constructor/API execution.
         for key in ('area_group','height','shape','shape_angle','result','material','operation','direction','boundary',
-                    'source_info','cylinder_group','surface_layout','path','path_reverse','path_orientation','layout','orientation','source','clip_boundary','round_corners','seed','new_pattern','irregularity',
+                    'source_info','cylinder_group','surface_layout','path','path_reverse','path_orientation','layout','orientation','source','clip_boundary','organic_bridges','round_corners','seed','new_pattern','irregularity',
                     'center_point','guide1','guide2','guide_reverse','start_mode','reverse','side2','bodies','output_group',
                     'preview','preview_mode','preview_color','distance1','distance2','taper1','taper2','start','target1',
                     'target2','extent1','extent2','object_offset1','object_offset2'):
@@ -270,6 +270,7 @@ class DialogContractTests(unittest.TestCase):
         source=Plane()
         s.inputs['source'].addSelection(source)
         s.inputs['preview'].value=False
+        s.inputs['organic_bridges'].value=False
         s.units=NS(evaluateExpression=lambda expression,unit:float(expression))
         s.update_visibility()
         return ui,s

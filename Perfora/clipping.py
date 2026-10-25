@@ -56,7 +56,11 @@ def body_loops(body):
 def contour_curves(contour):
     result=[]
     for edge in contour:
-        if edge.center is None:
+        if hasattr(edge,'control1'):
+            curve=adsk.core.NurbsCurve3D.createNonRational(
+                [model.point(p) for p in (edge.start,edge.control1,edge.control2,edge.end)],
+                3,[0.,0.,0.,0.,1.,1.,1.,1.],False)
+        elif edge.center is None:
             curve=adsk.core.Line3D.create(model.point(edge.start),model.point(edge.end))
         elif abs(abs(edge.sweep)-math.tau)<1e-8:
             curve=adsk.core.Circle3D.createByCenter(model.point(edge.center),

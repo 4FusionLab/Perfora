@@ -344,9 +344,12 @@ def add_polygon(sketch, vertices, role):
 
 def add_cell(sketch, cell):
     curves = sketch.sketchCurves
-    if cell.shape == 'circle' or (cell.shape == 'slot' and abs(cell.length - cell.size) < 1e-9):
+    if cell.shape in ('smooth_noise', 'reaction_diffusion', 'directional_fibers', 'topographic', 'gyroid'):
+        from .clipping import cell_curves
+        for curve in cell_curves(cell):copy_curve(sketch,curve,'cell')
+    elif cell.shape == 'circle' or (cell.shape == 'slot' and abs(cell.length - cell.size) < 1e-9):
         tag(curves.sketchCircles.addByCenterRadius(point(cell.center), cell.size / 2), 'cell')
-    elif cell.shape in ('smooth_noise', 'reaction_diffusion', 'directional_fibers', 'topographic', 'gyroid') or cell.shape == 'voronoi' and cell.corner_radius > 0:
+    elif cell.shape == 'voronoi' and cell.corner_radius > 0:
         first = previous = None
         for i, edge in enumerate(cell.contour):
             start = previous or point(edge.start)

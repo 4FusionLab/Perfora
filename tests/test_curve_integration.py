@@ -262,7 +262,7 @@ class CurveIntegrationTests(unittest.TestCase):
             ('path_orientation',e.PATH_ORIENTATIONS,'tangent'),('preview_mode',e.PREVIEW_MODES,'fast'),
             ('extent1',e.EXTENTS,'distance'),('extent2',e.EXTENTS,'distance'),('boundary',[('rectangle','')],'rectangle')):
             d[key]=Dropdown(options,value)
-        for key,value in (('clip_boundary',False),('reverse',False),('path_reverse',True),('round_corners',False),('preview',True)):
+        for key,value in (('clip_boundary',False),('organic_bridges',False),('reverse',False),('path_reverse',True),('round_corners',False),('preview',True)):
             d[key]=NS(value=value,isVisible=True)
         for key in ('area_group','source_info','cylinder_group','surface_layout','guide1','guide2','guide_reverse','output_group','side2','new_pattern','preview_color'):
             d[key]=NS(isVisible=True)

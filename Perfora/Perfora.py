@@ -87,6 +87,7 @@ class Session:
         self.restore_marker = None
         self._extrude_inputs = None
         self._planar_material = None
+        self._organic_trim = None
         self._auto_bodies = []
         self.initial_defaults_applied = False
         self.inputs = {}
@@ -165,8 +166,11 @@ class Session:
             self.number(pattern, key, label, expression, unit)
         self.inputs['organic_open'].tooltip = ('Raw open fraction of the field (15–75%). Web Thickness, bridges, rounded tips, Edge Offset and boundary trimming reduce the final open area. Use Full Preview to inspect the actual result.')
         self.inputs['organic_direction'].tooltip = ('Field direction in sketch axes, or the local circumferential / meridian chart on curved faces. 0 deg aligns long fibers with X (around a cylinder); 90 deg aligns them with Y (along its axis).')
-        self.inputs['organic_variation'].tooltip = '0 creates equal diameters; 65% permits diameters down to 35% of Maximum Diameter. Range: 0–90%.'
+        self.inputs['organic_variation'].tooltip = '0 creates equal diameters; 80% permits diameters down to 20% of Maximum Diameter. Range: 0–90%.'
         self.inputs['organic_gradient'].tooltip = 'Signed size gradient along Direction. 0 varies sizes randomly; +100% grows toward +X, −100% reverses the gradient.'
+        self.check(pattern,'organic_bridges','Add Bridges',False)
+        self.inputs['organic_bridges'].tooltip = ('Add local cross-bridges to long organic openings. Off preserves the natural field. '
+            'Material-island protection and minimum Web Thickness remain active.')
         self.check(pattern, 'round_corners', 'Round Corners', False)
         self.number(pattern, 'corner_radius', 'Corner Radius', '0.5 mm')
         self.inputs['corner_radius'].tooltip = ('Maximum corner radius. Short bevels are absorbed; the radius is reduced only for narrow holes. '
@@ -310,6 +314,7 @@ class Session:
             for key in (*VARIANT_PARAMETERS, *ORGANIC_PARAMETERS):
                 d[key].value = settings.get(key, getattr(defaults, key))
             d['guide_reverse'].value = settings.get('guide_reverse', False)
+            d['organic_bridges'].value = settings.get('organic_bridges',False)
             if surface.supported(self.selected_source()): self.sync_surface_layouts(self.selected_source())
             choices = getattr(self, 'surface_choices', SURFACE_LAYOUTS)
             if layout in dict(choices):
@@ -604,6 +609,13 @@ class Session:
             visible('star_points', shape == 'star')
             visible('star_ratio', shape == 'star')
             organic = shape in ORGANIC_SHAPES
+            if self.edited_feature is None:
+                if organic and getattr(self,'_organic_trim',None) is None:
+                    self._organic_trim=d['clip_boundary'].value
+                    d['clip_boundary'].value=True
+                elif not organic and getattr(self,'_organic_trim',None) is not None:
+                    d['clip_boundary'].value=self._organic_trim
+                    self._organic_trim=None
             field_shape = organic or shape == 'voronoi'
             layout = (self.chosen('surface_layout', self.surface_choices) if is_curved else self.chosen('layout', LAYOUTS)) if not field_shape else 'grid'
             for identifier in ('irregularity', 'round_corners'):
@@ -614,6 +626,7 @@ class Session:
                 visible(key, organic and (key == 'organic_direction' or
                     (key == 'organic_open' and shape in ORGANIC_FIELDS) or
                     (key in ('organic_variation', 'organic_gradient') and shape == 'blue_noise')))
+            visible('organic_bridges',shape in ORGANIC_FIELDS)
             for key in VARIANT_PARAMETERS:
                 visible(key, key in LAYOUT_PARAMETERS.get(layout, ()))
             if layout == 'fan':
@@ -819,6 +832,7 @@ class Session:
                             tangential_orientation=circular and shape != 'circle' and
                                 self.chosen('orientation', ORIENTATIONS) == 'tangential',
                             guide_reverse=d['guide_reverse'].value if layout == 'between_curves' else False,
+                            organic_bridges=d['organic_bridges'].value if shape in ORGANIC_FIELDS else False,
                             **variant_values, **{key:d[key].value for key in organic_keys})
         settings.validate()
         if self.edited_feature:

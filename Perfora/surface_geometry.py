@@ -60,6 +60,26 @@ def local_cell(cell):
     return replace(cell, center=(0.,0.), polygon=tuple((a-x,b-y) for a,b in cell.polygon))
 
 
+def organic_axis_envelope(cell,slope=0.,slant=1.):
+    """Circumferential reach and the smallest meridian radius contribution."""
+    if cell.shape not in geo.ORGANIC_FIELDS:return enclosing_radius(cell),0.
+    points=cell.vertices
+    return (max(abs(p[0]) for p in points)+cell.curve_tolerance,
+            min(p[1]*slope/slant for p in points)-cell.curve_tolerance)
+
+
+def projection_parameters(uv,low,high,periodic):
+    """Keep periodic Newton iterates on the evaluator's actual parameter chart."""
+    result=[]
+    for value,a,b,closed in zip(uv,low,high,periodic):
+        if closed:value=a+(value-a)%(b-a)
+        else:
+            tolerance=1e-9*max(1.,b-a)
+            if a-tolerance<=value<=b+tolerance:value=max(a,min(b,value))
+        result.append(value)
+    return result
+
+
 @dataclass(frozen=True)
 class ConeRegion:
     radius0: float

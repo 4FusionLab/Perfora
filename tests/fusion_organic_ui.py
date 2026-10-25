@@ -43,7 +43,7 @@ def prepare():
         choose(s,'operation',entry.OPERATIONS,'cut')
         d['size'].expression='4.5 mm';s.sync_dimensions('size')
         d['gap'].expression='0.55 mm';d['margin'].expression='0.7 mm'
-        d['organic_open'].expression='60';d['organic_direction'].expression='90 deg' if shape=='directional_fibers' else '0 deg'
+        d['organic_bridges'].value=globals().get('bridges',False);d['organic_open'].expression='58' if shape=='topographic' else '48';d['organic_direction'].expression='90 deg' if shape=='directional_fibers' else '0 deg'
         d['clip_boundary'].value=True;d['distance1'].expression='8 mm' if kind=='freeform' else '2.2 mm';d['reverse'].value=True
         d['bodies'].clearSelection();d['bodies'].addSelection(body)
     finally:s.updating=False
@@ -106,7 +106,7 @@ def edit_preview():
     session=entry._sessions[-1]
     key='organic_gradient' if shape=='blue_noise' else 'organic_open'
     assert abs(session.inputs[key].value-edit_value)<1e-8
-    session.inputs[key].expression=str(edit_value+5)
+    session.inputs[key].expression=str(edit_value+(-5 if shape=='blue_noise' else 5))
     preview('exact');return 'edit preview requested'
 
 
@@ -115,7 +115,8 @@ def end_edit(accepted):
     volume=component.bRepBodies.item(0).volume
     custom=component.features.customFeatures.item(0)
     key='organic_gradient' if shape=='blue_noise' else 'organic_open'
-    assert abs(custom.parameters.itemById(key).value-edit_value-(5 if accepted else 0))<1e-8
+    delta=(-5 if shape=='blue_noise' else 5) if accepted else 0
+    assert abs(custom.parameters.itemById(key).value-edit_value-delta)<1e-8
     assert (abs(volume-edit_volume)>1e-7) if accepted else (abs(volume-edit_volume)<1e-8)
     fixture['healthy'](design)
     report['checks'].append('Edit Feature '+('OK' if accepted else 'Cancel'));save();return True

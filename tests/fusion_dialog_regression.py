@@ -48,6 +48,7 @@ class PerforaDialogRegression(adsk.core.CommandCreatedEventHandler):
             assert session.inputs['margin'].isEnabled, 'Clipping must keep the edge margin active'
             session.inputs['clip_boundary'].value = False
             assert len(_dialog_entry.SHAPES) == 19 and _dialog_entry.SHAPES[-1][0]=='voronoi'
+            assert not session.inputs['organic_bridges'].value
             for index, (shape, _) in enumerate(_dialog_entry.SHAPES):
                 session.inputs['shape'].listItems.item(index).isSelected = True
                 session.update_visibility()
@@ -59,6 +60,7 @@ class PerforaDialogRegression(adsk.core.CommandCreatedEventHandler):
                     assert session.inputs[identifier].isVisible == (identifier == length_id)
                 assert session.inputs['arm_width'].isVisible == (shape == 'cross')
                 assert session.inputs['star_ratio'].isVisible == (shape == 'star')
+                assert session.inputs['organic_bridges'].isVisible == (shape in _dialog_entry.ORGANIC_FIELDS)
                 assert session.inputs['star_points'].isVisible == (shape == 'star')
                 for identifier in ('irregularity', 'seed', 'new_pattern'):
                     assert session.inputs[identifier].isVisible == (shape == 'voronoi' or

@@ -6,6 +6,13 @@ from Perfora.geometry import Settings
 from Perfora import surface_geometry as sg
 
 class SurfaceGeometryTests(unittest.TestCase):
+    def test_projection_wraps_only_closed_axes_and_clamps_boundary_roundoff(self):
+        self.assertEqual(sg.projection_parameters((-.1,2.+1e-10),(0.,0.),(math.tau,2.),(True,False)),[math.tau-.1,2.])
+        for actual,expected in zip(sg.projection_parameters((math.tau+.2,-.2),(0.,0.),(math.tau,2.),(True,False)),(.2,-.2)):
+            self.assertAlmostEqual(actual,expected)
+        for actual,expected in zip(sg.projection_parameters((2.,-.1),(0.,-1.),(3.,4.),(False,True)),(2.,-.1)):
+            self.assertAlmostEqual(actual,expected)
+
     def test_surface_distribution_policy_and_conical_bond(self):
         self.assertIn('chevron', sg.SURFACE_DISTRIBUTIONS['freeform'])
         for kind in ('cylinder', 'cone'):

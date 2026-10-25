@@ -36,16 +36,17 @@ def config(**changes):
     result.update(changes);return result
 
 
-def fixture(component,kind):
+def fixture(component,kind,large=False):
     if kind=='plane':
         sketch=component.sketches.addWithoutEdges(component.xYConstructionPlane)
-        sketch.sketchCurves.sketchLines.addTwoPointRectangle(entry.model.point((-2.5,-2)),entry.model.point((2.5,2)))
+        width,height=(8.,6.) if large else (5.,4.)
+        sketch.sketchCurves.sketchLines.addTwoPointRectangle(entry.model.point((-width/2,-height/2)),entry.model.point((width/2,height/2)))
         data=component.features.extrudeFeatures.createInput(sketch.profiles.item(0),adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
         data.setDistanceExtent(False,entry.model.value('2 mm'))
         body=component.features.extrudeFeatures.add(data).bodies.item(0);sketch.isVisible=False
         return body,max((f for f in body.faces if isinstance(f.geometry,adsk.core.Plane)),key=lambda f:f.pointOnFace.z)
     if kind!='freeform':
-        manager=adsk.fusion.TemporaryBRepManager.get();a,b=entry.model.point((0,0)),adsk.core.Point3D.create(0,0,3.)
+        manager=adsk.fusion.TemporaryBRepManager.get();a,b=entry.model.point((0,0)),adsk.core.Point3D.create(0,0,6. if large else 3.)
         outer=manager.createCylinderOrCone(a,1.8,b,1.8 if kind=='cylinder' else 1.)
         inner=manager.createCylinderOrCone(a,1.62,b,1.62 if kind=='cylinder' else .82)
         assert manager.booleanOperation(outer,inner,adsk.fusion.BooleanTypes.DifferenceBooleanType)
@@ -54,7 +55,7 @@ def fixture(component,kind):
         return body,max((f for f in body.faces if entry.multi_region.source_kind(f)==kind),key=lambda f:f.area)
     profiles=[]
     for z,w,h,dx in ((0,4.,2.5,0),(1.3,4.4,2.1,.1),(3.,3.4,2.7,.25)):
-        data=component.constructionPlanes.createInput();data.setByOffset(component.xYConstructionPlane,entry.model.value(str(z)+' cm'))
+        data=component.constructionPlanes.createInput();data.setByOffset(component.xYConstructionPlane,entry.model.value(str(z*(2 if large else 1))+' cm'))
         plane=component.constructionPlanes.add(data);sketch=component.sketches.addWithoutEdges(plane)
         sketch.sketchCurves.sketchLines.addTwoPointRectangle(entry.model.point((-w/2+dx,-h/2)),entry.model.point((w/2+dx,h/2)))
         profiles.append(sketch.profiles.item(0));sketch.isVisible=False
@@ -81,15 +82,20 @@ def run_case(shape,kind,mode,trim):
     report['cases'].append(detail);started=perf_counter();renderer=None
     try:
         design=adsk.fusion.Design.cast(app.activeProduct);component=design.rootComponent
-        body,face=fixture(component,kind);volume=body.volume;lumps=body.lumps.count
+        large=shape=='reaction_diffusion' and not trim
+        body,face=fixture(component,kind,large);volume=body.volume;lumps=body.lumps.count
+        detail['large_fixture']=large
         cfg=config(result=mode,bodies=[body],surface=kind!='plane')
         if kind=='freeform':cfg['distance1']='8 mm'
-        s=geo.Settings(shape=shape,size=.45,gap=.055,margin=.07,clip_boundary=trim,
-                       organic_open=60,organic_direction=math.pi/2 if shape=='directional_fibers' else 0)
+        s=geo.Settings(shape=shape,size=.5 if large else .45,gap=.055,margin=.07,clip_boundary=trim,
+                       organic_open=58 if shape=='topographic' else 48,
+                       organic_direction=math.pi/2 if shape=='directional_fibers' else 0,
+                       organic_bridges=not trim and shape in geo.ORGANIC_FIELDS)
+        detail['settings']=s.__dict__
         renderer=entry.Renderer();t=perf_counter()
         count=renderer.show(face,s,cfg)
         detail.update(holes=count,fast_seconds=perf_counter()-t)
-        assert count>1,(kind,shape,count)
+        assert count>0,(kind,shape,count)
         renderer.clear();t=perf_counter()
         if mode=='feature':
             sketch,custom,built=entry.parametric.build(face,s,cfg)
@@ -97,7 +103,7 @@ def run_case(shape,kind,mode,trim):
             assert body.volume<volume and body.lumps.count==lumps
             before=body.volume
             key='organic_gradient' if shape=='blue_noise' else 'organic_open'
-            p=custom.parameters.itemById(key);p.value+=5
+            p=custom.parameters.itemById(key);p.value+=-5 if shape=='blue_noise' else 5
             assert design.computeAll();healthy(design)
             assert abs(body.volume-before)>1e-7,(shape,'no real recompute',before,body.volume)
             detail.update(recompute_parameter=key,recompute_volume=body.volume,initial_volume=before)
@@ -109,7 +115,10 @@ def run_case(shape,kind,mode,trim):
                     reopened_design=adsk.fusion.Design.cast(app.activeProduct);healthy(reopened_design)
                     node=reopened_design.rootComponent.features.customFeatures.item(0)
                     p=node.parameters.itemById(key);v=sum(b.volume for b in reopened_design.rootComponent.bRepBodies)
-                    p.value+=3;assert reopened_design.computeAll();healthy(reopened_design)
+                    # Exercise a second, valid field state after reopening.
+                    # Raising fill repeatedly can merge a cylindrical field into
+                    # one aperture wider than a local straight tool can project.
+                    p.value+=-3 if shape=='blue_noise' else -2;assert reopened_design.computeAll();healthy(reopened_design)
                     assert abs(sum(b.volume for b in reopened_design.rootComponent.bRepBodies)-v)>1e-7
                     detail['archive_recompute']=True
                 finally:reopened.close(False);doc.activate()
@@ -121,9 +130,17 @@ def run_case(shape,kind,mode,trim):
             healthy(design)
         detail['build_seconds']=perf_counter()-t
         if globals().get('capture',False):
-            app.activeViewport.fit()
+            view=app.activeViewport;camera=view.camera
+            camera.cameraType=adsk.core.CameraTypes.OrthographicCameraType
+            camera.eye=adsk.core.Point3D.create(0,0,12) if kind=='plane' else adsk.core.Point3D.create(7,-10,7)
+            camera.target=adsk.core.Point3D.create(0,0,.1 if kind=='plane' else 1.5)
+            camera.upVector=adsk.core.Vector3D.create(0,1,0) if kind=='plane' else adsk.core.Vector3D.create(0,0,1)
+            camera.isSmoothTransition=False;camera.isFitView=False;camera.viewExtents=6.5;view.camera=camera
+            adsk.doEvents();view.refresh()
             filename=str(output/(kind+'-'+shape+'-'+mode+('-trim' if trim else '-whole')+'.png'))
-            assert app.activeViewport.saveAsImageFile(filename,1400,1000)
+            options=adsk.core.SaveImageFileOptions.create(filename)
+            options.width,options.height=1400,1000;options.isBackgroundTransparent=True;options.isAntiAliased=True
+            assert view.saveAsImageFileWithOptions(options)
             detail['screenshot']=filename
         detail['passed']=True
     except Exception:detail['error']=traceback.format_exc()

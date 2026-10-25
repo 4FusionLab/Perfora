@@ -8,7 +8,7 @@ depth, not just at the outer surface. Closed patterns never repeat an endpoint.
 from dataclasses import dataclass
 import math
 
-from .geometry import Cell, POLYGON_SHAPES, _clip_voronoi, _site_random
+from .geometry import Cell, POLYGON_SHAPES, ORGANIC_FIELDS, _clip_voronoi, _site_random
 
 
 @dataclass(frozen=True)
@@ -35,7 +35,7 @@ def tool_cell(settings, hole=None):
 
 def enclosing_radius(cell):
     if cell.shape in POLYGON_SHAPES:
-        return max(math.hypot(*p) for p in cell.vertices)
+        return max(math.hypot(*p) for p in cell.vertices)+(cell.curve_tolerance/2 if cell.shape in ORGANIC_FIELDS else 0)
     if cell.shape == 'circle':
         return cell.size / 2
     return max(cell.size, cell.length) / 2

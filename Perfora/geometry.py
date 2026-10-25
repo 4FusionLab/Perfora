@@ -193,8 +193,9 @@ class Settings:
     path_samples: tuple = ()
     organic_open: float = 48.0  # Requested pre-web threshold percentile, not CAD area.
     organic_direction: float = 0.0
-    organic_variation: float = 65.0
-    organic_gradient: float = 75.0
+    organic_variation: float = 80.0
+    organic_gradient: float = 100.0
+    organic_bridges: bool = False
 
     def validate(self):
         if self.distribution_revision not in (1, 2):
@@ -284,8 +285,8 @@ class Cell:
     @cached_property
     def contour(self):
         if self.shape in ORGANIC_FIELDS:
-            from .organic import fit_contour
-            return fit_contour(self.polygon, self.curve_tolerance)
+            from .organic import smooth_contour
+            return smooth_contour(self.polygon, self.curve_tolerance)
         return rounded_polygon(self.vertices, self.corner_radius)
 
     @cached_property
@@ -394,6 +395,46 @@ class ContourEdge:
         step = 2*math.acos(max(-1, min(1, 1-tolerance/radius)))
         count = min(256, max(2, math.ceil(abs(self.sweep)/max(step, 1e-6))))
         return (self.start,) + tuple(self.at(i/count) for i in range(1, count)) + (self.end,)
+
+
+@dataclass(frozen=True)
+class BezierEdge:
+    """Cubic with shared endpoint tangents; exact NURBS in the CAD adapter."""
+    start: tuple
+    control1: tuple
+    control2: tuple
+    end: tuple
+    center = None
+    sweep = 0.
+
+    def at(self,t):
+        u=1-t
+        return tuple(u*u*u*a+3*u*u*t*b+3*u*t*t*c+t*t*t*d
+                     for a,b,c,d in zip(self.start,self.control1,self.control2,self.end))
+
+    def samples(self,tolerance=0.0001):
+        result=[self.start]
+        def split(a,b,c,d,depth):
+            length=dist(a,d)
+            flat=max(point_segment_distance(p,a,d) for p in (b,c))
+            if depth>=12 or flat<=tolerance and length>EPS:
+                result.append(d);return
+            ab,bc,cd=tuple((x+y)/2 for x,y in zip(a,b)),tuple((x+y)/2 for x,y in zip(b,c)),tuple((x+y)/2 for x,y in zip(c,d))
+            abc,bcd=tuple((x+y)/2 for x,y in zip(ab,bc)),tuple((x+y)/2 for x,y in zip(bc,cd))
+            mid=tuple((x+y)/2 for x,y in zip(abc,bcd))
+            split(a,ab,abc,mid,depth+1);split(mid,bcd,cd,d,depth+1)
+        split(self.start,self.control1,self.control2,self.end,0)
+        return tuple(result)
+
+    @property
+    def length(self):
+        points=self.samples()
+        return sum(dist(a,b) for a,b in zip(points,points[1:]))
+
+    def tangent(self,end=False):
+        a,b=(self.control2,self.end) if end else (self.start,self.control1)
+        length=dist(a,b)
+        return (b[0]-a[0])/length,(b[1]-a[1])/length
 
 
 def rounded_polygon(points, requested_radius):
@@ -559,7 +600,7 @@ def fits(cell, region, segments, margin):
     # Edge Offset is an inclusive minimum, matching the exact inset used by
     # Trim to Boundary. A hidden stroking allowance used to remove whole holes
     # even when the exact Boolean intersection left their contours unchanged.
-    clearance = margin
+    clearance = margin + (cell.curve_tolerance/2 if cell.shape in ORGANIC_FIELDS else 0)
     if not region.contains(cell.center):
         return False
     rounded = cell.shape in ('circle', 'slot')
@@ -938,7 +979,7 @@ def outline_coordinates(cells, region, panel=False):
     for cell in cells:
         if cell.shape in ORGANIC_FIELDS or cell.shape == 'voronoi' and cell.corner_radius > 0:
             for edge in cell.contour:
-                points = edge.samples()
+                points = edge.samples(max(region.tolerance,cell.curve_tolerance/2)) if cell.shape in ORGANIC_FIELDS else edge.samples()
                 for a, b in zip(points, points[1:]):
                     coordinates.extend((a[0], a[1], 0.0, b[0], b[1], 0.0))
         elif cell.shape in POLYGON_SHAPES:
