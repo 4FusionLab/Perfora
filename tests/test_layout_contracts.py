@@ -249,13 +249,15 @@ class DialogContractTests(unittest.TestCase):
         s._extrude_inputs=None
         s._planar_material=None
         s.edited_feature=None
+        s.layout_choices=ui.LAYOUTS+[ui.LEGACY_BOND]
+        s.distribution_revision=2
         s.surface_choices=ui.SURFACE_LAYOUTS
         s.inputs={}
         s.numeric_inputs={}
         # Extract constructor declarations so new/missing controls cannot be
         # silently absent in the offline fixture. No constructor/API execution.
         for key in ('area_group','height','shape','shape_angle','result','material','operation','direction','boundary',
-                    'source_info','cylinder_group','surface_layout','path','path_reverse','path_orientation','layout','orientation','source','clip_boundary','organic_bridges','round_corners','seed','new_pattern','irregularity',
+                    'source_info','cylinder_group','surface_layout','path','path_reverse','path_orientation','layout','layout_orientation','orientation','source','clip_boundary','organic_bridges','round_corners','seed','new_pattern','irregularity',
                     'center_point','guide1','guide2','guide_reverse','start_mode','reverse','side2','bodies','output_group',
                     'preview','preview_mode','preview_color','distance1','distance2','taper1','taper2','start','target1',
                     'target2','extent1','extent2','object_offset1','object_offset2'):
@@ -292,7 +294,7 @@ class DialogContractTests(unittest.TestCase):
         self.assertIs(s.inputs['bodies'].selection(0).entity,bodies[second])
 
     def choose(self,s,ui,key):
-        s.inputs['layout'].selectedItem.index=next(i for i,(k,_) in enumerate(ui.LAYOUTS) if k==key)
+        s.inputs['layout'].selectedItem.index=next(i for i,(k,_) in enumerate(s.layout_choices) if k==key)
         s.update_visibility()
 
     def test_visibility_parameter_reading_and_no_silent_grid_fallback(self):
@@ -374,7 +376,7 @@ class DialogContractTests(unittest.TestCase):
             custom,data=custom_feature(ui.parametric,layout=layout,bond_shift=.25)
             s.edited_feature=custom
             s.restore_feature()
-            self.assertEqual(s.chosen('layout',ui.LAYOUTS),'staggered' if layout=='grid' else layout)
+            self.assertEqual(s.chosen('layout',s.layout_choices),'staggered' if layout=='grid' else layout)
             self.assertEqual(s.inputs['bond_shift'].value,.25)
         custom,_=custom_feature(ui.parametric,old=True)
         s.edited_feature=custom

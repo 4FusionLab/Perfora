@@ -29,7 +29,7 @@ fixture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixture)
 app = adsk.core.Application.get()
 original = app.activeDocument
-output = Path.home()/'Library/Logs/Perfora/layout-variants-regression.json' if sys.platform=='darwin' else Path.home()/'Perfora-test-results/layout-variants-regression.json'
+output = Path(globals()['report_path']) if 'report_path' in globals() else Path.home()/'Library/Logs/Perfora/layout-variants-regression.json' if sys.platform=='darwin' else Path.home()/'Perfora-test-results/layout-variants-regression.json'
 output.parent.mkdir(parents=True,exist_ok=True)
 results=[]
 
@@ -88,7 +88,9 @@ try:
                     if layout=='between_curves': cfg.update(zip(('guide1','guide2'),guides(comp,plane)))
                     s=geo.Settings(layout=layout,shape=shape,size=.35,slot_length=.65,arm_width=.12,
                                    gap=.12,margin=.15,shape_angle=.37,grid_angle=.21,
-                                   clip_boundary=trim,limit=5000,contour_tolerance=.04)
+                                   clip_boundary=trim,limit=5000,contour_tolerance=.04,
+                                   distribution_revision=globals().get('revision',1),
+                                   layout_orientation='tangent' if globals().get('revision')==2 else 'fixed')
                     renderer=preview.Renderer()
                     before=comp.sketches.count
                     try:
@@ -144,7 +146,7 @@ try:
         plane=comp.xYConstructionPlane
         a,b=guides(comp,plane)
         cfg=fixture.config(result='feature',guide1=a,guide2=b)
-        s=geo.Settings(layout='between_curves',size=.3,gap=.1,margin=.1)
+        s=geo.Settings(layout='between_curves',size=.3,gap=.1,margin=.1,distribution_revision=globals().get('revision',1))
         renderer=preview.Renderer()
         try:
             renderer.show(plane,s,cfg)

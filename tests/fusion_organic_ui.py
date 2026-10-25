@@ -18,9 +18,16 @@ fixture=runpy.run_path(str(root/'tests/fusion_organic_regression.py'),init_globa
 entry=fixture['entry'];app=fixture['app'];original=app.activeDocument
 original_state=(original.name,original.isModified)
 kind=globals().get('kind','plane');shape=globals().get('shape','reaction_diffusion');mode=globals().get('result_mode','feature')
+selected=globals().get('selected_face')
+snapshot=adsk.fusion.TemporaryBRepManager.get().copy(selected.body) if selected else None
 doc=app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
 design=adsk.fusion.Design.cast(app.activeProduct);component=design.rootComponent
-body,face=fixture['fixture'](component,kind)
+if selected:
+    base=component.features.baseFeatures.add();base.startEdit();component.bRepBodies.add(snapshot,base);base.finishEdit()
+    body=base.bodies.item(0)
+    face=min(body.faces,key=lambda f:abs(f.area-selected.area)+f.pointOnFace.distanceTo(selected.pointOnFace))
+else:
+    body,face=fixture['fixture'](component,kind)
 baseline=(design.timeline.count,component.sketches.count,body.volume)
 session=None;edit_volume=None;edit_value=None
 report=dict(shape=shape,kind=kind,mode=mode,fusion=app.version,stage='opening',passed=False,checks=[])
@@ -41,8 +48,8 @@ def prepare():
         d['preview'].value=False;d['source'].clearSelection();assert d['source'].addSelection(face)
         choose(s,'shape',entry.SHAPES,shape);choose(s,'result',entry.RESULTS,mode)
         choose(s,'operation',entry.OPERATIONS,'cut')
-        d['size'].expression='4.5 mm';s.sync_dimensions('size')
-        d['gap'].expression='0.55 mm';d['margin'].expression='0.7 mm'
+        d['size'].expression='5 mm' if selected else '4.5 mm';s.sync_dimensions('size')
+        d['gap'].expression='1.5 mm' if selected else '0.55 mm';d['margin'].expression='3 mm' if selected else '0.7 mm'
         d['organic_bridges'].value=globals().get('bridges',False);d['organic_open'].expression='58' if shape=='topographic' else '48';d['organic_direction'].expression='90 deg' if shape=='directional_fibers' else '0 deg'
         d['clip_boundary'].value=True;d['distance1'].expression='8 mm' if kind=='freeform' else '2.2 mm';d['reverse'].value=True
         d['bodies'].clearSelection();d['bodies'].addSelection(body)

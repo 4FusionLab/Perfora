@@ -245,6 +245,7 @@ class CurveIntegrationTests(unittest.TestCase):
     def session(self,layout='path',shape='slot',result='feature'):
         e=self.entry;s=e.Session.__new__(e.Session)
         s._planar_material=None;s.surface_choices=e.SURFACE_LAYOUTS
+        s.layout_choices=e.LAYOUTS;s.distribution_revision=2
         s.updating=False;s._extrude_inputs={} if result=='feature' else None;s.edited_feature=None
         s.units=NS(evaluateExpression=lambda expression,unit:float(expression))
         numeric=dict(size=.3,size_flats=.3,size_side=.3,size_width=.3,size_diagonal=.3,size_minor=.3,
@@ -259,6 +260,7 @@ class CurveIntegrationTests(unittest.TestCase):
         for key,options,value in (('shape',e.SHAPES,shape),('layout',e.LAYOUTS,layout),('result',e.RESULTS,result),
             ('direction',e.DIRECTIONS,'one'),('start_mode',e.STARTS,'profile'),('operation',e.OPERATIONS,'body'),
             ('material',e.MATERIALS,'cells'),('orientation',e.ORIENTATIONS,'fixed'),
+            ('layout_orientation',[('tangent','Follow Pattern'),('fixed','Fixed')],'tangent'),
             ('path_orientation',e.PATH_ORIENTATIONS,'tangent'),('preview_mode',e.PREVIEW_MODES,'fast'),
             ('extent1',e.EXTENTS,'distance'),('extent2',e.EXTENTS,'distance'),('boundary',[('rectangle','')],'rectangle')):
             d[key]=Dropdown(options,value)
