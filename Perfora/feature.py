@@ -364,8 +364,6 @@ def build(source, settings, config, cache=None):
         # Bind dependencies at their upstream state, before the first Boolean
         # consumes faces. Group the finished span in the input, as one native
         # request, without rolling an empty custom node during its creation.
-        if combines:
-            combines[0].timelineObject.rollTo(True)
         if not data.setStartAndEndFeatures(base if config.get('surface') else frame, combines[-1] if combines else base):
             raise ValueError('Unable to group the Perfora Feature.')
         custom = component.features.customFeatures.add(data)
