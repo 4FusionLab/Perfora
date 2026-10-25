@@ -178,6 +178,9 @@ class Settings:
     guide_reverse: bool = False
     guide1: tuple = ()  # Prepared 2D strokes only; live references stay in config.
     guide2: tuple = ()
+    # Opt-in offline candidate. Legacy files/defaults retain revision 1.
+    distribution_revision: int = 1
+    layout_orientation: str = 'fixed'
     path_spacing: float = 0.8
     path_start: float = 0.0
     path_end: float = 0.0
@@ -188,6 +191,10 @@ class Settings:
     path_samples: tuple = ()
 
     def validate(self):
+        if self.distribution_revision not in (1, 2):
+            raise ValueError('Unsupported Distribution revision.')
+        if self.layout_orientation not in ('fixed', 'tangent'):
+            raise ValueError('Layout Orientation must be Fixed or Tangent.')
         if not math.isfinite(self.spread_radius) or self.spread_radius < 0:
             raise ValueError('Spread Radius must be finite and nonnegative. Use 0 to fill the boundary.')
         if self.spread_radius > 0 and self.spread_radius <= self.margin:
@@ -665,6 +672,9 @@ def generate(region, settings):
     if settings.layout == 'circular':
         return generate_circular(region, settings)
     if settings.layout in VARIANT_LAYOUTS:
+        if settings.distribution_revision == 2:
+            from .distribution_fields import build_field
+            return build_field(region, settings).cells
         from .distributions import generate_variant
         return generate_variant(region, settings)
     outer = candidate_points(region, settings.grid_angle)

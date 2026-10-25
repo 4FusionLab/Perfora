@@ -85,6 +85,7 @@ class OptimizationTests(unittest.TestCase):
             elif isinstance(value,tuple): value = ((0.,0.), (1.,1.))
             else: value += .2
             if field.name == 'spread_radius': value = 1.0
+            if field.name == 'layout_orientation': value = 'tangent'
             changed = replace(base, **{field.name:value})
             cache.resolve(region, base, ('frame',))
             before = cache.misses

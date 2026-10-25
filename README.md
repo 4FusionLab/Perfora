@@ -16,6 +16,8 @@
 
 ## Make the pattern. Keep the native model.
 
+Development visual acceptance: [the offline Distribution test](studies/README.md) exports all 12 current Distribution entries to one self-contained HTML file using the shared geometry kernel. Revision 2 is opt-in and awaits visual acceptance and native integration; installed Fusion behavior is unchanged.
+
 Select a planar face, a closed sketch profile, or a construction plane. Choose a hole shape, set the spacing and edge clearance, and preview the result. Perfora creates ordinary sketch profiles, a native Fusion Extrude, or a parametric Perfora timeline feature.
 
 To perforate part of an existing face, draw a closed sketch on that face, finish the sketch, and select its shaded profile in **Profiles**. No Split Face is required. For **Cut** or **Intersect**, the supporting body is selected automatically in **Objects**; check the direction and extent before confirming. Profiles on construction planes still require explicit Objects.

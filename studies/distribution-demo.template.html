@@ -1,0 +1,112 @@
+<div id="perfora-distribution-study">
+  <style>
+    #perfora-distribution-study .study-controls {display:flex;flex-wrap:wrap;gap:16px;align-items:end;margin-bottom:16px}
+    #perfora-distribution-study .study-views {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:20px}
+    #perfora-distribution-study .study-panel svg {width:100%;height:auto;display:block;max-height:540px}
+    #perfora-distribution-study .study-panel[hidden] {display:none}
+    #perfora-distribution-study .study-note {margin-top:12px}
+    #perfora-distribution-study .study-panel h3 {margin-bottom:8px}
+    #perfora-distribution-study .study-overview {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:24px}
+    #perfora-distribution-study .study-overview svg {width:100%;height:auto;display:block}
+    #perfora-distribution-study #study-overview[hidden],#perfora-distribution-study #study-detail[hidden] {display:none}
+  </style>
+  <h2>Distribution · точные 2D-демо</h2>
+  <div class="study-controls">
+    <label class="form-label">Раскладка
+      <select class="form-select" id="study-layout">
+        <option value="all" selected>Все Distribution</option>
+        <option value="staggered">Staggered</option><option value="rows">Rectangular</option>
+        <option value="circular">Circular</option><option value="path">Along Path</option>
+        <option value="contour">01 · Contour</option><option value="fan">02 · Fan</option>
+        <option value="phyllotaxis">03 · Phyllotaxis</option><option value="poisson">04 · Poisson Disk</option>
+        <option value="wave">05 · Wave</option><option value="chevron">06 · Chevron</option>
+        <option value="running_bond">07 · Staggered / Row Shift</option><option value="between_curves">08 · Between Curves</option>
+      </select>
+    </label>
+    <label class="form-label" id="study-shift-label" hidden>Сдвиг рядов
+      <select class="form-select" id="study-shift"><option value="third">1/3</option><option value="half">1/2 · обычная шахматка</option></select>
+    </label>
+    <label class="form-label">Отверстия
+      <select class="form-select" id="study-shape">
+        <option value="circle">Круг · Ø 2.5 mm</option>
+        <option value="slot-tangent" selected>Щель · 1.7 × 5.2 mm · по рисунку</option>
+        <option value="slot-fixed">Щель · 1.7 × 5.2 mm · фиксированная</option>
+      </select>
+    </label>
+    <label class="form-check"><input class="form-check-input" type="checkbox" id="study-guides"><span class="form-check-label">Линии построения</span></label>
+    <label class="form-check"><input class="form-check-input" type="checkbox" id="study-compare"><span class="form-check-label">Сравнить с прежним</span></label>
+  </div>
+  <div class="study-overview" id="study-overview"></div>
+  <div class="study-views" id="study-detail">
+    <section class="study-panel" id="study-before" hidden><h3>Прежний алгоритм</h3><div class="study-drawing"></div><div class="text-small study-metrics"></div></section>
+    <section class="study-panel" id="study-after"><h3>Кандидат v2</h3><div class="study-drawing"></div><div class="text-small study-metrics" aria-live="polite"></div></section>
+  </div>
+  <div class="text-small study-note" id="study-note"></div>
+  <details id="study-parameters" hidden><summary>Параметры генерации · cm / rad</summary><pre id="study-parameters-text" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre></details>
+  <script type="application/json" id="study-data">__STUDY_DATA__</script>
+  <script>
+  (()=>{
+    const root=document.getElementById('perfora-distribution-study');
+    const data=JSON.parse(root.querySelector('#study-data').textContent);
+    const layout=root.querySelector('#study-layout'),shape=root.querySelector('#study-shape');
+    const guides=root.querySelector('#study-guides'),compare=root.querySelector('#study-compare');
+    const shift=root.querySelector('#study-shift');
+    const point=p=>`${p[0]},${-p[1]}`;
+    const path=p=>'M'+p.map(point).join('L');
+    function drawing(d,name,overlay){
+      const outline=d.loops.map(l=>path(l)+'Z').join(' ');
+      const holes=d.cells.map(([x,y,a])=>{
+        if(d.shape==='circle')return `<circle cx="${x}" cy="${-y}" r="${d.width/2}"/>`;
+        const half=(d.length-d.width)/2,dx=half*Math.cos(a),dy=half*Math.sin(a);
+        return `<path d="M${x-dx},${-y+dy}L${x+dx},${-y-dy}" fill="none" stroke="var(--background)" stroke-width="${d.width}" stroke-linecap="round"/>`;
+      }).join('');
+      let lines='';
+      if(overlay)lines=d.strokes.map(p=>`<path d="${path(p)}"/>`).join('');
+      return `<svg viewBox="-6.3 -5.3 12.6 10.6" role="img" aria-label="${name}: ${d.count} отверстий, плоский вид, масштаб 120 на 100 миллиметров">
+        <defs><clipPath id="study-${name}"><path d="${outline}"/></clipPath></defs>
+        <path d="${outline}" fill="var(--foreground)"/>
+        <g fill="var(--background)">${holes}</g>
+        <g clip-path="url(#study-${name})" fill="none" stroke="var(--orange)" stroke-width=".022" opacity=".9">${lines}</g>
+      </svg>`;
+    }
+    function draw(){
+      const isAll=layout.value==='all';
+      root.querySelector('#study-overview').hidden=!isAll;
+      root.querySelector('#study-detail').hidden=isAll;
+      root.querySelector('#study-parameters').hidden=isAll;
+      if(isAll){
+        root.querySelector('#study-shift-label').hidden=false;
+        root.querySelector('#study-overview').innerHTML=data.names.map(name=>{
+          const selected=name==='running_bond'&&shift.value==='half'?data.half_shift[shape.value]:data.cases[name][shape.value];
+          return `<section><h3>${data.labels[name][0]}</h3>${compare.checked?'<div class="text-small">Прежний алгоритм</div>'+drawing(selected.before,'old-'+name,guides.checked):''}<div class="text-small">${['staggered','rows','circular','path'].includes(name)?'Текущий алгоритм':'Кандидат v2'}</div>${drawing(selected.after,'new-'+name,guides.checked)}<div class="text-small">${selected.after.count} отверстий · зазор ≥ ${selected.after.gap.toFixed(2)} mm</div></section>`;
+        }).join('');
+        root.querySelector('#study-note').textContent=`${data.names.length} пунктов из реестра команды Fusion. Running Bond объединяется с Staggered. Все размеры и контуры получены общим геометрическим ядром.`;
+        return;
+      }
+      const selected=layout.value==='running_bond'&&shift.value==='half'?data.half_shift[shape.value]:data.cases[layout.value][shape.value];
+      root.querySelector('#study-shift-label').hidden=layout.value!=='running_bond';
+      root.querySelector('#study-before').hidden=!compare.checked;
+      for(const version of ['before','after']){
+        const panel=root.querySelector('#study-'+version),d=selected[version];
+        panel.querySelector('.study-drawing').innerHTML=drawing(d,version,guides.checked);
+        panel.querySelector('.study-metrics').textContent=`${d.count} отверстий · измеренная перемычка ≥ ${d.gap.toFixed(2)} mm · генерация ${d.ms.toFixed(0)} ms`;
+      }
+      root.querySelector('#study-note').textContent=data.notes[layout.value];
+      root.querySelector('#study-parameters-text').textContent=JSON.stringify(selected.after.settings,null,2);
+    }
+    function apply(state){
+      const s=state?.modelContent;
+      if(s&&(s.layout==='all'||data.cases[s.layout]))layout.value=s.layout;
+      if(s&&['circle','slot-tangent','slot-fixed'].includes(s.shape))shape.value=s.shape;
+      if(s){guides.checked=!!s.guides;compare.checked=!!s.compare;shift.value=s.shift==='half'?'half':'third';}
+      draw();
+    }
+    for(const el of [layout,shape,guides,compare,shift])el.addEventListener('change',()=>{
+      draw();
+      window.openai?.setWidgetState?.({modelContent:{layout:layout.value,shape:shape.value,guides:guides.checked,compare:compare.checked,shift:shift.value},privateContent:null})?.catch(()=>{});
+    });
+    apply(window.openai?.widgetState);
+    window.addEventListener('openai:set_globals',e=>apply(e.detail?.globals?.widgetState));
+  })();
+  </script>
+</div>
