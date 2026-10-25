@@ -85,6 +85,33 @@ def log_error():
     app.log('Perfora: ' + traceback.format_exc())
 
 
+TIMELINE_RESTORE_EVENT = 'DiegoV_Perforator_RestoreTimeline'
+_timeline_restores = []
+_timeline_restore_event = None
+
+
+class RestoreTimeline(adsk.core.CustomEventHandler):
+    def notify(self, args):
+        # Destroy runs before Fusion finishes aborting an Edit transaction.
+        # Rolling forward there can leave an owned sketch permanently rolled
+        # back. A posted custom event runs after that transaction has ended.
+        pending = list(_timeline_restores)
+        _timeline_restores.clear()
+        for design, anchor, marker in pending:
+            try:
+                if not design.isValid:
+                    continue
+                timeline = design.timeline
+                position = anchor.index + 1 if anchor and anchor.isValid else min(marker, timeline.count)
+                if timeline.markerPosition != position:
+                    if anchor and anchor.isValid:
+                        anchor.rollTo(False)
+                    else:
+                        timeline.markerPosition = position
+            except Exception:
+                log_error()
+
+
 class Session:
     def __init__(self, command, edited_feature=None):
         self.command = command
@@ -1203,7 +1230,9 @@ class Destroy(adsk.core.CommandEventHandler):
         self.session.close_defaults()
         self.session.renderer.reset()
         if self.session.edited_feature and self.session.restore_marker is not None:
-            self.session.restore_timeline()
+            _timeline_restores.append((self.session.edited_feature.parentComponent.parentDesign,
+                self.session.restore_anchor, self.session.restore_marker))
+            self.session.app.fireCustomEvent(TIMELINE_RESTORE_EVENT)
         if self.session in _sessions:
             _sessions.remove(self.session)
         self.session.selection_memory.clear()
@@ -1282,9 +1311,14 @@ class Created(adsk.core.CommandCreatedEventHandler):
 
 
 def run(context):
+    global _timeline_restore_event
     try:
         app = adsk.core.Application.get()
         ui = app.userInterface
+        _timeline_restore_event = app.registerCustomEvent(TIMELINE_RESTORE_EVENT)
+        restore_handler = RestoreTimeline()
+        _timeline_restore_event.add(restore_handler)
+        _handlers.append(restore_handler)
         definition = ui.commandDefinitions.itemById(COMMAND_ID)
         if not definition:
             resources = str(Path(__file__).parent / 'resources' / 'toolbar-f692fbb3')
@@ -1314,6 +1348,7 @@ def run(context):
 
 
 def stop(context):
+    global _timeline_restore_event
     try:
         ui = adsk.core.Application.get().userInterface
         panel = ui.allToolbarPanels.itemById(PANEL_ID)
@@ -1328,6 +1363,10 @@ def stop(context):
         if edit:
             edit.deleteMe()
         parametric.unregister()
+        RestoreTimeline().notify(None)
+        if _timeline_restore_event:
+            adsk.core.Application.get().unregisterCustomEvent(TIMELINE_RESTORE_EVENT)
+            _timeline_restore_event = None
         _handlers.clear()
     except Exception:
         log_error()
