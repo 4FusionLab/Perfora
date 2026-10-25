@@ -62,10 +62,11 @@ def register():
 
 
 def unregister():
-    global _handler
+    global _handler, _definition
     if _definition and _handler:
         _definition.customFeatureCompute.remove(_handler)
     _handler = None
+    _definition = None
 
 
 def validate(config, design=None):
