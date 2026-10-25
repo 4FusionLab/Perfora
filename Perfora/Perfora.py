@@ -93,6 +93,7 @@ class Session:
         self.distribution_revision = saved_settings.get('distribution_revision', 1) if edited_feature else 2
         self.layout_choices = LAYOUTS + ([LEGACY_BOND] if saved_settings.get('layout') == 'running_bond' else [])
         self.restore_marker = None
+        self.restore_anchor = None
         self._extrude_inputs = None
         self._planar_material = None
         self._organic_trim = None
@@ -506,6 +507,12 @@ class Session:
                 return parameter.value
             return parametric.stored(self.edited_feature)['settings'].get('organic_open', 48.)
         return DEFAULT_OPEN.get(shape, 48.)
+
+    def restore_timeline(self):
+        if self.restore_anchor is not None:
+            self.restore_anchor.rollTo(False)
+        elif self.restore_marker is not None:
+            self.edited_feature.parentComponent.parentDesign.timeline.markerPosition = self.restore_marker
 
     def field_defaults(self):
         if self.edited_feature or getattr(self, '_field_defaults_applied', False):
@@ -1162,7 +1169,7 @@ class Execute(adsk.core.CommandEventHandler):
                 count = parametric.update(self.session.edited_feature, settings, config, cache=self.session.renderer.geometry_cache)
                 feature = self.session.edited_feature
                 if self.session.restore_marker is not None:
-                    feature.parentComponent.parentDesign.timeline.markerPosition = self.session.restore_marker
+                    self.session.restore_timeline()
             elif config['result'] == 'feature':
                 sketch, feature, count = parametric.build(source, settings, config, cache=self.session.renderer.geometry_cache)
             else:
@@ -1196,7 +1203,7 @@ class Destroy(adsk.core.CommandEventHandler):
         self.session.close_defaults()
         self.session.renderer.reset()
         if self.session.edited_feature and self.session.restore_marker is not None:
-            self.session.edited_feature.parentComponent.parentDesign.timeline.markerPosition = self.session.restore_marker
+            self.session.restore_timeline()
         if self.session in _sessions:
             _sessions.remove(self.session)
         self.session.selection_memory.clear()
@@ -1216,6 +1223,7 @@ class EditActivate(adsk.core.CommandEventHandler):
             custom = s.edited_feature
             timeline = custom.parentComponent.parentDesign.timeline
             s.restore_marker = timeline.markerPosition
+            s.restore_anchor = timeline.item(s.restore_marker-1) if s.restore_marker else None
             custom.timelineObject.rollTo(True)
             args.command.beginStep()
             s.updating = True
