@@ -60,7 +60,7 @@ def adapters():
     core.Line3D,core.Arc3D,core.Circle3D,core.NurbsCurve3D=Line,Arc,Circle,Spline
     # Import-time event bases only; no fake Application is provided on purpose.
     for name in ('SelectionEventHandler','InputChangedEventHandler','ValidateInputsEventHandler','CustomEventHandler',
-                 'CommandEventHandler','KeyboardEventHandler','CommandCreatedEventHandler'):
+                 'CommandEventHandler','KeyboardEventHandler','CommandCreatedEventHandler','ApplicationCommandEventHandler'):
         setattr(core,name,type(name,(),{}))
     fusion=ModuleType('adsk.fusion')
     fusion.SketchCurve,fusion.BRepEdge,fusion.ConstructionPlane=SketchCurve,Edge,Plane

@@ -137,9 +137,11 @@ Feature stores all source dependencies and its Objects mapping; source set, oper
 
 ## Parametric Feature
 
+Development fix: Feature recompute captures Object references before Boolean operations and uses upstream faces to avoid a dependency on its own result. Edit Feature OK upgrades legacy Object references; Cancel restores the timeline after the edit command has terminated. Verified in Fusion 2706.1.14 on macOS with all six noise fields and Voronoi on copies of the selected Box face, plus native Edit Feature OK/Cancel and Undo/Redo.
+
 **Type → Feature** creates one **Perfora** node in the timeline. With the add-in running, changing its model parameters or upstream source geometry regenerates the pattern, including the number of holes. Double-click the node or choose **Edit Feature** to edit the pattern, trimming, placement, profile type, and thickness. Expressions can reference Fusion user parameters. OK commits the edit; Cancel restores the previous model.
 
-All 13 shapes, exact trimming, rounded Voronoi holes, Fast/Full Preview, and **Join**, **Cut**, **Intersect**, **New Body** are supported. **Capture Design History** is required. This initial mode supports **Distance** with zero taper and **One Side**, **Two Sides**, **Symmetric**. Source, operation, and target bodies stay fixed during edit. Use Extrude for **All**, **To Object**, taper, or **New Component**.
+All 19 shapes, exact trimming, rounded Voronoi holes, Fast/Full Preview, and **Join**, **Cut**, **Intersect**, **New Body** are supported. **Capture Design History** is required. This initial mode supports **Distance** with zero taper and **One Side**, **Two Sides**, **Symmetric**. Source, operation, and target bodies stay fixed during edit. Use Extrude for **All**, **To Object**, taper, or **New Component**.
 
 Keep Perfora running to edit or recompute the feature. Large topology changes can invalidate downstream face/edge references. The mode uses Autodesk's [Custom Feature API](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/CustomFeatures_UM.htm), which remains in Preview.
 
