@@ -14,7 +14,7 @@ import traceback
 import adsk.core
 
 _dialog_entry = globals().get('entry') or next(module for module in tuple(sys.modules.values())
-                     if str(getattr(module, '__file__', '')).endswith('/Perfora/Perfora.py'))
+                     if str(getattr(module, '__file__', '')) == str(Path(__file__).resolve().parents[1] / 'Perfora/Perfora.py'))
 _dialog_report = Path.home() / 'Library/Logs/Perfora/dialog-regression.json'
 _dialog_report.parent.mkdir(parents=True, exist_ok=True)
 _dialog_lifetime = []
@@ -76,14 +76,14 @@ class PerforaDialogRegression(adsk.core.CommandCreatedEventHandler):
                 assert session.inputs['layout'].isVisible == (shape != 'voronoi' and shape not in _dialog_entry.ORGANIC_SHAPES)
                 assert session.inputs['shape_angle'].isVisible == (shape not in ('circle', 'voronoi') and shape not in _dialog_entry.ORGANIC_SHAPES)
                 assert session.inputs[size_id].tooltip == _dialog_entry.SIZE_HELP[shape]
-            session.inputs['shape'].listItems.item(0).isSelected = True
+            session.set_shape('circle')
             session.update_visibility()
             session.inputs['layout'].listItems.item(2).isSelected = True
             session.update_visibility()
             assert session.inputs['center_point'].isVisible
             assert session.inputs['start_radius'].isVisible
             assert not session.inputs['orientation'].isVisible
-            session.inputs['shape'].listItems.item(3).isSelected = True
+            session.set_shape('slot')
             session.update_visibility()
             assert session.inputs['orientation'].isVisible
             session.inputs['orientation'].listItems.item(2).isSelected = True
@@ -92,7 +92,7 @@ class PerforaDialogRegression(adsk.core.CommandCreatedEventHandler):
             session.update_visibility()
             assert session.inputs['center_point'].isVisible
             assert not session.inputs['start_radius'].isVisible and not session.inputs['orientation'].isVisible
-            session.inputs['shape'].listItems.item(0).isSelected = True
+            session.set_shape('circle')
             session.inputs['layout'].listItems.item(0).isSelected = True
             session.update_visibility()
             for identifier, options in (('result', _dialog_entry.RESULTS), ('layout', _dialog_entry.LAYOUTS)):

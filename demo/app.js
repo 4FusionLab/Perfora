@@ -17,12 +17,12 @@
   function status(message,mode='ready'){$('status-text').textContent=message;$('status-dot').className='status-dot'+(mode==='ready'?'':' '+mode);}
   function visibility(){
     const layout=$('layout').value,shape=$('shape').value,voronoi=shape==='voronoi',organic=organics.has(shape),field=voronoi||organic;
-    const family=organic?'organic':'pattern';activeFamily=family;
-    $('distribution-field').hidden=organic;
-    $('layout-help').hidden=organic;
-    $('shape-label').textContent=organic?'Field':'Hole Shape';
-    $('mode-caption').textContent=organic?'Create flowing openings from a field.':'Choose a shape and arrange it.';
-    for(const option of $('shape').options)option.hidden=organics.has(option.value)!==organic;
+    const family=field?'organic':'pattern';activeFamily=family;
+    $('distribution-field').hidden=field;
+    $('layout-help').hidden=field;
+    $('shape-label').textContent=field?'Field':'Hole Shape';
+    $('mode-caption').textContent=field?'Organic and cellular openings. Size and web define the pattern.':'Choose a shape and arrange it.';
+    for(const option of $('shape').options)option.hidden=(organics.has(option.value)||option.value==='voronoi')!==field;
     for(const button of document.querySelectorAll('[data-mode]'))button.setAttribute('aria-pressed',String(button.dataset.mode===family));
     $('layout').disabled=field;
     $('layout-help').textContent=organic?'This shape creates its own field. Pattern Scale sets its physical size.':voronoi?'Organic polygonal cells. One field, its own distribution.':descriptions[layout];

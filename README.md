@@ -101,13 +101,13 @@ Every numeric field has a default. Leaving a field empty restores its default af
 
 **Type → Feature** is selected by default when opening Perfora. Sketch and Extrude remain available.
 
-**Preview Color** changes Fast Preview contours: Gold (default), Cyan, Magenta, Green, White, or Black. Switch colors to keep contours visible over selected profiles. Color changes reuse the existing graphics and hole layout. Full Preview uses the Fusion model appearance.
+**Preview Color** changes Fast Preview contours: Magenta (default), Gold, Cyan, Green, White, or Black. Switch colors to keep contours visible over selected profiles. Color changes reuse the existing graphics and hole layout. Full Preview uses the Fusion model appearance.
 
 Fusion selection highlighting can tint or cover custom graphics while an entity is selected; the thicker contours improve contrast, but Preview Color does not override Fusion selection colors.
 
 ## Voronoi
 
-**Voronoi** was introduced as the thirteenth hole shape in 0.2.0 and remains the last entry. Select **Hole Shape → Voronoi**, then adjust **Cell Spacing**, **Irregularity (%)**, and **Seed**. **New Pattern** advances the seed while keeping the other settings. A seed reproduces the same pattern for the same source and settings.
+**Voronoi** is the last entry in **Pattern Type → Noise → Field**. Select **Voronoi**, then adjust **Cell Spacing**, **Irregularity (%)**, and **Seed**. **New Pattern** advances the seed while keeping the other settings. A seed reproduces the same pattern for the same source and settings.
 
 Cell Spacing controls the nominal distance between sites, rather than the size of every hole. Irregularity ranges from regular square cells at 0% to varied convex polygons at 100%. **Web Thickness** sets the minimum gap between holes; a large web can consume small cells. **Distribution** and **Hole Angle** are hidden in this mode. Pattern rotation, X/Y offsets, edge clearance, exact trimming, Fast/Full Preview, sketch profiles, and native Extrude remain available.
 
@@ -115,13 +115,13 @@ Enable **Round Corners** to add tangent circular fillets to the Voronoi holes. *
 
 ## Organic patterns (development)
 
-Six additional **Hole Shape** entries precede Voronoi: **Smooth Noise**, **Reaction Diffusion**, **Directional Fibers**, **Ridged Noise / Topographic**, **Gyroid Field**, and **Blue Noise / Size Gradient**. Voronoi remains last; the original 13 shape IDs and saved parameters are unchanged. These additions are unpublished.
+The **Noise** section contains six fields followed by Voronoi: **Smooth Noise**, **Reaction Diffusion**, **Directional Fibers**, **Ridged Noise / Topographic**, **Gyroid Field**, and **Blue Noise / Size Gradient**. Voronoi remains last; the original 13 shape IDs and saved parameters are unchanged. These additions are unpublished.
 
-The first five use **Pattern Scale**, **Field Fill (%)**, **Direction**, **Seed / New Pattern**, **Web Thickness** and **Edge Offset**. Field Fill controls the raw threshold, so bridges, rounded tips, webs and trimming reduce the final open area. Blue Noise uses **Maximum Diameter**, **Size Variation (%)** and a signed **Size Gradient (%)**, with radius-aware spacing. It complements the existing fixed-size Poisson Disk Distribution.
+The first five use **Cell Size**, **Web Thickness**, **Edge Offset** and **Seed / New Pattern**. New commands start at 8 mm cells and a 0.8 mm web. Field Fill is no longer a visible control; saved legacy thresholds are retained when editing existing Features. Blue Noise uses **Maximum Diameter**, **Size Variation (%)** and a signed **Size Gradient (%)**, with radius-aware spacing. It complements the existing fixed-size Poisson Disk Distribution.
 
 **Add Bridges** is a separate checkbox, off by default, for extra local breaks in long openings. Its state is saved in Feature and restored during editing. Minimum web and material-island protection remain active.
 
-These shapes define their own bounded field; Distribution, Pattern Angle and Hole Angle are hidden. Direction rotates the field in sketch axes. On a curved face, 0° follows the circumferential chart axis and 90° follows the axial/meridian axis, including fibers. All six connect to Sketch, Extrude, Feature, Fast/Full Preview, Trim to Boundary and inner-cutout clearance on planar, cylindrical, conical and regular freeform sources. Multiple selections must still have one surface type. Curved openings are finite straight tools, with conservative seam/depth separation; the motif can become sparser at high curvature or a cone tip.
+These shapes define their own bounded field; Distribution and Hole Angle are hidden. Pattern Angle rotates the field in sketch axes. On a curved face, 0° follows the circumferential chart axis and 90° follows the axial/meridian axis, including fibers. All six connect to Sketch, Extrude, Feature, Fast/Full Preview, Trim to Boundary and inner-cutout clearance on planar, cylindrical, conical and regular freeform sources. Multiple selections must still have one surface type. Curved openings are finite straight tools, with conservative seam/depth separation; the motif can become sparser at high curvature or a cone tip.
 
 Material islands are joined before contour extraction. Overlong slots receive bridges; conflicting small fragments are omitted to protect the actual contour web. With a zero edge border, boundary fragments that would detach material are retained as solid material. Sampling and contour budgets give actionable errors instead of unbounded CAD work. See [algorithms, controls, surface behavior and validation](docs/ORGANIC_PATTERNS.md).
 
@@ -292,6 +292,6 @@ Perfora is the goddess of holes, guardian of clean edges, and sworn enemy of rep
 
 [GPL-3.0-only](LICENSE). An independent **4FusionLab** project, not affiliated with or endorsed by Autodesk. Native operation icons are resolved from the user's Fusion installation; Autodesk graphics are not bundled.
 
-Large organic fields adapt their sampling within 8–16 samples per Pattern Scale and the fixed node budget. Previously accepted small regions retain their grid; physical Pattern Scale and Web Thickness stay explicit.
+Large organic fields adapt their sampling within 8–16 samples per Cell Size and the fixed node budget. Previously accepted small regions retain their grid; physical Cell Size and Web Thickness stay explicit.
 
-The native Pattern Type selector separates Pattern (13 hole shapes, with Voronoi last) from Organic Field (six fields). Each family retains its selected shape; only relevant controls are shown. The browser playground uses the same two-family navigation.
+The native Pattern Type selector separates Pattern (12 repeating hole shapes) from Noise (six fields, followed by Voronoi). Each family retains its selected shape; only relevant controls are shown. The browser playground uses the same two-family navigation.

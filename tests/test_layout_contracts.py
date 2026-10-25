@@ -214,7 +214,8 @@ class Control:
 class DialogContractTests(unittest.TestCase):
     def test_pattern_family_keeps_independent_shape_selections(self):
         ui,s=self.session()
-        self.assertEqual(ui.PATTERN_SHAPES[-1][0],'voronoi')
+        self.assertEqual(ui.FIELD_SHAPES[-1][0],'voronoi')
+        self.assertNotIn('voronoi',dict(ui.PATTERN_SHAPES))
         self.assertFalse(set(dict(ui.PATTERN_SHAPES)) & set(ORGANIC_SHAPES))
         s.set_shape('slot');s.update_visibility()
         self.assertTrue(s.inputs['shape'].isVisible)
@@ -227,6 +228,16 @@ class DialogContractTests(unittest.TestCase):
         self.assertEqual(s.shape_key(),'slot')
         s.inputs['pattern_type'].listItems.item(1).isSelected=True;s.update_visibility()
         self.assertEqual(s.shape_key(),'gyroid')
+        s.set_shape('voronoi');s.update_visibility()
+        self.assertEqual(s.shape_key(),'voronoi')
+        self.assertTrue(s.inputs['organic_shape'].isVisible)
+        self.assertFalse(s.inputs['shape'].isVisible)
+        self.assertFalse(s.inputs['layout'].isVisible)
+        self.assertFalse(s.inputs['organic_open'].isVisible)
+        s.inputs['pattern_type'].listItems.item(0).isSelected=True;s.update_visibility()
+        self.assertEqual(s.shape_key(),'slot')
+        s.inputs['pattern_type'].listItems.item(1).isSelected=True;s.update_visibility()
+        self.assertEqual(s.shape_key(),'voronoi')
 
     def test_organic_fields_hide_incompatible_controls_and_restore_repeating_layout(self):
         ui,s=self.session()

@@ -33,10 +33,16 @@ async (page) => {
     await p.locator('#layout').selectOption('chevron');
     const organic=new Set(['smooth_noise','reaction_diffusion','directional_fibers','topographic','gyroid','blue_noise']);
     for(const shape of ['circle','hexagon','square','slot','triangle','rectangle','diamond','ellipse','pentagon','octagon','cross','star','smooth_noise','reaction_diffusion','directional_fibers','topographic','gyroid','blue_noise','voronoi']){
-      await p.locator('[data-mode="'+(organic.has(shape)?'organic':'pattern')+'"]').click();
+      await p.locator('[data-mode="'+(organic.has(shape)||shape==='voronoi'?'organic':'pattern')+'"]').click();
       await p.locator('#shape').selectOption(shape);
       await p.waitForTimeout(250);
       await sample('shape-'+shape);
+      if(shape==='voronoi'){
+        const visible=await p.locator('#shape option').evaluateAll(options=>options.filter(o=>!o.hidden).map(o=>o.value));
+        if(visible.length!==7||visible.at(-1)!=='voronoi')throw Error('Voronoi is not last in Noise.');
+        if(!await p.locator('#distribution-field').isHidden())throw Error('Voronoi exposes Distribution.');
+        if(await p.locator('#irregularity-field').evaluate(el=>el.hidden))throw Error('Voronoi lost Irregularity.');
+      }
     }
     stage='family navigation';
     await p.locator('[data-mode="organic"]').click();

@@ -2,7 +2,7 @@
 
 Публичное браузерное демо и штатный стенд быстрой визуальной проверки паттернов.
 Fusion и браузер используют **одно геометрическое ядро Perfora**. Исходники
-`Perfora/geometry.py`, `distributions.py`, `distribution_fields.py`, `curves.py`
+`Perfora/geometry.py`, `organic.py`, `distributions.py`, `distribution_fields.py`, `curves.py`
 и `curve_layout.py` встраиваются в страницу без изменения и исполняются в
 Python через Pyodide 0.27.7, в отдельном Web Worker. В JavaScript остаются ввод,
 отображение готовых контуров и ссылки. Экспорт по решению пользователя отсутствует. Отдельной реализации раскладок
@@ -10,20 +10,21 @@ Python через Pyodide 0.27.7, в отдельном Web Worker. В JavaScrip
 
 ## Возможности
 
-- 11 семейств Distribution, 13 существующих Hole Shape; Voronoi — отдельное
-  поле, обычная Distribution для него скрывается.
+- Pattern: 12 повторяемых форм и 11 семейств Distribution.
+- Noise: Smooth Noise, Reaction Diffusion, Directional Fibers, Topographic,
+  Gyroid Field, Blue Noise и последним Voronoi. Distribution скрыта.
 - Running Bond объединён с Staggered; отдельного управления Row Shift нет.
 - Граница Rectangle/Rounded/Circle, размеры панели, размеры отверстий,
   Web Thickness, Edge Offset, ориентация и параметры выбранного рисунка.
-- Seed/New Pattern для Poisson Disk и Voronoi; ссылки с параметрами.
+- Cell Size и Web Thickness вместо процента заполнения; у Voronoi сохраняются
+  Cell Spacing, Irregularity и Round Corners. Seed/New Pattern и ссылки с параметрами.
 - Геометрия пересчитывается в браузере; сервер вычислений и API-ключи не нужны.
   Первый запуск требует интернета для загрузки закреплённой версии Pyodide с
   jsDelivr. Страница содержит готовый первый рисунок, поэтому не открывается
   пустой во время загрузки. Контуры панели не отправляются на сервер.
 
-Новые шумовые формы добавляются после завершения их отдельной задачи и
-подключения к общему ядру. Additional Bridges относится только к шумовым
-паттернам и включается отдельно от Web Thickness. У обычных Distribution
+Все шесть шумовых форм используют общее Python-ядро. Add Bridges относится
+к первым пяти полям и включается отдельно от Web Thickness. У обычных Distribution
 дополнительных мостиков нет.
 
 ## Сборка и локальный запуск
