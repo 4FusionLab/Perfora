@@ -1154,12 +1154,8 @@ class Execute(adsk.core.CommandEventHandler):
                 return
             self.session.renderer.clear()
             if self.preview and self.session.edited_feature:
-                # Preview a disposable native operation on the rolled-back
-                # source. Updating the existing Base Feature in a preview can
-                # commit its parameters while leaving its Combine rolled back.
-                # OK aborts this preview, then updates the existing node once.
-                _, _, count = model.build(source, settings, dict(config, result='extrude'),
-                    cache=self.session.renderer.geometry_cache)
+                count = self.session.renderer.show_edit_solid(self.session.edited_feature,
+                    source, settings, config)
                 self.session.status('%d holes. Full preview.' % count)
                 return
             if self.session.edited_feature:

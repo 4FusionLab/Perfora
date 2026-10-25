@@ -48,14 +48,63 @@ class Renderer:
         self.surface_prepared = None
         self.multi_key = None
         self.multi_plans = None
+        self.hidden_bodies = []
+        self.exact_bodies = ()
 
     def clear(self):
+        for body, visible in self.hidden_bodies:
+            if body.isValid:
+                body.isVisible = visible
+        self.hidden_bodies = []
+        self.exact_bodies = ()
         if self.graphics and self.graphics.isValid:
             self.graphics.deleteMe()
         self.graphics = None
         self.lines = None
         self.color_key = None
         self.drawn_key = None
+
+    def show_edit_solid(self, custom, source, settings, config):
+        """Exact temporary BRep preview; never edit the node being previewed."""
+        from . import feature, multi_region, surface
+        self.clear()
+        frames = [f for f in custom.features if isinstance(f, adsk.fusion.Sketch)]
+        selected = list(source) if isinstance(source, (tuple, list)) else [source]
+        if len(selected) > 1:
+            plans = multi_region.prepare(selected, settings, config, self.geometry_cache, frames)
+            tool = surface.merge([multi_region.make_body(plan, config) for plan in plans])
+            count = sum(len(plan.cells) for plan in plans)
+        else:
+            tool, count = feature.make_body(source, settings, config, frames[0],
+                frames[1] if len(frames) > 1 else None, self.geometry_cache)
+        manager = adsk.fusion.TemporaryBRepManager.get()
+        bodies = []
+        targets = [model.native(b) for b in config['bodies']]
+        operations = dict(cut=adsk.fusion.BooleanTypes.DifferenceBooleanType,
+            join=adsk.fusion.BooleanTypes.UnionBooleanType,
+            intersect=adsk.fusion.BooleanTypes.IntersectionBooleanType)
+        if config['operation'] in operations:
+            for target in targets:
+                body = manager.copy(target)
+                if not manager.booleanOperation(body, manager.copy(tool), operations[config['operation']]):
+                    raise ValueError('Unable to preview the Feature operation.')
+                bodies.append(body)
+        else:
+            bodies.append(tool)
+        try:
+            self.graphics = custom.parentComponent.customGraphicsGroups.add()
+            self.graphics.isSelectable = False
+            for body in bodies:
+                graphic = self.graphics.addBRepBody(body)
+                graphic.isSelectable = False
+            for target in targets:
+                self.hidden_bodies.append((target, target.isVisible))
+                target.isVisible = False
+            self.exact_bodies = tuple(bodies)
+            return count
+        except Exception:
+            self.clear()
+            raise
 
     def reset(self):
         self.clear()
