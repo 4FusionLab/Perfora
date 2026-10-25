@@ -378,17 +378,16 @@ class AdapterTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'bad solid'):
                 self.feature.rebuild_many(custom,[self.a,self.b],self.settings,self.config)
 
-    def test_feature_create_second_solid_failure_removes_node_and_all_references(self):
+    def test_feature_second_solid_failure_cleans_references_before_creating_node(self):
         dependencies,owned=[],[]
         data=NS(addDependency=lambda key,entity:dependencies.append(key) or True,
                 addCustomParameter=lambda *args:True)
-        custom=Owned('custom')
-        custom.customNamedValues=NS(addOrSetValue=lambda *args:True)
         def sketch(source):
             item=Owned('reference')
             owned.append(item)
             return item
-        self.component.features=NS(customFeatures=NS(createInput=lambda definition:data,add=lambda data:custom),
+        self.component.features=NS(customFeatures=NS(createInput=lambda definition:data,
+                                   add=lambda data:self.fail('all solids must be ready before adding a custom node')),
                                    baseFeatures=NS(add=lambda:self.fail('all solids must be ready before adding bases')))
         cfg=dict(self.config,result='feature',width=4.,height=3.,start='0 mm',distance1='2 mm',distance2='2 mm')
         with patch.object(self.feature,'validate'),patch.object(self.feature,'register',return_value=object()), \
@@ -401,7 +400,6 @@ class AdapterTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'bad second solid'):
                 self.feature.build_many([self.a,self.b],self.settings,cfg)
         self.assertEqual(dependencies,['source0','source1'])
-        self.assertFalse(custom.isValid)
         self.assertTrue(all(not item.isValid for item in owned))
         self.assertFalse(self.feature._busy)
 

@@ -1229,6 +1229,8 @@ class EditActivate(adsk.core.CommandEventHandler):
             args.command.beginStep()
             s.updating = True
             try:
+                for key in ('source', 'center_point', 'guide1', 'guide2', 'path', 'bodies'):
+                    s.inputs[key].clearSelection()
                 for source in parametric.source_entities(custom):
                     s.inputs['source'].addSelection(source)
                 center = parametric.center_entity(custom)
@@ -1242,7 +1244,8 @@ class EditActivate(adsk.core.CommandEventHandler):
                     s.inputs['path'].addSelection(path)
                 data = parametric.stored(custom)
                 for i in range(data['body_count']):
-                    s.inputs['bodies'].addSelection(custom.dependencies.itemById('body' + str(i)).entity)
+                    s.inputs['bodies'].addSelection(parametric.dependency_body(
+                        custom.dependencies.itemById('body' + str(i))))
             finally:
                 s.updating = False
             s.update_visibility()
