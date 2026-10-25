@@ -29,6 +29,45 @@ def healthy(custom):
             feature.name, int(feature.healthState), feature.errorOrWarningMessage)
 
 
+def legacy_build(face, settings, config):
+    """Old transaction: bind the modified whole body after its Boolean.
+
+    This deliberately recreates the native self-dependency, rather than
+    manufacturing a health state or replacing the installed compute handler.
+    """
+    component = face.body.parentComponent
+    frame = entry.model.new_source_sketch(face)
+    scratch = component.sketches.addWithoutEdges(component.xYConstructionPlane)
+    tool, count = parametric.make_body(face, settings, config, frame, scratch)
+    base = component.features.baseFeatures.add()
+    assert base.startEdit()
+    component.bRepBodies.add(tool, base)
+    assert base.finishEdit()
+    tools = adsk.core.ObjectCollection.create()
+    tools.add(base.bodies.item(0))
+    ci = component.features.combineFeatures.createInput(config['bodies'][0], tools)
+    ci.operation = adsk.fusion.FeatureOperations.CutFeatureOperation
+    ci.isKeepToolBodies = True
+    combine = component.features.combineFeatures.add(ci)
+    data = component.features.customFeatures.createInput(parametric.register())
+    data.addDependency('source', face)
+    data.addDependency('body0', config['bodies'][0])
+    for key, (label, unit) in parametric.parameters(config).items():
+        value = getattr(settings, key) if key in settings.__dict__ else config[key]
+        vi = entry.model.value(value) if isinstance(value, str) else adsk.core.ValueInput.createByReal(value)
+        data.addCustomParameter(key, label, vi, unit, True)
+    data.setStartAndEndFeatures(frame, combine)
+    previous = parametric._busy
+    parametric._busy = True
+    try:
+        custom = component.features.customFeatures.add(data)
+        custom.customNamedValues.addOrSetValue('perfora', json.dumps(parametric.metadata(settings, config)))
+        custom.timelineObject.rollTo(False)
+    finally:
+        parametric._busy = previous
+    return frame, custom, count
+
+
 for legacy in (False, True):
     doc = app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
     case = dict(legacy=legacy, passed=False)
@@ -40,14 +79,7 @@ for legacy in (False, True):
         settings = entry.Settings(shape='circle', size=.4, gap=.15, margin=.1,
                                   clip_boundary=True)
         config = fixture['config'](result='feature', bodies=[body])
-        reference = parametric.body_reference
-        if legacy:
-            # Recreate the exact old dependency, using the real Fusion API.
-            parametric.body_reference = parametric.dependency_entity
-        try:
-            _, custom, count = parametric.build(face, settings, config)
-        finally:
-            parametric.body_reference = reference
+        _, custom, count = (legacy_build if legacy else parametric.build)(face, settings, config)
         case.update(holes=count, initial_health=int(custom.healthState),
                     volume_before=body.volume)
         before = body.volume

@@ -376,6 +376,16 @@ def build(source, settings, config, cache=None):
             component.bRepBodies.add(body, base)
         finally:
             base.finishEdit()
+        # Capture references while Objects still have their upstream faces.
+        # Intersect can remove a reference face entirely. Input dependencies
+        # are not bound until the custom node itself has been added.
+        first = frame if frame else base
+        if not first.timelineObject.rollTo(True):
+            raise ValueError('Unable to prepare the Feature timeline.')
+        custom = component.features.customFeatures.add(data)
+        custom.customNamedValues.addOrSetValue('perfora', json.dumps(metadata(settings, config)))
+        if not base.timelineObject.rollTo(False):
+            raise ValueError('Unable to restore the Feature geometry.')
         tool = base.bodies.item(0)
         if config['operation'] in ('cut', 'intersect', 'join'):
             targets = config['bodies']
@@ -395,11 +405,9 @@ def build(source, settings, config, cache=None):
                 if combine.healthState == adsk.fusion.FeatureHealthStates.ErrorFeatureHealthState:
                     raise ValueError(combine.errorOrWarningMessage)
             tool.isVisible = False
-        # Face dependencies resolve upstream of this complete owned span.
-        if not data.setStartAndEndFeatures(base if config.get('surface') else frame, combines[-1] if combines else base):
+        custom.timelineObject.rollTo(True)
+        if not custom.setStartAndEndFeatures(first, combines[-1] if combines else base):
             raise ValueError('Unable to group the Perfora Feature.')
-        custom = component.features.customFeatures.add(data)
-        custom.customNamedValues.addOrSetValue('perfora', json.dumps(metadata(settings, config)))
         custom.timelineObject.rollTo(False)
         if frame:
             frame.isVisible = scratch.isVisible = False
@@ -468,6 +476,13 @@ def build_many(selected, settings, config, cache=None):
             finally:
                 if not base.finishEdit():
                     raise ValueError('Unable to finish the Perfora Feature geometry.')
+        if not frames[0].timelineObject.rollTo(True):
+            raise ValueError('Unable to prepare the Feature timeline.')
+        custom = component.features.customFeatures.add(data)
+        owned.append(custom)
+        custom.customNamedValues.addOrSetValue('perfora', json.dumps(metadata(settings, config)))
+        if not bases[-1].timelineObject.rollTo(False):
+            raise ValueError('Unable to restore the Feature geometry.')
         if config['operation'] in ('cut', 'intersect', 'join'):
             operations = dict(cut=adsk.fusion.FeatureOperations.CutFeatureOperation,
                               join=adsk.fusion.FeatureOperations.JoinFeatureOperation,
@@ -487,11 +502,9 @@ def build_many(selected, settings, config, cache=None):
                     if combine.healthState == adsk.fusion.FeatureHealthStates.ErrorFeatureHealthState:
                         raise ValueError(combine.errorOrWarningMessage or 'Feature operation failed.')
                 tool.isVisible = False
-        if not data.setStartAndEndFeatures(frames[0], combines[-1] if combines else bases[-1]):
+        custom.timelineObject.rollTo(True)
+        if not custom.setStartAndEndFeatures(frames[0], combines[-1] if combines else bases[-1]):
             raise ValueError('Unable to group the Perfora Feature.')
-        custom = component.features.customFeatures.add(data)
-        owned.append(custom)
-        custom.customNamedValues.addOrSetValue('perfora', json.dumps(metadata(settings, config)))
         custom.timelineObject.rollTo(False)
         for frame in frames:
             frame.isVisible = False
