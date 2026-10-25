@@ -104,6 +104,43 @@ def dependency_entity(entity, component):
     return entity.createForAssemblyContext(occurrences.item(0))
 
 
+def body_reference(body, component):
+    """Reference an upstream face, not the body that our Combine modifies.
+
+    A dependency on the entire target BRepBody includes this custom feature's
+    own Boolean result. Fusion then leaves the node rolled back without ever
+    dispatching its compute event. A face dependency resolves at the upstream
+    timeline state and gives us the same target through face.body.
+    """
+    body = model.native(body)
+    if not body.faces.count:
+        raise ValueError('A Feature Object has no reference face.')
+    face = max(body.faces, key=lambda face: face.area)
+    return dependency_entity(face, component)
+
+
+def dependency_body(dependency):
+    entity = model.native(dependency.entity) if dependency else None
+    if isinstance(entity, adsk.fusion.BRepFace):
+        return entity.body
+    return entity  # Saved Features can still contain legacy BRepBody references.
+
+
+def repair_body_dependencies(custom):
+    """Upgrade legacy Object references inside the caller's edit transaction."""
+    global _busy
+    previous_busy = _busy
+    _busy = True
+    try:
+        for i in range(stored(custom)['body_count']):
+            dependency = custom.dependencies.itemById('body' + str(i))
+            entity = model.native(dependency.entity) if dependency else None
+            if isinstance(entity, adsk.fusion.BRepBody):
+                dependency.entity = body_reference(entity, custom.parentComponent)
+    finally:
+        _busy = previous_busy
+
+
 def source_entity(custom):
     if stored(custom).get('source_count', 1) > 1:
         return source_entities(custom)[0]
@@ -187,7 +224,7 @@ def read(custom):
     config['bodies'] = []
     for i in range(data['body_count']):
         dependency = custom.dependencies.itemById('body' + str(i))
-        body = model.native(dependency.entity) if dependency else None
+        body = dependency_body(dependency)
         if body is None or not body.isValid:
             raise ValueError('A Feature Object dependency is missing. Restore the upstream body.')
         config['bodies'].append(body)
@@ -308,7 +345,7 @@ def build(source, settings, config, cache=None):
         if not data.addDependency('path', path):
             raise ValueError('Unable to create the Path dependency.')
     for i, target in enumerate(config['bodies']):
-        data.addDependency('body' + str(i), dependency_entity(target, component))
+        data.addDependency('body' + str(i), body_reference(target, component))
     expressions = config.get('_expressions', {})
     for key, (label, unit) in parameters(config).items():
         val = expressions.get(key)
@@ -322,12 +359,9 @@ def build(source, settings, config, cache=None):
     previous_busy = _busy
     _busy = True
     try:
-        # Face-backed reference sketches must precede the empty Custom Feature.
-        # During native preview on a Base Feature result, creating them after
-        # that placeholder can bind their support to the placeholder itself.
+        # Build the owned span before grouping it into a Custom Feature.
         if not config.get('surface'):
-            frame = (component.sketches.addWithoutEdges(component.xYConstructionPlane)
-                     if config.get('surface') else model.new_source_sketch(source))
+            frame = model.new_source_sketch(source)
             frame.name = 'Perfora Reference'
             # Exact temporary offsets no longer edit this compatibility sketch.
             # A second sketch on the same selected Base Feature face inside a
@@ -361,9 +395,7 @@ def build(source, settings, config, cache=None):
                 if combine.healthState == adsk.fusion.FeatureHealthStates.ErrorFeatureHealthState:
                     raise ValueError(combine.errorOrWarningMessage)
             tool.isVisible = False
-        # Bind dependencies at their upstream state, before the first Boolean
-        # consumes faces. Group the finished span in the input, as one native
-        # request, without rolling an empty custom node during its creation.
+        # Face dependencies resolve upstream of this complete owned span.
         if not data.setStartAndEndFeatures(base if config.get('surface') else frame, combines[-1] if combines else base):
             raise ValueError('Unable to group the Perfora Feature.')
         custom = component.features.customFeatures.add(data)
@@ -393,7 +425,7 @@ def build_many(selected, settings, config, cache=None):
         config['bodies'] = []  # Hidden Objects must not become unused dependencies.
     data = component.features.customFeatures.createInput(register())
     dependencies = [('source' + str(i), dependency_entity(s, component)) for i, s in enumerate(selected)]
-    dependencies.extend(('body' + str(i), dependency_entity(body, component)) for i, body in enumerate(config['bodies']))
+    dependencies.extend(('body' + str(i), body_reference(body, component)) for i, body in enumerate(config['bodies']))
     if config.get('center_point') is not None:
         dependencies.append(('center_point', model.point_reference(config['center_point'], component)))
     if settings.layout == 'path': dependencies.append(('path', model.path_reference(config.get('path'), component)))
@@ -414,9 +446,6 @@ def build_many(selected, settings, config, cache=None):
     previous_busy = _busy
     _busy = True
     try:
-        custom = component.features.customFeatures.add(data)
-        owned.append(custom)
-        custom.customNamedValues.addOrSetValue('perfora', json.dumps(metadata(settings, config)))
         for index, source in enumerate(selected):
             frame = (component.sketches.addWithoutEdges(component.xYConstructionPlane)
                      if config.get('surface') else model.new_source_sketch(source))
@@ -448,9 +477,9 @@ def build_many(selected, settings, config, cache=None):
                 for index in plan.body_indices:
                     tools = adsk.core.ObjectCollection.create()
                     tools.add(tool)
-                    data = component.features.combineFeatures.createInput(model.native(config['bodies'][index]), tools)
-                    data.operation, data.isKeepToolBodies = operations[config['operation']], True
-                    combine = component.features.combineFeatures.add(data)
+                    combine_input = component.features.combineFeatures.createInput(model.native(config['bodies'][index]), tools)
+                    combine_input.operation, combine_input.isKeepToolBodies = operations[config['operation']], True
+                    combine = component.features.combineFeatures.add(combine_input)
                     if combine is None:
                         raise ValueError('Unable to create the Perfora Feature operation.')
                     owned.append(combine)
@@ -458,9 +487,11 @@ def build_many(selected, settings, config, cache=None):
                     if combine.healthState == adsk.fusion.FeatureHealthStates.ErrorFeatureHealthState:
                         raise ValueError(combine.errorOrWarningMessage or 'Feature operation failed.')
                 tool.isVisible = False
-        custom.timelineObject.rollTo(True)
-        if not custom.setStartAndEndFeatures(frames[0], combines[-1] if combines else bases[-1]):
+        if not data.setStartAndEndFeatures(frames[0], combines[-1] if combines else bases[-1]):
             raise ValueError('Unable to group the Perfora Feature.')
+        custom = component.features.customFeatures.add(data)
+        owned.append(custom)
+        custom.customNamedValues.addOrSetValue('perfora', json.dumps(metadata(settings, config)))
         custom.timelineObject.rollTo(False)
         for frame in frames:
             frame.isVisible = False
@@ -546,6 +577,7 @@ def update(custom, settings, config, cache=None):
     _busy = True
     try:
         config = dict(config)
+        repair_body_dependencies(custom)
         original = stored(custom)['config']
         for key in ('_origin_plane', '_source_count', '_body_map'):
             if key in original:

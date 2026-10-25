@@ -1225,6 +1225,7 @@ class EditActivate(adsk.core.CommandEventHandler):
             s.restore_marker = timeline.markerPosition
             s.restore_anchor = timeline.item(s.restore_marker-1) if s.restore_marker else None
             custom.timelineObject.rollTo(True)
+            parametric.repair_body_dependencies(custom)
             args.command.beginStep()
             s.updating = True
             try:

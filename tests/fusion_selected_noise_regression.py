@@ -49,12 +49,15 @@ for shape in globals().get('shapes',entry.ORGANIC_SHAPES):
             assert feature.healthState==adsk.fusion.FeatureHealthStates.HealthyFeatureHealthState,feature.errorOrWarningMessage
             item.update(build_seconds=perf_counter()-t,volume_before=before,volume_after=body.volume)
             if mode=='feature':
+                assert isinstance(feature.dependencies.itemById('body0').entity, adsk.fusion.BRepFace)
+                assert entry.parametric.read(feature)[2]['bodies'][0] == body
                 item['stage']='recompute';before_edit=body.volume
-                p=feature.parameters.itemById('organic_gradient' if shape=='blue_noise' else 'organic_open');p.value-=5
+                p=feature.parameters.itemById('size');p.value+=.05
                 assert design.computeAll()
                 assert feature.healthState==adsk.fusion.FeatureHealthStates.HealthyFeatureHealthState,feature.errorOrWarningMessage
                 assert abs(body.volume-before_edit)>1e-7
                 item['recomputed_volume']=body.volume
+                item['recompute_parameter']='size'
             if globals().get('capture',False):
                 app.activeViewport.fit();adsk.doEvents();app.activeViewport.refresh()
                 filename=str(output/('box-'+shape+'-'+mode+'.png'))
