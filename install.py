@@ -18,7 +18,7 @@ def build_archive(root=ROOT):
     target = root / ('dist/Perfora-' + version + '.zip')
     target.parent.mkdir(exist_ok=True)
     files = []
-    for directory in ('Perfora', 'PerforaSmokeTest', 'tests', 'docs', 'scripts'):
+    for directory in ('Perfora', 'PerforaSmokeTest', 'tests', 'docs', 'scripts', 'studies', 'demo'):
         files.extend(p for p in (root / directory).rglob('*')
                      if p.is_file() and '__pycache__' not in p.parts and '.vscode' not in p.parts
                      and p.suffix not in ('.pyc', '.pyo') and p.name != '.DS_Store')

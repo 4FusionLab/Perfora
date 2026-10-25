@@ -1,0 +1,71 @@
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Explore Perfora hole patterns. A live browser demo powered by the same geometry kernel as the Autodesk Fusion add-in.">
+  <title>Perfora — Pattern playground</title>
+  <link rel="icon" href="data:,">
+  <style>__STYLES__</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="https://github.com/4FusionLab/Perfora" target="_blank" rel="noopener"><img src="__LOGO__" alt="" width="44" height="44"><span>perfora<small>by 4FusionLab</small></span></a>
+    <span class="demo-label">PATTERN PLAYGROUND</span>
+    <nav><a href="https://github.com/4FusionLab/Perfora" target="_blank" rel="noopener">GitHub ↗</a><a class="get-perfora" href="https://github.com/4FusionLab/Perfora/releases" target="_blank" rel="noopener">Get Perfora ↗</a></nav>
+  </header>
+  <main>
+    <section class="intro"><div><p class="eyebrow">PERFORATE EVERYTHING</p><h1>A little space.<br>A lot of possibilities.</h1></div><p class="intro-copy">Find the rhythm for your next panel.<br>Choose a pattern, make it yours, take it to Fusion.</p></section>
+    <div class="workspace">
+      <aside class="controls" aria-label="Pattern settings">
+        <div class="control-heading"><h2>Your pattern</h2><button id="reset" class="text-button" type="button">Reset</button></div>
+        <label class="field">Distribution<select id="layout" data-parameter><option value="staggered">Staggered</option><option value="rows">Rectangular</option><option value="circular">Circular</option><option value="path">Along Path</option><option value="contour">Contour</option><option value="fan">Fan</option><option value="phyllotaxis">Phyllotaxis</option><option value="poisson">Poisson Disk</option><option value="wave" selected>Wave</option><option value="chevron">Chevron</option><option value="between_curves">Between Curves</option></select></label>
+        <p class="field-help" id="layout-help">Smooth, continuous rows. A rhythm that flows.</p>
+        <label class="field">Hole Shape<select id="shape" data-parameter>__SHAPE_OPTIONS__</select></label>
+        <div class="pair">
+          <label class="field"><span id="size-label">Width</span><span class="number-field"><input id="size" data-parameter type="number" min="1" max="20" step=".1" value="1.7"><span>mm</span></span></label>
+          <label class="field" id="length-field">Length<span class="number-field"><input id="length" data-parameter type="number" min="1" max="40" step=".1" value="5.2"><span>mm</span></span></label>
+        </div>
+        <div class="pair">
+          <label class="field">Web Thickness<span class="number-field"><input id="gap" data-parameter type="number" min=".3" max="10" step=".1" value="1.2"><span>mm</span></span></label>
+          <label class="field">Edge Offset<span class="number-field"><input id="margin" data-parameter type="number" min="0" max="20" step=".1" value="1.8"><span>mm</span></span></label>
+        </div>
+        <label class="field" id="orientation-field">Orientation<select id="orientation" data-parameter><option value="tangent" selected>Follow Pattern</option><option value="fixed">Fixed</option><option id="radial-option" value="radial" hidden>Radial</option></select></label>
+        <section class="specific-fields" aria-label="Distribution settings">
+          <label class="field" data-for="wave">Amplitude <span class="number-field"><input id="amplitude" data-parameter type="number" min="0" max="20" step=".5" value="6.5"><span>mm</span></span></label>
+          <label class="field" data-for="wave">Wavelength <span class="number-field"><input id="wavelength" data-parameter type="number" min="10" max="150" step="1" value="51"><span>mm</span></span></label>
+          <label class="field" data-for="chevron">Chevron Angle <span class="number-field"><input id="chevron_angle" data-parameter type="number" min="10" max="70" step="1" value="28"><span>deg</span></span></label>
+          <label class="field" data-for="fan">Sector Angle <span class="number-field"><input id="sector" data-parameter type="number" min="20" max="360" step="5" value="180"><span>deg</span></span></label>
+          <label class="field" data-for="fan">Ray Count <input id="rays" data-parameter type="number" min="3" max="80" step="1" value="25"></label>
+          <label class="field" data-for="between_curves">Row Count <input id="guide_rows" data-parameter type="number" min="2" max="30" step="1" value="12"></label>
+          <label class="field" data-for="circular">Start Radius <span class="number-field"><input id="start_radius" data-parameter type="number" min="0" max="30" step=".5" value="0"><span>mm</span></span></label>
+        </section>
+        <div class="seed-row" id="seed-field"><label class="field">Seed<input id="seed" data-parameter type="number" min="0" max="2147483647" step="1" value="7"></label><button id="new-seed" type="button" class="secondary">New Pattern</button></div>
+        <details class="advanced"><summary>More options</summary>
+          <label class="field" id="spacing-field">Spacing <span class="range-label"><span>Compact</span><output id="spacing-value">1.12×</output><span>Open</span></span><input id="spacing" data-parameter type="range" min="1" max="2.5" step=".02" value="1.12"></label>
+          <label class="field" id="angle-field">Hole Angle<span class="number-field"><input id="angle" data-parameter type="number" min="-180" max="180" step="5" value="0"><span>deg</span></span></label>
+          <label class="field" id="arm-field">Arm Width<span class="number-field"><input id="arm_width" data-parameter type="number" min=".2" max="8" step=".1" value="1"><span>mm</span></span></label>
+          <label class="field" id="star-points-field">Star Points<input id="star_points" data-parameter type="number" min="3" max="12" step="1" value="5"></label>
+          <label class="field" id="star-ratio-field">Inner Radius <span class="number-field"><input id="star_ratio" data-parameter type="number" min="10" max="70" step="1" value="45"><span>%</span></span></label>
+          <label class="field" id="irregularity-field">Irregularity <span class="number-field"><input id="irregularity" data-parameter type="number" min="0" max="100" step="5" value="80"><span>%</span></span></label>
+          <label class="field" id="corners-field">Corner Radius <span class="number-field"><input id="corner_radius" data-parameter type="number" min="0" max="4" step=".1" value="0"><span>mm</span></span></label>
+        </details>
+        <section class="panel-settings"><h2>Your panel</h2><label class="field">Boundary<select id="boundary" data-parameter><option value="rectangle">Rectangle</option><option value="rounded">Rounded</option><option value="disk">Circle</option></select></label><div class="pair"><label class="field">Width<span class="number-field"><input id="width" data-parameter type="number" min="30" max="300" step="5" value="120"><span>mm</span></span></label><label class="field">Height<span class="number-field"><input id="height" data-parameter type="number" min="30" max="300" step="5" value="100"><span>mm</span></span></label></div></section>
+      </aside>
+      <section class="preview-column" aria-label="Pattern preview">
+        <div class="preview-top"><div class="status"><span id="status-dot" class="status-dot loading"></span><span id="status-text" role="status" aria-live="polite">Preparing live controls…</span></div><button id="browse" type="button" class="text-button" aria-expanded="false" aria-controls="pattern-gallery">Explore patterns ↘</button></div>
+        <div class="preview-stage" id="preview-stage"><div class="view-caption">TOP VIEW <span>·</span> <span id="dimension-caption">120 × 100 mm</span></div><svg id="preview" role="img" aria-label="Wave perforation preview" viewBox="-7 -6 14 12"><defs><filter id="panel-shadow" x="-30%" y="-30%" width="160%" height="180%"><feDropShadow dx="0" dy=".12" stdDeviation=".12" flood-opacity=".15"/></filter></defs><g id="panel-geometry"></g><g id="guide-geometry" fill="none" stroke="#b96d47" stroke-width=".025" stroke-dasharray=".08 .08" hidden></g></svg><div class="scale-note"><span></span> 10 mm</div></div>
+        <div id="error" class="error" role="alert" hidden></div>
+        <div class="preview-bottom"><div class="stats" aria-live="polite"><span><strong id="hole-count">—</strong> holes</span><span><strong id="open-area">—</strong> open area</span></div><label class="guides-toggle"><input id="show-guides" type="checkbox"> Show guides</label></div>
+        <div class="actions"><button id="share" type="button" class="text-button">Copy pattern link ↗</button></div>
+        <div class="share-fallback" id="share-fallback" hidden><label>Pattern link<input id="share-url" readonly></label></div>
+        <div id="pattern-gallery" class="gallery" hidden>__GALLERY__</div>
+        <div class="preset-strip"><span>Try a starting point</span><button type="button" data-preset="wave">Gentle waves</button><button type="button" data-preset="sunflower">Sunflower</button><button type="button" data-preset="honeycomb">Honeycomb</button></div>
+        <p class="preview-note">A 2D pattern preview. Create native sketches, extrusions and editable features with Perfora in Autodesk Fusion.</p>
+      </section>
+    </div>
+  </main>
+  <footer><span>4FusionLab · Perfora</span><span>Built for the way you make.</span><a href="https://github.com/4FusionLab/Perfora/blob/main/LICENSE" target="_blank" rel="noopener">GPL-3.0</a></footer>
+  <script id="demo-bundle" type="application/json">__BUNDLE__</script>
+  <script>__APP_SCRIPT__</script>
+</body></html>

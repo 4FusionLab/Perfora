@@ -108,9 +108,9 @@ class DistributionStudyTests(unittest.TestCase):
                 self.assertLess(math.dist(transform(before.center),after.center),1e-7)
                 self.assertAlmostEqual(before.angle+angle,after.angle,places=7)
 
-    def test_candidate_rejects_unimplemented_trim_and_other_shapes(self):
+    def test_candidate_rejects_unimplemented_trim_and_scope(self):
         a=self.samples['wave','circle','fixed']
-        for changes in ({'clip_boundary':True},{'shape':'hexagon'},{'spread_radius':2}):
+        for changes in ({'clip_boundary':True},{'spread_radius':2}):
             with self.assertRaisesRegex(ValueError,'revision 2'):
                 kernel_generate(a.region,replace(a.settings,**changes))
 

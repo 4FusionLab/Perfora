@@ -8,7 +8,7 @@ never silently punches a missing sample out of a row. Revision 2 is opt-in until
 from dataclasses import dataclass
 import math
 from time import perf_counter
-from .geometry import (EPS, Cell, Settings, Loop, Region, fits, dist, segment_distance, rotate, placement_center)
+from .geometry import (EPS, Cell, Settings, Loop, Region, fits, dist, segment_distance, rotate, placement_center, enclosing_radius)
 from .curves import ArcPath
 from .distributions import _poisson, _DistanceTree
 from bisect import bisect_right
@@ -49,14 +49,22 @@ def _sample_path(path, pitch, closed=False):
 
 def _clearance(a,b):
     # Exact capsule distance for the two acceptance shapes (circle/slot).
-    return segment_distance(*a.spine,*b.spine)-(a.size+b.size)/2
+    if a.shape in ('circle','slot') and b.shape in ('circle','slot'):
+        return segment_distance(*a.spine,*b.spine)-(a.size+b.size)/2
+    return dist(a.center,b.center)-_radius(a)-_radius(b)
+
+
+def _radius(c):
+    if c.shape in ('slot','ellipse'):return max(c.length,c.size)/2
+    if c.shape=='circle':return c.size/2
+    return max(dist(c.center,p) for p in c.vertices)
 
 
 def minimum_gap(cells, required=None, _refine=True):
     # Local broad phase is sufficient for proving a requested minimum.
     if not cells:
         return math.inf
-    reach=max(c.length if c.shape=='slot' else c.size for c in cells)+(required if required is not None else 1)
+    reach=2*max(_radius(c) for c in cells)+(required if required is not None else 1)
     buckets={}
     nearest=math.inf
     for c in cells:
@@ -75,9 +83,10 @@ def minimum_gap(cells, required=None, _refine=True):
 
 
 def _draft(name, region, s, factor, orientation):
-    length=s.slot_length if s.shape=='slot' else s.size
+    length=s.slot_length if s.shape=='slot' else s.size if s.shape=='circle' else 2*enclosing_radius(s)
     along=max(length+s.gap,s.along_spacing)*factor
     normal=max(s.size+s.gap,s.row_spacing)*factor
+    if s.shape not in ('circle','slot'):normal=along
     if orientation=='fixed' and s.shape=='slot' and name in ('contour','fan','wave','chevron'):
         normal=along
     strokes=[]
@@ -215,7 +224,8 @@ def _draft(name, region, s, factor, orientation):
                 samples.append((p,math.atan2(b[1]-a[1],b[0]-a[0])))
     else:
         raise ValueError('Unknown study.')
-    cells=[Cell(p,s.shape,s.size,s.slot_length,(a if orientation=='tangent' else 0)+s.shape_angle) for p,a in samples]
+    cells=[Cell(p,s.shape,s.size,s.slot_length,(a if orientation=='tangent' else 0)+s.shape_angle,
+                s.arm_width,s.star_ratio,s.star_points) for p,a in samples]
     # Trim off whole boundary holes only; internal samples never undergo culling.
     cells=[c for c in cells if fits(c,region,region._boundary_index,s.margin)]
     return cells,strokes
@@ -224,11 +234,11 @@ def _draft(name, region, s, factor, orientation):
 def build_field(region,s):
     """Shared versioned kernel used by geometry.generate and visual regression.
 
-    Revision 2 currently accepts circles/capsules and whole holes. It stays
+    Revision 2 accepts repeating shapes and whole holes. It stays
     opt-in until the user's acceptance and full CAD integration are complete.
     """
-    if s.shape not in ('circle','slot') or s.clip_boundary or s.spread_radius or region.scope_center is not None:
-        raise ValueError('Distribution revision 2 currently requires Circle/Slot and whole holes.')
+    if s.shape=='voronoi' or s.clip_boundary or s.spread_radius or region.scope_center is not None:
+        raise ValueError('Distribution revision 2 currently requires repeating shapes and whole holes.')
     s.validate()
     origin=placement_center(region,s)
     def local(p):return rotate((p[0]-origin[0],p[1]-origin[1]),-s.grid_angle)
