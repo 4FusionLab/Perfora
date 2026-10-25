@@ -328,7 +328,10 @@ def build(source, settings, config, cache=None):
             frame = (component.sketches.addWithoutEdges(component.xYConstructionPlane)
                      if config.get('surface') else model.new_source_sketch(source))
             frame.name = 'Perfora Reference'
-            scratch = model.new_source_sketch(source)
+            # Exact temporary offsets no longer edit this compatibility sketch.
+            # A second sketch on the same selected Base Feature face inside a
+            # native command can acquire a circular reference to the first.
+            scratch = component.sketches.addWithoutEdges(component.xYConstructionPlane)
             scratch.name = 'Perfora Edge Offset'
         # Still capture dependencies before Boolean operations consume faces.
         custom = component.features.customFeatures.add(data)
