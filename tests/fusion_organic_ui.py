@@ -129,6 +129,7 @@ def end_edit(accepted):
     assert abs(custom.parameters.itemById(key).value-edit_value-delta)<1e-8
     assert (abs(volume-edit_volume)>1e-7) if accepted else (abs(volume-edit_volume)<1e-8)
     fixture['healthy'](design)
+    assert custom.healthState==adsk.fusion.FeatureHealthStates.HealthyFeatureHealthState,custom.errorOrWarningMessage
     report['checks'].append('Edit Feature '+('OK' if accepted else 'Cancel'));save();return True
 
 
