@@ -7,7 +7,7 @@
 - Add Along Path, Contour, Fan, Phyllotaxis, Poisson Disk, Wave, Chevron and Between Curves: 11 public Distribution families in total. New commands use revision 2; saved Features keep their revision and legacy Running Bond.
 - Support cylindrical, conical and regular smooth freeform solid faces, plus up to 32 regions of one surface type in one component.
 - Add a bundled browser playground using the same Python geometry kernel as Fusion, with all 19 shapes and shareable parameters.
-- Preserve LF source files on every platform so embedded-kernel byte hashes and release ZIP contents remain consistent on Windows too.
+- Preserve LF and read text explicitly as UTF-8 on every platform so embedded-kernel byte hashes, demo labels and release ZIP contents remain consistent on Windows too.
 - Bound organic-field sampling on large regions and preserve partial boundary openings with the requested edge clearance.
 - Fix Custom Feature self-dependencies by retaining Object references through upstream faces and binding them before Boolean operations consume geometry. Edit Feature OK upgrades legacy Object references.
 - Restore the edit timeline after command termination so Cancel preserves geometry and node health without adding an Undo step. Keep exact Feature preview separate from committed CAD construction.

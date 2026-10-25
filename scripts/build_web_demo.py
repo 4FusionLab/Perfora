@@ -46,11 +46,11 @@ def build():
         x,y,w,h=result['box'];pad=max(w,h)*.04
         svg=f'<svg viewBox="{x-pad} {y-pad} {w+2*pad} {h+2*pad}" aria-hidden="true"><path d="{result["outer"]} {result["holes"]}" fill="#46534b" fill-rule="evenodd"/></svg>'
         gallery.append(f'<button type="button" class="pattern-tile" data-layout="{name}" aria-pressed="false">{svg}<span>{LABELS[name]}</span></button>')
-    bundle=dict(sources=sources,source=source,worker=(ROOT/'demo/worker.js').read_text(),initial=initial,variants=VARIANT_LAYOUTS)
+    bundle=dict(sources=sources,source=source,worker=(ROOT/'demo/worker.js').read_text(encoding='utf-8'),initial=initial,variants=VARIANT_LAYOUTS)
     data=json.dumps(bundle,separators=(',',':')).replace('<','\\u003c')
-    template=(ROOT/'demo/app.html').read_text()
+    template=(ROOT/'demo/app.html').read_text(encoding='utf-8')
     options=''.join(f'<option value="{key}"'+(' selected' if key=='slot' else '')+f'>{label}</option>' for key,label in SHAPES)
-    replacements={'__STYLES__':(ROOT/'demo/style.css').read_text(),'__APP_SCRIPT__':(ROOT/'demo/app.js').read_text(),
+    replacements={'__STYLES__':(ROOT/'demo/style.css').read_text(encoding='utf-8'),'__APP_SCRIPT__':(ROOT/'demo/app.js').read_text(encoding='utf-8'),
                   '__BUNDLE__':data,'__GALLERY__':''.join(gallery),'__SHAPE_OPTIONS__':options,
                   '__LOGO__':'data:image/png;base64,'+base64.b64encode((ROOT/'Perfora/resources/toolbar-f692fbb3/64x64.png').read_bytes()).decode()}
     for key,value in replacements.items():template=template.replace(key,value)

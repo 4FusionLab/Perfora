@@ -75,9 +75,10 @@ class WebDemoTests(unittest.TestCase):
         html=build()
         data=json.loads(re.search(r'<script id="demo-bundle" type="application/json">(.*?)</script>',html,re.S).group(1))
         for name in MODULES:
-            self.assertEqual(data['sources'][name],(ROOT/name).read_text())
+            self.assertEqual(data['sources'][name],(ROOT/name).read_text(encoding='utf-8'))
             self.assertEqual(data['source']['sha256'][name],hashlib.sha256((ROOT/name).read_bytes()).hexdigest())
         self.assertNotIn('/Users/',html)
+        self.assertIn('Get Perfora ↗',html)
         self.assertNotIn('__BUNDLE__',html)
         self.assertNotIn('study-shift',html)
         self.assertNotIn('Additional Bridges',html)
