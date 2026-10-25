@@ -333,9 +333,19 @@ def build(source, settings, config, cache=None):
             # native command can acquire a circular reference to the first.
             scratch = component.sketches.addWithoutEdges(component.xYConstructionPlane)
             scratch.name = 'Perfora Edge Offset'
+        # Insert the owning node before its already-created reference sketches.
+        # Creating those sketches after a placeholder can make face references
+        # circular; grouping sketches placed before the owner leaves that owner
+        # in a permanently rolled-back state in native Edit Feature.
+        if frame:
+            if not frame.timelineObject.rollTo(True):
+                raise ValueError('Unable to prepare the Feature timeline.')
         # Still capture dependencies before Boolean operations consume faces.
         custom = component.features.customFeatures.add(data)
         custom.customNamedValues.addOrSetValue('perfora', json.dumps(metadata(settings, config)))
+        if scratch:
+            if not scratch.timelineObject.rollTo(False):
+                raise ValueError('Unable to restore the Feature reference sketches.')
         body, count = make_body(source, settings, config, frame, scratch, cache)
         base = component.features.baseFeatures.add()
         base.name = 'Perfora Geometry'
