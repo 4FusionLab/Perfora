@@ -11,12 +11,12 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="GPL-3.0 license"></a>
 </p>
 
-<p align="center"><a href="https://github.com/4FusionLab/Perfora/releases/tag/v1.0.1"><strong>Download v1.0.1</strong></a> · <a href="README.ru.md">Русский</a> · <a href="https://github.com/4FusionLab/Perfora/issues">Report a problem</a></p>
+<p align="center"><a href="https://github.com/4FusionLab/Perfora/releases/tag/v1.1.0"><strong>Download v1.1.0</strong></a> · <a href="README.ru.md">Русский</a> · <a href="https://github.com/4FusionLab/Perfora/issues">Report a problem</a></p>
 
 
 ## Make the pattern. Keep the native model.
 
-Development visual acceptance: [the offline Distribution test](studies/README.md) renders the 11 Distribution families from the shared geometry kernel. New native commands use revision 2 for the revised families, including partial boundary candidates and Follow Pattern orientation. Existing Features retain their saved revision; legacy Running Bond remains editable.
+Shared-kernel visual bench: [the offline Distribution test](studies/README.md) renders the 11 Distribution families from the shared geometry kernel. New native commands use revision 2 for the revised families, including partial boundary candidates and Follow Pattern orientation. Existing Features retain their saved revision; legacy Running Bond remains editable.
 
 [Pattern playground](demo/README.md) is the browser demo and fast visual test bench. It executes the same Python geometry sources as Fusion, with 11 Distribution families, 19 hole shapes, including six organic fields and shareable parameters. Build with `python3 scripts/build_web_demo.py`; serve the repository and open `/demo/`. It is prepared for static hosting; no deployment is performed by the build.
 
@@ -24,9 +24,9 @@ Select a planar face, a closed sketch profile, or a construction plane. Choose a
 
 To perforate part of an existing face, draw a closed sketch on that face, finish the sketch, and select its shaded profile in **Profiles**. No Split Face is required. For **Cut** or **Intersect**, the supporting body is selected automatically in **Objects**; check the direction and extent before confirming. Profiles on construction planes still require explicit Objects.
 
-**Perfora 1.0.1 fixes Feature Cut recompute after upstream resizing.** Parametric patterns, circular placement, bounded spread, and faster previews. [Release notes →](docs/releases/v1.0.1.md)
+**Perfora 1.1.0 adds six noise fields, 11 Distribution families, curved faces and multiple regions, with reliable Feature recompute and editing.** [Release notes →](docs/releases/v1.1.0.md)
 
-**Development branch:** cylindrical, conical and smooth freeform solid faces use the common Sketch/Extrude/Feature workflow, including Voronoi and boundary trimming. This is not in the published 1.0.1 release; see the curved-face behavior and limitations below.
+**Curved faces:** cylindrical, conical and regular smooth freeform solid faces use the common Sketch/Extrude/Feature workflow, including Voronoi and boundary trimming. See the source-specific behavior and limitations below.
 
 ## Made with Perfora
 
@@ -113,9 +113,9 @@ Cell Spacing controls the nominal distance between sites, rather than the size o
 
 Enable **Round Corners** to add tangent circular fillets to the Voronoi holes. **Corner Radius** sets the maximum radius. Short bevels are absorbed by the rounded contour; the radius is reduced only when the hole is too narrow. Rounding is off by default and preserves the minimum web. Fast Preview follows the same arcs used by the sketch and Extrude. New convex corners at straight and circular trim boundaries are rounded too. Existing concave source corners and elliptical/spline boundary segments retain their exact geometry.
 
-## Organic patterns (development)
+## Noise
 
-The **Noise** section contains six fields followed by Voronoi: **Smooth Noise**, **Reaction Diffusion**, **Directional Fibers**, **Ridged Noise / Topographic**, **Gyroid Field**, and **Blue Noise / Size Gradient**. Voronoi remains last; the original 13 shape IDs and saved parameters are unchanged. These additions are unpublished.
+The **Noise** section contains six fields followed by Voronoi: **Smooth Noise**, **Reaction Diffusion**, **Directional Fibers**, **Ridged Noise / Topographic**, **Gyroid Field**, and **Blue Noise / Size Gradient**. Voronoi remains last; the original 13 shape IDs and saved parameters are unchanged. Available in 1.1.0.
 
 The first five use **Cell Size**, **Web Thickness**, **Edge Offset** and **Seed / New Pattern**. New commands start at 8 mm cells and a 0.8 mm web. Field Fill is no longer a visible control; saved legacy thresholds are retained when editing existing Features. Blue Noise uses **Maximum Diameter**, **Size Variation (%)** and a signed **Size Gradient (%)**, with radius-aware spacing. It complements the existing fixed-size Poisson Disk Distribution.
 
@@ -125,9 +125,9 @@ These shapes define their own bounded field; Distribution and Hole Angle are hid
 
 Material islands are joined before contour extraction. Overlong slots receive bridges; conflicting small fragments are omitted to protect the actual contour web. With a zero edge border, boundary fragments that would detach material are retained as solid material. Sampling and contour budgets give actionable errors instead of unbounded CAD work. See [algorithms, controls, surface behavior and validation](docs/ORGANIC_PATTERNS.md).
 
-## Multiple regions (development)
+## Multiple regions
 
-This branch adds up to **32 regions of one surface type** in **Profiles**, with common settings and one combined **Maximum Holes** limit. Planar faces and profiles may be combined; cylinders, cones and freeform faces remain separate types. This feature is unpublished. Construction planes remain single-source. Sketch creates one sketch per region, including fixed 3D contours on curved faces. Extrude uses native extrusion on planar sources and Base Feature/Combine on curved sources. Feature groups all regions in one parametric timeline node.
+Select up to **32 regions of one surface type** in **Profiles**, with common settings and one combined **Maximum Holes** limit. Planar faces and profiles may be combined; cylinders, cones and freeform faces remain separate types. Construction planes remain single-source. Sketch creates one sketch per region, including fixed 3D contours on curved faces. Extrude uses native extrusion on planar sources and Base Feature/Combine on curved sources. Feature groups all regions in one parametric timeline node.
 
 For several planar regions, the default origin is the component origin projected onto each plane. The pattern X axis follows projected component X, switching to projected component Y near an X-normal plane; Y completes a consistent plane frame. Coplanar regions share the same lattice phase, including Voronoi and Circular, regardless of selection order. **Start Point** overrides the origin and is projected onto each plane. X/Y Offset and Pattern Angle use these shared plane axes (offsets use pattern axes for grids/Voronoi). Saved legacy Spread Radius parameters remain supported. Extrude direction follows each source sketch normal; inspect Full Preview for opposite-facing sources. Returning to a single source restores the existing automatic-center behavior.
 
@@ -137,7 +137,7 @@ Feature stores all source dependencies and its Objects mapping; source set, oper
 
 ## Parametric Feature
 
-Development fix: Feature recompute captures Object references before Boolean operations and uses upstream faces to avoid a dependency on its own result. Edit Feature OK upgrades legacy Object references; Cancel restores the timeline after the edit command has terminated. Verified in Fusion 2706.1.14 on macOS with all six noise fields and Voronoi on copies of the selected Box face, plus native Edit Feature OK/Cancel and Undo/Redo.
+Feature recompute captures Object references before Boolean operations and uses upstream faces to avoid a dependency on its own result. Edit Feature OK upgrades legacy Object references; Cancel restores the timeline after the edit command has terminated. Verified in Fusion 2706.1.14 on macOS with all six noise fields and Voronoi on copies of the selected Box face, plus native Edit Feature OK/Cancel and Undo/Redo.
 
 **Type → Feature** creates one **Perfora** node in the timeline. With the add-in running, changing its model parameters or upstream source geometry regenerates the pattern, including the number of holes. Double-click the node or choose **Edit Feature** to edit the pattern, trimming, placement, profile type, and thickness. Expressions can reference Fusion user parameters. OK commits the edit; Cancel restores the previous model.
 
@@ -155,7 +155,7 @@ Spread Radius has been removed from the command. New patterns fill the selected 
 
 ## Circular distribution
 
-**Distribution → Circular** places holes on concentric rings. It supports all 12 repeating shapes; Voronoi keeps its own distribution. Available in the stable 1.0 release. In this development branch, rings retain their chord-packed layout (six holes on the first regular ring), with even counts preserving opposite site pairs and central symmetry for centered circular holes. Offsets, asymmetric hole contours and existing openings can change the final symmetry.
+**Distribution → Circular** places holes on concentric rings. It supports all 12 repeating shapes; Voronoi keeps its own distribution. Available in the stable 1.0 release. In 1.1.0, rings retain their chord-packed layout (six holes on the first regular ring), with even counts preserving opposite site pairs and central symmetry for centered circular holes. Offsets, asymmetric hole contours and existing openings can change the final symmetry.
 
 - **Start Radius** measures the first ring to hole centers. At 0, the pattern starts with one center hole; a positive value omits that hole. This does not specify a solid central zone: holes may extend inside the first ring.
 - Holes per ring and radial spacing are automatic, based on the shape size and **Web Thickness**. Chord spacing preserves the web across each ring's closing seam. Noncircular shapes use conservative enclosing bounds, so actual webs can be wider than requested.
@@ -164,24 +164,24 @@ Spread Radius has been removed from the command. New patterns fill the selected 
 - **Edge Offset**, internal openings, **Trim to Boundary**, Fast/Full Preview, profiles and Extrude operations remain available. In Feature mode, the selected point is a dependency: moving it recomputes the pattern, and Edit Feature can replace or clear it. Ring radii and spacing are set before trimming; changing the boundary can move the pattern with its bounding-box center.
 
 
-## Development branch: eight more distributions
+## Eleven Distribution families
 
-**Validated in Fusion on macOS; exact coverage is in the [integration report](docs/RELEASE_INTEGRATION.md).** This working branch adds **Contour, Fan, Phyllotaxis, Poisson Disk, Wave, Chevron, Running Bond, and Between Curves** for all 12 repeating hole shapes. Voronoi keeps its own distribution; Rectangular, Staggered, and Circular remain available.
+**Validated in Fusion on macOS; exact coverage is in the [integration report](docs/RELEASE_INTEGRATION.md).** Eight additions — **Along Path, Contour, Fan, Phyllotaxis, Poisson Disk, Wave, Chevron and Between Curves** — bring the public list to 11 Distribution families for the 12 repeating shapes. Noise fields and Voronoi define their own distribution. Running Bond remains available only when editing legacy Features.
 
-Native fields, shared Fast/Full Preview and Sketch/Extrude/Feature paths, parameter storage, guide dependencies, Edit Feature restoration, and older Feature defaults are implemented in source. Offline geometry/contract tests and native CAD/UI acceptance on macOS pass; see the [integration report](docs/RELEASE_INTEGRATION.md) for exact coverage. Published v1.0.1 does not contain these additions.
+Native fields, shared Fast/Full Preview and Sketch/Extrude/Feature paths, stored parameters, guide dependencies and Edit Feature are included. Recorded Python and native macOS acceptance is in the [integration report](docs/RELEASE_INTEGRATION.md).
 
 Along Spacing and Row Spacing use automatic enclosing-hole spacing at 0; smaller requested pitches are raised to the safe minimum. A spatial neighbour index omits candidates that could violate Web Thickness, including rotated shapes, fan centers, contour seams, and chevron vertices. Packing is conservative. Phyllotaxis has Density Ratio; saved Spread Radius parameters remain compatible; Poisson Disk has Seed/New Pattern; Wave uses length-based sampling, amplitude/wavelength/phase/row phase; Running Bond accepts cumulative shifts such as `1 / 3` and `1 / 4`.
 
 Contour follows approximate signed-distance levels, with explicit Contour Tolerance and a sampling budget; it is not an exact CAD offset, and sub-resolution details can disappear. Between Curves currently requires two separate open planar curves/edges in the Profiles component, matches normalized arc length and endpoints, and rejects crossed, collapsed, folded, closed, nonplanar, or cross-component guides. Arbitrary complex spline strips and curve chains are not promised. For Contour/Between Curves, Start Point and offsets affect only saved legacy Spread Radius scopes; Pattern Angle is hidden.
 
 New Feature nodes expose the added model parameters. Older nodes keep missing values as stored snapshots when edited; recreate a Feature to obtain new model parameters and their expression dependencies. [Implementation limits, integration seam, and CAD/UI acceptance →](docs/LAYOUT_VARIANTS.md)
-## Along Path (development)
+## Along Path
 
-The integrated development branch adds **Distribution → Along Path** for all 12 repeating shapes: select one coplanar line, arc, circle or spline in the Profiles component. **Path Spacing** measures arc length; **Start Offset**, **End Offset**, **Position** and **Reverse Path** control placement. **Fixed** or **Tangent** orientation adds **Hole Angle**. Closed paths omit duplicate seam centers. Tight turns, nearby sections and the closing seam are checked against Web Thickness using conservative enclosing bounds; conflicts are reported rather than silently skipping holes.
+Perfora 1.1.0 adds **Distribution → Along Path** for all 12 repeating shapes: select one coplanar line, arc, circle or spline in the Profiles component. **Path Spacing** measures arc length; **Start Offset**, **End Offset**, **Position** and **Reverse Path** control placement. **Fixed** or **Tangent** orientation adds **Hole Angle**. Closed paths omit duplicate seam centers. Tight turns, nearby sections and the closing seam are checked against Web Thickness using conservative enclosing bounds; conflicts are reported rather than silently skipping holes.
 
 The implementation connects to Fast/Full Preview, existing trimming/inner cutouts/Edge Offset, Sketch, Extrude and Feature. Feature stores a live path dependency and new native path parameters; Edit Feature can replace the path or change distribution. Older nodes remain compatible with existing distributions; recreate them to use Along Path, because existing nodes cannot gain its native parameters. Chains, off-plane/cross-component paths and elliptical paths are unsupported. Start Point, Spread Radius, Pattern Angle and X/Y Offset are inactive in this distribution; Voronoi keeps its own distribution.
 
-**This functionality is unpublished.** Native CAD/UI, recompute/edit, Undo/Redo and local F3D acceptance are recorded in the [integration report](docs/RELEASE_INTEGRATION.md). [Behavior, API rationale, tolerances, limitations and CAD acceptance →](docs/CURVE_LAYOUT.md)
+Native CAD/UI, recompute/edit, Undo/Redo and local F3D acceptance are recorded in the [integration report](docs/RELEASE_INTEGRATION.md). [Behavior, API rationale, tolerances, limitations and CAD acceptance →](docs/CURVE_LAYOUT.md)
 
 ## Performance
 
@@ -197,7 +197,7 @@ The optimizations preserve hole contours, clearance checks, Voronoi Seed, and ex
 
 ### Recommended: add the folder in Fusion
 
-1. Download **[Perfora-1.0.1.zip](https://github.com/4FusionLab/Perfora/releases/download/v1.0.1/Perfora-1.0.1.zip)** from the [release page](https://github.com/4FusionLab/Perfora/releases/tag/v1.0.1) and extract it to a permanent location.
+1. Download **[Perfora-1.1.0.zip](https://github.com/4FusionLab/Perfora/releases/download/v1.1.0/Perfora-1.1.0.zip)** from the [release page](https://github.com/4FusionLab/Perfora/releases/tag/v1.1.0) and extract it to a permanent location.
 2. In Fusion, open **Utilities → Scripts and Add-Ins**.
 3. Click **+ → Script or add-in from device**.
 4. Select the inner **`Perfora`** folder containing **`Perfora.py`** and **`Perfora.manifest`**, not the top-level extracted folder.
@@ -237,7 +237,7 @@ On a construction plane, Boundary defines a centered rectangle or circle. **Trim
 
 ## Know the limits
 
-### Curved faces — development branch
+### Curved faces
 
 Select one cylindrical, conical, or regular smooth freeform face of a solid body in **Profiles**. The same **Type → Sketch / Extrude / Feature**, **Pattern**, **Placement**, and **Extrude** sections are used for planar and curved sources. Spheres, tori, meshes, singular patches, and patterns spanning multiple faces are excluded. These capabilities are not part of the published 1.0.1 release.
 
@@ -254,27 +254,27 @@ Fast Preview and final solids share the same preparation path. Cached color/sect
 Native CAD acceptance is recorded for Fusion 2706.1.14 on macOS 27.0.1, including local F3D reopen. Windows CI checks Python code and installation; native Windows Fusion CAD, cloud save/reopen, and complex assemblies are not claimed as tested.
 
 - Edge Offset must leave a valid inset; touching or intersecting offset loops can be rejected by Fusion.
-- Curved sources use the development workflow described above. Spheres, tori, singular faces and mesh bodies are unsupported.
+- Curved sources use the source-specific workflow described above. Spheres, tori, singular faces and mesh bodies are unsupported.
 - Sketch and Extrude outputs keep a fixed hole layout. Use Feature to regenerate the pattern.
 - Native Extrude parameters remain editable in Fusion. Source and Cut/Intersect target bodies must belong to the same component. Editing a component affects all its occurrences.
 - The default limit is 1,500 holes, configurable up to 5,000. Dense patterns and full previews take longer. Some rotated shapes use conservative spacing, so the actual web can be wider than requested.
 
-## Next-release feature set
+## Surface and distribution availability
 
-This local branch combines cylindrical, conical and freeform faces, eight new distributions, Along Path, and up to 32 regions of **one surface type** in one component. Planar faces and planar sketch profiles may be combined. Planar, cylindrical, conical and freeform sources cannot be mixed. Repeated references are deduplicated. Construction Plane remains a single source. Maximum Holes applies to the complete selection.
+Perfora 1.1.0 combines cylindrical, conical and freeform faces, eight new distributions, Along Path, and up to 32 regions of **one surface type** in one component. Planar faces and planar sketch profiles may be combined. Planar, cylindrical, conical and freeform sources cannot be mixed. Repeated references are deduplicated. Construction Plane remains a single source. Maximum Holes applies to the complete selection.
 
 | Source | Repeating-hole distributions |
 | --- | --- |
-| Planar | Staggered, Rectangular, Circular, Along Path, Contour, Fan, Phyllotaxis, Poisson Disk, Wave, Chevron, Running Bond, Between Curves |
-| Cylinder | Staggered, Rectangular, Running Bond, Poisson Disk |
-| Cone | Staggered, Rectangular, Running Bond |
-| Freeform | Staggered, Rectangular, Running Bond, Poisson Disk, Wave, Chevron |
+| Planar | Staggered, Rectangular, Circular, Along Path, Contour, Fan, Phyllotaxis, Poisson Disk, Wave, Chevron, Between Curves |
+| Cylinder | Staggered, Rectangular, Poisson Disk |
+| Cone | Staggered, Rectangular |
+| Freeform | Staggered, Rectangular, Poisson Disk, Wave, Chevron |
 
 Voronoi retains its own distribution on all supported surface types. Conical Running Bond maintains the fractional row shift while adapting row capacity to local radius. Centered motifs and planar guides stay on planar sources; Chevron and Wave are not offered on surfaces of revolution. Unsupported combinations produce an explicit error during recompute too.
 
 Multiple regions support Sketch, Extrude and one parametric Feature node. Coplanar regions share one phase; curved regions follow their local normals. All regions are prepared before modifying the first body. Conservative finite-tool checks reject conflicts across neighboring curved regions without resizing holes. Intersect requires a separate target body for each region. New Component remains available for a single source.
 
-These features are unpublished. The manifest remains 1.0.1 pending the release version decision. See [RELEASE_INTEGRATION.md](docs/RELEASE_INTEGRATION.md) for actual acceptance and limitations.
+Included in **1.1.0**. See [RELEASE_INTEGRATION.md](docs/RELEASE_INTEGRATION.md) and [noise/recompute acceptance](docs/ORGANIC_PATTERNS.md) for recorded validation and limitations.
 
 
 ## Development
@@ -284,7 +284,7 @@ python3 -m unittest discover -s tests -v
 python3 install.py --zip
 ```
 
-The build produces `dist/Perfora-1.0.1.zip` and its `.sha256` file. Version comes from the add-in manifest. CI checks geometry and installation on macOS, Windows, and Linux, then publishes verified 1.x versions as stable releases marked Latest. The earlier 0.x versions remain prereleases. Native Fusion checks run separately.
+The build produces `dist/Perfora-1.1.0.zip` and its `.sha256` file. Version comes from the add-in manifest. CI checks geometry and installation on macOS, Windows, and Linux, then publishes verified 1.x versions as stable releases marked Latest. The earlier 0.x versions remain prereleases. Native Fusion checks run separately.
 
 [Contributing and CAD checks](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Release process](docs/PUBLISHING.md)
 

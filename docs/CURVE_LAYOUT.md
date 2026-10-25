@@ -1,5 +1,7 @@
 # Along Path: implementation and pending CAD acceptance
 
+Материал этапа разработки перед 1.1.0. Актуальный состав, совместимость и объём выполненной приёмки — в [описании релиза](releases/v1.1.0.md); для текущего диалога доступны 11 Distribution, а Running Bond сохранён только для старых Feature. Исторические планы и замеры ниже не означают нового прогона проверок.
+
 **Обновление интеграции:** реализация включена в `codex/release-features`. Исторический офлайн-статус ниже описывает исходную ветку; текущие CAD/UI-результаты и совместимость поверхностей фиксируются в [RELEASE_INTEGRATION.md](RELEASE_INTEGRATION.md).
 
 Development branch only. This change starts at Perfora 1.0.1 and has **not** been run, installed, registered, reloaded, or visually inspected in Fusion. The manifest/release version is unchanged. Local numerical and adapter tests do not establish native CAD correctness.

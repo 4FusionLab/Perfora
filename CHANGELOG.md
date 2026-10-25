@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.1.0 — 2026-10-25
+
+- Add six Noise fields: Smooth Noise, Reaction Diffusion, Directional Fibers, Topographic, Gyroid Field and Blue Noise. Move Voronoi to Noise, last in the list; keep 12 repeating shapes in Pattern.
+- Use Cell Size and Web Thickness as the main noise controls, with optional Add Bridges and additional field settings. Retain saved legacy fill thresholds. Default Fast Preview color is Magenta.
+- Add Along Path, Contour, Fan, Phyllotaxis, Poisson Disk, Wave, Chevron and Between Curves: 11 public Distribution families in total. New commands use revision 2; saved Features keep their revision and legacy Running Bond.
+- Support cylindrical, conical and regular smooth freeform solid faces, plus up to 32 regions of one surface type in one component.
+- Add a bundled browser playground using the same Python geometry kernel as Fusion, with all 19 shapes and shareable parameters.
+- Bound organic-field sampling on large regions and preserve partial boundary openings with the requested edge clearance.
+- Fix Custom Feature self-dependencies by retaining Object references through upstream faces and binding them before Boolean operations consume geometry. Edit Feature OK upgrades legacy Object references.
+- Restore the edit timeline after command termination so Cancel preserves geometry and node health without adding an Undo step. Keep exact Feature preview separate from committed CAD construction.
+- Recorded acceptance before release preparation: 200 Python tests, 36 browser cases, all six noise fields and Voronoi on copied real Box geometry, native Edit Feature OK/Cancel and Undo/Redo, legacy-node recovery, multi-region operations, representative curved sources and local F3D reopen.
+- Release ZIP and checksum are built and published by the normal three-OS GitHub Actions workflow. Local and Fusion checks are not repeated during release preparation; native Windows CAD and cloud-save acceptance remain unclaimed.
+
 ## 1.0.1 — 2026-10-24
 
 - Fix Feature Cut losing its target body when an upstream face shrinks with Trim to Boundary and a nonzero Edge Offset. Compute the exact offset on temporary BRep wires without editing the face-supported scratch sketch during recompute.
