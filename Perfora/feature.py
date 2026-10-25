@@ -334,19 +334,6 @@ def build(source, settings, config, cache=None):
             # native command can acquire a circular reference to the first.
             scratch = component.sketches.addWithoutEdges(component.xYConstructionPlane)
             scratch.name = 'Perfora Edge Offset'
-        # Insert the owning node before its already-created reference sketches.
-        # Creating those sketches after a placeholder can make face references
-        # circular; grouping sketches placed before the owner leaves that owner
-        # in a permanently rolled-back state in native Edit Feature.
-        if frame:
-            if not frame.timelineObject.rollTo(True):
-                raise ValueError('Unable to prepare the Feature timeline.')
-        # Still capture dependencies before Boolean operations consume faces.
-        custom = component.features.customFeatures.add(data)
-        custom.customNamedValues.addOrSetValue('perfora', json.dumps(metadata(settings, config)))
-        if scratch:
-            if not scratch.timelineObject.rollTo(False):
-                raise ValueError('Unable to restore the Feature reference sketches.')
         body, count = make_body(source, settings, config, frame, scratch, cache)
         base = component.features.baseFeatures.add()
         base.name = 'Perfora Geometry'
@@ -374,9 +361,15 @@ def build(source, settings, config, cache=None):
                 if combine.healthState == adsk.fusion.FeatureHealthStates.ErrorFeatureHealthState:
                     raise ValueError(combine.errorOrWarningMessage)
             tool.isVisible = False
-        custom.timelineObject.rollTo(True)
-        if not custom.setStartAndEndFeatures(base if config.get('surface') else frame, combines[-1] if combines else base):
+        # Bind dependencies at their upstream state, before the first Boolean
+        # consumes faces. Group the finished span in the input, as one native
+        # request, without rolling an empty custom node during its creation.
+        if combines:
+            combines[0].timelineObject.rollTo(True)
+        if not data.setStartAndEndFeatures(base if config.get('surface') else frame, combines[-1] if combines else base):
             raise ValueError('Unable to group the Perfora Feature.')
+        custom = component.features.customFeatures.add(data)
+        custom.customNamedValues.addOrSetValue('perfora', json.dumps(metadata(settings, config)))
         custom.timelineObject.rollTo(False)
         if frame:
             frame.isVisible = scratch.isVisible = False
