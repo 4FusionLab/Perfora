@@ -171,10 +171,12 @@ try:
         assert body.volume<before
         assert len(feature.source_entities(custom))==2
         assert feature.stored(custom)['config']['_body_map']==[[0],[0]]
+        before_edit=body.volume
         custom.parameters.itemById('size').expression='2 mm'
         design.computeAll()
         healthy(custom)
         assert body.isSolid and body.volume<before
+        assert abs(body.volume-before_edit)>1e-7
         return dict(holes=count,volume_cm3=body.volume)
     case('feature_shared_body_cut_recompute',shared_body_cut)
 
@@ -228,6 +230,7 @@ try:
                     design.computeAll()
                     healthy(result)
                     assert all(body.isSolid and body.volume>0 for body in (a,b))
+                    assert all(abs(body.volume-previous)>1e-7 for body,previous in zip((a,b),after))
                 return dict(holes=count,before_cm3=before,after_cm3=after)
             case(mode+'_mapped_'+operation,mapped_operation)
 finally:

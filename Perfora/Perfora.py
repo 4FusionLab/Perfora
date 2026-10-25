@@ -112,6 +112,12 @@ class RestoreTimeline(adsk.core.CustomEventHandler):
                 log_error()
 
 
+class EditTerminated(adsk.core.ApplicationCommandEventHandler):
+    def notify(self, args):
+        if args.commandId == parametric.EDIT_COMMAND_ID:
+            adsk.core.Application.get().fireCustomEvent(TIMELINE_RESTORE_EVENT)
+
+
 class Session:
     def __init__(self, command, edited_feature=None):
         self.command = command
@@ -1232,7 +1238,6 @@ class Destroy(adsk.core.CommandEventHandler):
         if self.session.edited_feature and self.session.restore_marker is not None:
             _timeline_restores.append((self.session.edited_feature.parentComponent.parentDesign,
                 self.session.restore_anchor, self.session.restore_marker))
-            self.session.app.fireCustomEvent(TIMELINE_RESTORE_EVENT)
         if self.session in _sessions:
             _sessions.remove(self.session)
         self.session.selection_memory.clear()
@@ -1319,6 +1324,9 @@ def run(context):
         restore_handler = RestoreTimeline()
         _timeline_restore_event.add(restore_handler)
         _handlers.append(restore_handler)
+        terminated_handler = EditTerminated()
+        ui.commandTerminated.add(terminated_handler)
+        _handlers.append(terminated_handler)
         definition = ui.commandDefinitions.itemById(COMMAND_ID)
         if not definition:
             resources = str(Path(__file__).parent / 'resources' / 'toolbar-f692fbb3')
@@ -1363,6 +1371,9 @@ def stop(context):
         if edit:
             edit.deleteMe()
         parametric.unregister()
+        for handler in _handlers:
+            if isinstance(handler, EditTerminated):
+                ui.commandTerminated.remove(handler)
         RestoreTimeline().notify(None)
         if _timeline_restore_event:
             adsk.core.Application.get().unregisterCustomEvent(TIMELINE_RESTORE_EVENT)
