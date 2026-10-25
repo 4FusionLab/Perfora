@@ -15,7 +15,8 @@ from . import model, ui_resources, cylindrical, surface, multi_region, feature a
 from .preview import Renderer, PREVIEW_COLORS
 from .numeric_inputs import NumericInput
 from .distributions import VARIANT_PARAMETERS, LAYOUT_PARAMETERS
-from .organic import PARAMETERS as ORGANIC_PARAMETERS, LABELS as ORGANIC_LABELS
+from .organic import (PARAMETERS as ORGANIC_PARAMETERS, LABELS as ORGANIC_LABELS,
+                      DEFAULT_OPEN, DEFAULT_CELL_SIZE, DEFAULT_WEB)
 
 COMMAND_ID = 'DiegoV_Perforator'  # Stable ID for existing installations.
 PANEL_ID = 'SolidCreatePanel'
@@ -43,7 +44,7 @@ SIZE_HELP = {
     'cross': 'Overall width and height of the cross. Arm Width controls the width of each arm.',
     'star': 'Outer diameter of the star. Inner Radius is a percentage of the outer radius.',
     'voronoi': 'Nominal distance between Voronoi sites. Smaller spacing creates more holes. Web Thickness is independent.'}
-SIZE_HELP.update({key: 'Physical scale of the organic field. Larger values create broader, fewer openings; Web Thickness is independent.' for key in ORGANIC_FIELDS})
+SIZE_HELP.update({key: 'Characteristic cell size of the field. Larger values create broader, fewer cells. Web Thickness sets the material between openings.' for key in ORGANIC_FIELDS})
 SIZE_HELP['blue_noise'] = 'Maximum circular hole diameter. Size Variation and Size Gradient control smaller holes; Web Thickness is checked using both radii.'
 SIZE_FIELDS = {
     'size': ('Diameter', ('circle', 'pentagon', 'star')),
@@ -54,7 +55,7 @@ SIZE_FIELDS = {
     'size_minor': ('Minor Axis', ('ellipse',)),
     'size_overall': ('Overall Size', ('cross',)),
     'cell_spacing': ('Cell Spacing', ('voronoi',)),
-    'organic_scale': ('Pattern Scale', ORGANIC_FIELDS),
+    'organic_scale': ('Cell Size', ORGANIC_FIELDS),
     'blue_diameter': ('Maximum Diameter', ('blue_noise',))}
 LENGTH_FIELDS = {
     'slot_length': ('Length', ('slot', 'rectangle')),
@@ -152,6 +153,7 @@ class Session:
         self.number(area, 'height', 'Height', '60 mm')
 
         pattern = self.group(root, 'pattern_group', 'Pattern')
+        field_options = self.group(root, 'field_options', 'Field Options', expanded=False)
         self.dropdown(pattern, 'pattern_type', 'Pattern Type', PATTERN_TYPES)
         self.inputs['pattern_type'].tooltip = 'Pattern repeats a hole shape using a Distribution. Organic Field creates flowing openings from noise or variable-size blue noise.'
         self.dropdown(pattern, 'shape', 'Hole Shape', PATTERN_SHAPES)
@@ -173,12 +175,12 @@ class Session:
         self.inputs['new_pattern'].isFullWidth = True
         self.inputs['new_pattern'].tooltip = 'Increment Seed to explore another pattern without changing its spacing.'
         for key, (label, unit, expression) in ORGANIC_PARAMETERS.items():
-            self.number(pattern, key, label, expression, unit)
+            self.number(field_options if key in ('organic_variation','organic_gradient') else pattern, key, label, expression, unit)
         self.inputs['organic_open'].tooltip = ('Raw open fraction of the field (15–75%). Web Thickness, bridges, rounded tips, Edge Offset and boundary trimming reduce the final open area. Use Full Preview to inspect the actual result.')
         self.inputs['organic_direction'].tooltip = ('Field direction in sketch axes, or the local circumferential / meridian chart on curved faces. 0 deg aligns long fibers with X (around a cylinder); 90 deg aligns them with Y (along its axis).')
         self.inputs['organic_variation'].tooltip = '0 creates equal diameters; 80% permits diameters down to 20% of Maximum Diameter. Range: 0–90%.'
         self.inputs['organic_gradient'].tooltip = 'Signed size gradient along Direction. 0 varies sizes randomly; +100% grows toward +X, −100% reverses the gradient.'
-        self.check(pattern,'organic_bridges','Add Bridges',False)
+        self.check(field_options,'organic_bridges','Add Bridges',False)
         self.inputs['organic_bridges'].tooltip = ('Add local cross-bridges to long organic openings. Off preserves the natural field. '
             'Material-island protection and minimum Web Thickness remain active.')
         self.check(pattern, 'round_corners', 'Round Corners', False)
@@ -197,7 +199,7 @@ class Session:
         self.dropdown(pattern, 'surface_layout', 'Distribution', self.surface_choices, icons=True)
         self.dropdown(pattern, 'layout_orientation', 'Orientation', [('tangent', 'Follow Pattern'), ('fixed', 'Fixed')])
         for key, (label, unit, expression) in VARIANT_PARAMETERS.items():
-            self.number(pattern, key, label, expression, unit)
+            self.number(field_options if key in ('organic_variation','organic_gradient') else pattern, key, label, expression, unit)
         self.inputs['along_spacing'].tooltip = ('Center spacing measured along each row. 0 is automatic. '
             'Spacing is raised to the enclosing hole diameter plus Web Thickness; nearby candidates may be omitted to keep the web.')
         self.inputs['row_spacing'].tooltip = 'Row spacing. 0 is automatic; the enclosing hole diameter plus Web Thickness is the minimum.'
@@ -281,7 +283,7 @@ class Session:
         self.inputs['preview_mode'].tooltip = ('Fast displays cached contours on the selected source. Full previews the '
             'complete solid operation. OK creates the exact result.')
         self.dropdown(root, 'preview_color', 'Preview Color', PREVIEW_COLORS)
-        self.inputs['preview_color'].tooltip = ('Color of Fast Preview contours. Gold is the default. '
+        self.inputs['preview_color'].tooltip = ('Color of Fast Preview contours. Magenta is the default. '
             'Full Preview uses the Fusion model appearance.')
         self.inputs['status'] = root.addTextBoxCommandInput('status', '', '', 2, True)
         self.inputs['status'].isFullWidth = True
@@ -459,6 +461,7 @@ class Session:
         for fields in (SIZE_FIELDS, LENGTH_FIELDS, AREA_FIELDS):
             if identifier not in fields:
                 continue
+            previous = self.updating
             self.updating = True
             try:
                 expression = self.inputs[identifier].expression
@@ -466,7 +469,7 @@ class Session:
                     if linked != identifier and self.inputs[linked].expression != expression:
                         self.inputs[linked].expression = expression
             finally:
-                self.updating = False
+                self.updating = previous
 
     def selection(self, parent, identifier, title, filters, minimum, maximum, tooltip=''):
         control = parent.addSelectionInput(identifier, title, tooltip or title)
@@ -495,6 +498,28 @@ class Session:
                 next(i for i, (value, _) in enumerate(options) if value == key)).isSelected = True
         finally:
             self.updating = previous
+
+    def field_threshold(self, shape):
+        if self.edited_feature:
+            parameter = self.edited_feature.parameters.itemById('organic_open')
+            if parameter:
+                return parameter.value
+            return parametric.stored(self.edited_feature)['settings'].get('organic_open', 48.)
+        return DEFAULT_OPEN.get(shape, 48.)
+
+    def field_defaults(self):
+        if self.edited_feature or getattr(self, '_field_defaults_applied', False):
+            return
+        self.updating = True
+        try:
+            self.inputs['organic_scale'].value = DEFAULT_CELL_SIZE
+            self.sync_dimensions('organic_scale')
+            self.inputs['gap'].value = DEFAULT_WEB
+            self.inputs['organic_variation'].value = 35
+            self.inputs['organic_gradient'].value = 0
+            self._field_defaults_applied = True
+        finally:
+            self.updating = False
 
     def selected_source(self):
         selection = self.inputs['source']
@@ -657,8 +682,9 @@ class Session:
                 visible(identifier, field_shape or layout == 'poisson')
             for key in ORGANIC_PARAMETERS:
                 visible(key, organic and (key == 'organic_direction' or
-                    (key == 'organic_open' and shape in ORGANIC_FIELDS) or
                     (key in ('organic_variation', 'organic_gradient') and shape == 'blue_noise')))
+            visible('organic_open',False)
+            visible('field_options',organic)
             visible('organic_bridges',shape in ORGANIC_FIELDS)
             for key in VARIANT_PARAMETERS:
                 visible(key, key in LAYOUT_PARAMETERS.get(layout, ()))
@@ -868,6 +894,7 @@ class Session:
                             distribution_revision=self.distribution_revision,
                             layout_orientation=self.chosen('layout_orientation', [('tangent', ''), ('fixed', '')]) if self.distribution_revision == 2 else 'fixed',
                             guide_reverse=d['guide_reverse'].value if layout == 'between_curves' else False,
+                            organic_open=self.field_threshold(shape),
                             organic_bridges=d['organic_bridges'].value if shape in ORGANIC_FIELDS else False,
                             **variant_values, **{key:d[key].value for key in organic_keys})
         settings.validate()
@@ -932,6 +959,10 @@ class Session:
                     expressions.pop(key, None)
             for key in ORGANIC_PARAMETERS:
                 if key not in organic_keys:
+                    saved = self.edited_feature.parameters.itemById(key) if self.edited_feature else None
+                    if saved:
+                        expressions[key] = saved.expression
+                        continue
                     expressions[key] = str(getattr(settings, key)) + (' rad' if key == 'organic_direction' else '')
             for key in ('grid_angle', 'offset_x', 'offset_y', 'start_radius'):
                 if key not in required:
@@ -1001,6 +1032,8 @@ class Changed(adsk.core.InputChangedEventHandler):
         if isinstance(args.input, adsk.core.GroupCommandInput):
             return
         try:
+            if args.input.id in ('pattern_type','organic_shape') and self.session.shape_key() in ORGANIC_SHAPES:
+                self.session.field_defaults()
             self.session.restore_empty_inputs(exclude=args.input.id)
             control = self.session.numeric_inputs.get(args.input.id)
             if control and not control.expression.strip():
@@ -1076,6 +1109,7 @@ class ActivateDefaults(adsk.core.CommandEventHandler):
         if not self.session.initial_defaults_applied:
             self.session.initial_defaults_applied = True
             self.session.inputs['result'].listItems.item(2).isSelected = True
+            self.session.inputs['preview_color'].listItems.item(0).isSelected = True
             self.session.apply_preselected_sources()
         self.session.restore_empty_inputs()
 

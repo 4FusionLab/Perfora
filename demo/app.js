@@ -26,7 +26,7 @@
     for(const button of document.querySelectorAll('[data-mode]'))button.setAttribute('aria-pressed',String(button.dataset.mode===family));
     $('layout').disabled=field;
     $('layout-help').textContent=organic?'This shape creates its own field. Pattern Scale sets its physical size.':voronoi?'Organic polygonal cells. One field, its own distribution.':descriptions[layout];
-    $('size-label').textContent=organic?(shape==='blue_noise'?'Maximum Diameter':'Pattern Scale'):sizeLabels[shape];
+    $('size-label').textContent=organic?(shape==='blue_noise'?'Maximum Diameter':'Cell Size'):sizeLabels[shape];
     $('length-field').hidden=!lengths.has(shape);
     $('length-field').firstChild.textContent=shape==='ellipse'?'Major Axis':shape==='diamond'?'Diagonal 2':'Length';
     $('orientation-field').hidden=field||shape==='circle'||['staggered','rows','poisson'].includes(layout);
@@ -46,7 +46,8 @@
     document.querySelectorAll('.pattern-tile').forEach(el=>el.setAttribute('aria-pressed',String(!voronoi&&el.dataset.layout===layout)));
     $('show-guides').disabled=field;
     $('organic-fields').hidden=!organic;
-    $('organic-open-field').hidden=$('organic-bridges-field').hidden=shape==='blue_noise';
+    $('organic-bridges-field').hidden=shape==='blue_noise';
+    $('pattern-options').hidden=organic;
     $('organic-variation-field').hidden=$('organic-gradient-field').hidden=shape!=='blue_noise';
   }
   function setValues(values){
@@ -68,7 +69,7 @@
     const [x,y,w,h]=result.box,pad=Math.max(w,h)*.13;
     $('preview').setAttribute('viewBox',`${x-pad} ${y-pad} ${w+pad*2} ${h+pad*2}`);
     $('preview').setAttribute('aria-label',`${config.shape==='voronoi'?'Voronoi':$('layout').selectedOptions[0].textContent} pattern, ${result.count} holes, ${result.open_area}% open area`);
-    $('panel-geometry').innerHTML=`<path d="${result.outer} ${result.holes}" fill="#343c38" fill-rule="evenodd" filter="url(#panel-shadow)"/>`;
+    $('panel-geometry').innerHTML=result.clip?`<defs><clipPath id="cut-boundary"><path d="${result.clip}"/></clipPath><mask id="panel-cut" maskUnits="userSpaceOnUse" x="${x}" y="${y}" width="${w}" height="${h}"><path d="${result.outer}" fill="white"/><path d="${result.holes}" fill="black" clip-path="url(#cut-boundary)"/></mask></defs><path d="${result.outer}" fill="#343c38" mask="url(#panel-cut)" filter="url(#panel-shadow)"/>`:`<path d="${result.outer} ${result.holes}" fill="#343c38" fill-rule="evenodd" filter="url(#panel-shadow)"/>`;
     $('guide-geometry').innerHTML=result.guides.map(d=>`<path d="${d}"/>`).join('');
     $('guide-geometry').toggleAttribute('hidden',!$('show-guides').checked);
     $('show-guides').closest('label').hidden=!result.guides.length;
@@ -150,7 +151,7 @@
       const sh=el.value;
       if(sh==='slot'){$('size').value='1.7';$('length').value='5.2';}
       else if(sh==='voronoi')$('size').value='7';
-      else if(organics.has(sh))$('size').value='5';
+      else if(organics.has(sh))$('size').value='8';
       else $('size').value='2.5';
       if(sh==='cross')$('arm_width').value='.8';
     }
@@ -160,7 +161,7 @@
     const family=button.dataset.mode;if(family===activeFamily)return;
     familySettings[activeFamily]=parameters();
     const panel={width:$('width').value,height:$('height').value,boundary:$('boundary').value};
-    setValues({...defaults,...(familySettings[family]||{shape:family==='organic'?'smooth_noise':'slot',size:family==='organic'?5:1.7}),...panel});
+    setValues({...defaults,...(familySettings[family]||{shape:family==='organic'?'smooth_noise':'slot',size:family==='organic'?8:1.7,gap:family==='organic'?.8:1.2}),...panel});
     schedule();
   }));
   $('new-seed').addEventListener('click',()=>{$('seed').value=(Number($('seed').value)+1)%2147483648;schedule();});

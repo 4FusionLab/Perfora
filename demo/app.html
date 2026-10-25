@@ -43,14 +43,15 @@
           <label class="field" data-for="circular">Start Radius <span class="number-field"><input id="start_radius" data-parameter type="number" min="0" max="30" step=".5" value="0"><span>mm</span></span></label>
         </section>
         <section id="organic-fields" hidden aria-label="Field settings">
-          <label class="field" id="organic-open-field">Field Fill (%)<input id="organic_open" data-parameter type="number" min="15" max="75" step="1" value="48"></label>
-          <label class="field">Direction (deg)<input id="organic_direction" data-parameter type="number" min="-180" max="180" step="5" value="0"></label>
+          <details class="advanced"><summary>Field options</summary>
+          <label class="field">Pattern Angle (deg)<input id="organic_direction" data-parameter type="number" min="-180" max="180" step="5" value="0"></label>
           <label class="field" id="organic-bridges-field"><span><input id="organic_bridges" data-parameter type="checkbox"> Add Bridges</span></label>
-          <label class="field" id="organic-variation-field">Size Variation (%)<input id="organic_variation" data-parameter type="number" min="0" max="90" step="5" value="80"></label>
-          <label class="field" id="organic-gradient-field">Size Gradient (%)<input id="organic_gradient" data-parameter type="number" min="-100" max="100" step="5" value="100"></label>
+          <label class="field" id="organic-variation-field">Size Variation (%)<input id="organic_variation" data-parameter type="number" min="0" max="90" step="5" value="35"></label>
+          <label class="field" id="organic-gradient-field">Size Gradient (%)<input id="organic_gradient" data-parameter type="number" min="-100" max="100" step="5" value="0"></label>
+          </details>
         </section>
         <div class="seed-row" id="seed-field"><label class="field">Seed<input id="seed" data-parameter type="number" min="0" max="2147483647" step="1" value="7"></label><button id="new-seed" type="button" class="secondary">New Pattern</button></div>
-        <details class="advanced"><summary>More options</summary>
+        <details class="advanced" id="pattern-options"><summary>More options</summary>
           <label class="field" id="spacing-field">Spacing <span class="range-label"><span>Compact</span><output id="spacing-value">1.12×</output><span>Open</span></span><input id="spacing" data-parameter type="range" min="1" max="2.5" step=".02" value="1.12"></label>
           <label class="field" id="angle-field">Hole Angle<span class="number-field"><input id="angle" data-parameter type="number" min="-180" max="180" step="5" value="0"><span>deg</span></span></label>
           <label class="field" id="arm-field">Arm Width<span class="number-field"><input id="arm_width" data-parameter type="number" min=".2" max="8" step=".1" value="1"><span>mm</span></span></label>

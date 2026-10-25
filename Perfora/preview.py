@@ -11,7 +11,7 @@ from .cache import GeometryCache
 
 
 # Presentation only: never part of Settings or the prepared geometry cache.
-PREVIEW_COLORS = [('gold', 'Gold'), ('cyan', 'Cyan'), ('magenta', 'Magenta'),
+PREVIEW_COLORS = [('magenta', 'Magenta'), ('cyan', 'Cyan'), ('gold', 'Gold'),
                   ('green', 'Green'), ('white', 'White'), ('black', 'Black')]
 COLOR_RGB = {'gold': (255, 191, 0), 'cyan': (0, 170, 240),
              'magenta': (255, 70, 210), 'green': (100, 255, 100),
@@ -81,7 +81,7 @@ class Renderer:
         self.geometry_cache.clear()
         self.path_cache = model.PathCache()
 
-    def show(self, source, settings, config, color='gold'):
+    def show(self, source, settings, config, color='magenta'):
         if isinstance(source, (tuple, list)):
             from . import multi_region
             selected, _ = multi_region.validate(source, config)

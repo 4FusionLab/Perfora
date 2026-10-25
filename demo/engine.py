@@ -8,9 +8,10 @@ from dataclasses import replace
 import json
 import math
 from time import perf_counter
-from Perfora.geometry import Settings, Region, Loop, rectangle_region, generate, VARIANT_LAYOUTS, SHAPE_IDS, LENGTH_SHAPES, ORGANIC_SHAPES, ORGANIC_FIELDS
+from Perfora.geometry import Settings, Region, Loop, rectangle_region, generate, VARIANT_LAYOUTS, SHAPE_IDS, LENGTH_SHAPES, ORGANIC_SHAPES, ORGANIC_FIELDS, convex_inset, clip_polygon_convex, overlaps
 from Perfora.curve_layout import sample_path
 from studies.source_fixtures import ArcEvaluator
+from Perfora.organic import DEFAULT_OPEN, DEFAULT_CELL_SIZE, DEFAULT_WEB
 
 LAYOUTS=('staggered','rows','circular','path','contour','fan','phyllotaxis','poisson','wave','chevron','between_curves')
 
@@ -46,7 +47,7 @@ def prepare(data):
     if organic:
         layout='rows'
         active={'shape','layout','width','height','size','gap','margin','boundary','seed','organic_direction'}
-        active.update(('organic_variation','organic_gradient') if shape=='blue_noise' else ('organic_open','organic_bridges'))
+        active.update(('organic_variation','organic_gradient') if shape=='blue_noise' else ('organic_bridges',))
     if shape in LENGTH_SHAPES:active.add('length')
     if shape!='circle' and not organic:active.add('angle')
     if shape=='cross':active.add('arm_width')
@@ -60,9 +61,9 @@ def prepare(data):
     width=number(data,'width',120,30,300)/10
     kind=data.get('boundary','rectangle')
     height=width if kind=='disk' else number(data,'height',100,30,300)/10
-    size=number(data,'size',5 if organic else 2.5,1,20)/10
+    size=number(data,'size',DEFAULT_CELL_SIZE*10 if organic else 2.5,1,20)/10
     length=number(data,'length',5.2,1,40)/10
-    gap=number(data,'gap',1.2,.3,10)/10
+    gap=number(data,'gap',DEFAULT_WEB*10 if organic else 1.2,.3,10)/10
     margin=number(data,'margin',1.8,0,20)/10
     density=number(data,'spacing',1.12,1,2.5)
     orientation=data.get('orientation','tangent')
@@ -82,10 +83,10 @@ def prepare(data):
         start_radius=number(data,'start_radius',0,0,30)/10,
         distribution_revision=2 if layout in VARIANT_LAYOUTS else 1,
         layout_orientation='tangent' if orientation!='fixed' else 'fixed',
-        organic_open=number(data,'organic_open',48,15,75),
+        organic_open=DEFAULT_OPEN.get(shape,48),
         organic_direction=math.radians(number(data,'organic_direction',0,-180,180)),
-        organic_variation=number(data,'organic_variation',80,0,90),
-        organic_gradient=number(data,'organic_gradient',100,-100,100),
+        organic_variation=number(data,'organic_variation',35,0,90),
+        organic_gradient=number(data,'organic_gradient',0,-100,100),
         organic_bridges=bool(data.get('organic_bridges',False)) if shape in ORGANIC_FIELDS else False,
         tangential_orientation=layout=='circular' and orientation=='tangent',
         radial_orientation=layout=='circular' and orientation=='radial')
@@ -117,7 +118,7 @@ def prepare(data):
                   path_orientation='tangent' if orientation!='fixed' else 'fixed')
         s=replace(s,path_samples=sample_path(evaluator,s,lambda p:(p.x,p.y,p.z),lambda p:(p.x,p.y,p.z)))
         guides=[tuple((p.x,p.y) for p in evaluator.getStrokes(evaluator.start,evaluator.end,.01)[1])]
-    if shape=='voronoi' or organic:s=replace(s,layout='grid',distribution_revision=1)
+    if shape=='voronoi' or organic:s=replace(s,layout='grid',distribution_revision=1,clip_boundary=organic)
     return region,s,guides
 
 
@@ -171,17 +172,32 @@ def area(c):
     return abs(sum(a[0]*b[1]-a[1]*b[0] for a,b in zip(p,p[1:]+p[:1])))/2
 
 
+def visible_area(cell,cut):
+    if cut is None:
+        return area(cell)
+    points=(tuple((cell.center[0]+cell.size/2*math.cos(i*math.tau/96),
+                   cell.center[1]+cell.size/2*math.sin(i*math.tau/96)) for i in range(96))
+            if cell.shape=='circle' else cell.vertices)
+    points=clip_polygon_convex(points,cut.loops[0].points)
+    return abs(sum(a[0]*b[1]-a[1]*b[0] for a,b in zip(points,points[1:]+points[:1])))/2
+
+
 def compute(data):
     started=perf_counter()
     region,s,guides=prepare(data)
     cells=generate(region,s)
+    cut=convex_inset(region,s.margin) if s.shape in ORGANIC_SHAPES else None
+    if cut is not None:
+        cells=[c for c in cells if overlaps(c,cut,cut.segments)]
+        if not cells:raise ValueError('No openings remain. Reduce Web Thickness or Edge Offset, or increase Cell Size.')
     outer=' '.join(polygon_path(l.points) for l in region.loops)
     holes=' '.join(cell_path(c) for c in cells)
     panel_area=sum(abs(sum(a[0]*b[1]-a[1]*b[0] for a,b in zip(l.points,l.points[1:]+l.points[:1])))/2*(1 if l.outer else -1) for l in region.loops)
     points=[p for l in region.loops for p in l.points]
     box=[min(p[0] for p in points),-max(p[1] for p in points),max(p[0] for p in points)-min(p[0] for p in points),max(p[1] for p in points)-min(p[1] for p in points)]
-    return dict(outer=outer,holes=holes,box=box,guides=['M'+'L'.join(fmt(x)+','+fmt(-y) for x,y in p) for p in guides],
-                count=len(cells),open_area=round(sum(area(c) for c in cells)/panel_area*100,1),
+    open_area=sum(visible_area(c,cut) for c in cells)
+    return dict(outer=outer,holes=holes,box=box,clip=' '.join(polygon_path(l.points) for l in cut.loops) if cut else None,guides=['M'+'L'.join(fmt(x)+','+fmt(-y) for x,y in p) for p in guides],
+                count=len(cells),open_area=round(open_area/panel_area*100,1),
                 milliseconds=round((perf_counter()-started)*1000),settings={k:v for k,v in s.__dict__.items() if k not in ('guide1','guide2','path_samples')},
                 first_center=cells[0].center,revision=s.distribution_revision)
 

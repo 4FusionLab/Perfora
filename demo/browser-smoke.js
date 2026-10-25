@@ -31,11 +31,27 @@ async (page) => {
       }
     }
     await p.locator('#layout').selectOption('chevron');
+    const organic=new Set(['smooth_noise','reaction_diffusion','directional_fibers','topographic','gyroid','blue_noise']);
     for(const shape of ['circle','hexagon','square','slot','triangle','rectangle','diamond','ellipse','pentagon','octagon','cross','star','smooth_noise','reaction_diffusion','directional_fibers','topographic','gyroid','blue_noise','voronoi']){
+      await p.locator('[data-mode="'+(organic.has(shape)?'organic':'pattern')+'"]').click();
       await p.locator('#shape').selectOption(shape);
       await p.waitForTimeout(250);
       await sample('shape-'+shape);
     }
+    stage='family navigation';
+    await p.locator('[data-mode="organic"]').click();
+    await p.locator('#shape').selectOption('directional_fibers');await p.waitForTimeout(250);await sample('field-before-bridges');
+    if(!await p.locator('#distribution-field').isHidden())throw Error('Field exposes Distribution.');
+    if(await p.locator('#organic_bridges').isChecked())throw Error('Add Bridges defaults on.');
+    const natural=results.at(-1).hash;
+    await p.locator('#organic-fields summary').click();
+    await p.locator('#organic_bridges').check();await p.waitForTimeout(250);await sample('field-with-bridges');
+    if(results.at(-1).hash===natural)throw Error('Add Bridges did not alter the field.');
+    const bridged=results.at(-1).hash;
+    await p.locator('[data-mode="pattern"]').click();await p.waitForTimeout(250);await wait();
+    if(!await p.locator('#organic-fields').isHidden())throw Error('Pattern exposes organic settings.');
+    await p.locator('[data-mode="organic"]').click();await p.waitForTimeout(250);await sample('field-restored');
+    if(results.at(-1).hash!==bridged||!await p.locator('#organic_bridges').isChecked())throw Error('Field settings lost on mode switch.');
     await p.locator('#reset').click();await p.waitForTimeout(250);await sample('reset');
     const original=results.at(-1).hash;
     await p.locator('#amplitude').fill('10');await p.locator('#amplitude').dispatchEvent('change');await p.waitForTimeout(250);await sample('changed-amplitude');

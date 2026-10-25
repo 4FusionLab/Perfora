@@ -27,7 +27,7 @@ class PerforaDialogRegression(adsk.core.CommandCreatedEventHandler):
             session = _dialog_entry.Session(args.command)
             session.inputs['preview'].value = False
             session.update_visibility()
-            assert session.chosen('preview_color', _dialog_entry.PREVIEW_COLORS) == 'gold'
+            assert session.chosen('preview_color', _dialog_entry.PREVIEW_COLORS) == 'magenta'
             assert not session.inputs['preview_color'].isVisible
             session.inputs['preview'].value = True
             session.update_visibility()

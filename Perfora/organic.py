@@ -18,9 +18,14 @@ FIELDS = g.ORGANIC_FIELDS
 SHAPES = g.ORGANIC_SHAPES
 LABELS = ('Smooth Noise', 'Reaction Diffusion', 'Directional Fibers', 'Ridged Noise / Topographic',
           'Gyroid Field', 'Blue Noise / Size Gradient')
+# New-command presets only. Stored Features retain their own field threshold.
+DEFAULT_OPEN = dict(smooth_noise=48., reaction_diffusion=48., directional_fibers=48.,
+                    topographic=58., gyroid=48., blue_noise=48.)
+DEFAULT_CELL_SIZE = .8
+DEFAULT_WEB = .08
 PARAMETERS = {
     'organic_open': ('Field Fill (%)', '', '48'),
-    'organic_direction': ('Direction', 'deg', '0 deg'),
+    'organic_direction': ('Pattern Angle', 'deg', '0 deg'),
     'organic_variation': ('Size Variation (%)', '', '80'),
     'organic_gradient': ('Size Gradient (%)', '', '100'),
 }

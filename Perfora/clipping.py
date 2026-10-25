@@ -179,6 +179,21 @@ def apply_spread(body, region, settings):
 
 
 def inset_body(source, original, margin, scratch=None):
+    """Use native offsets, then the shared bounded boundary sweep if they fail."""
+    try:
+        return _wire_inset(source, original, margin, scratch)
+    except (RuntimeError, ValueError):
+        # The same exact-mask fallback already supports projected curved faces.
+        # Planar imported/base-feature faces can produce crossing offset wires
+        # too, even when a substantial interior remains usable.
+        from .surface import erode_boundary
+        result = erode_boundary(original, margin)
+        if result is None:
+            raise ValueError('Edge Offset leaves no region for perforation.')
+        return result
+
+
+def _wire_inset(source, original, margin, scratch=None):
     """Offset temporary wires without editing the parametric design.
 
     Keep source/scratch arguments for callers and existing Feature documents.

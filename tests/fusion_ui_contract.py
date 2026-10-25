@@ -94,7 +94,7 @@ class Activate(adsk.core.CommandEventHandler):
             # Fusion can restore remembered values after commandCreated. Keep
             # bulk UI contract edits from launching intermediate CAD previews.
             s.inputs['preview'].value = False
-            assert s.chosen('preview_color', entry.PREVIEW_COLORS) == 'gold'
+            assert s.chosen('preview_color', entry.PREVIEW_COLORS) == 'magenta'
             if hasattr(entry, 'parametric'):
                 assert s.chosen('result', entry.RESULTS) == 'feature'
             choose(s, 'result', entry.RESULTS, 'extrude')

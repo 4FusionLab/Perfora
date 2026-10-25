@@ -59,7 +59,7 @@ def prepare():
     assert settings.shape==shape and settings.layout=='grid'
     assert not d['layout'].isVisible and not d['surface_layout'].isVisible
     assert d['seed'].isVisible and d['organic_direction'].isVisible
-    assert d['organic_open'].isVisible==(shape!='blue_noise')
+    assert not d['organic_open'].isVisible
     assert d['organic_variation'].isVisible==(shape=='blue_noise')
     assert entry.SHAPES[-1][0]=='voronoi'
     report.update(stage='ready',settings=str(settings));app.activeViewport.fit();save();return report['stage']
@@ -103,7 +103,7 @@ def begin_edit():
     global edit_volume,edit_value
     custom=component.features.customFeatures.item(0)
     edit_volume=component.bRepBodies.item(0).volume
-    key='organic_gradient' if shape=='blue_noise' else 'organic_open'
+    key='size'
     edit_value=custom.parameters.itemById(key).value
     app.userInterface.activeSelections.clear();app.userInterface.activeSelections.add(custom)
     app.userInterface.commandDefinitions.itemById(entry.parametric.EDIT_COMMAND_ID).execute()
@@ -112,9 +112,11 @@ def begin_edit():
 def edit_preview():
     global session
     session=entry._sessions[-1]
-    key='organic_gradient' if shape=='blue_noise' else 'organic_open'
+    key='size'
     assert abs(session.inputs[key].value-edit_value)<1e-8
-    session.inputs[key].expression=str(edit_value+(-5 if shape=='blue_noise' else 5))
+    size_id=session.dimension_id(entry.SIZE_FIELDS,shape)
+    session.inputs[size_id].expression=str(edit_value+.05)+' cm'
+    session.sync_dimensions(size_id)
     preview('exact');return 'edit preview requested'
 
 
@@ -122,8 +124,8 @@ def end_edit(accepted):
     assert app.userInterface.activeCommand!=entry.parametric.EDIT_COMMAND_ID
     volume=component.bRepBodies.item(0).volume
     custom=component.features.customFeatures.item(0)
-    key='organic_gradient' if shape=='blue_noise' else 'organic_open'
-    delta=(-5 if shape=='blue_noise' else 5) if accepted else 0
+    key='size'
+    delta=.05 if accepted else 0
     assert abs(custom.parameters.itemById(key).value-edit_value-delta)<1e-8
     assert (abs(volume-edit_volume)>1e-7) if accepted else (abs(volume-edit_volume)<1e-8)
     fixture['healthy'](design)

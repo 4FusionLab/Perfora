@@ -22,6 +22,54 @@ def dist(a, b):
     return math.hypot(a[0] - b[0], a[1] - b[1])
 
 
+def clip_polygon_convex(points, boundary):
+    """Clip a sampled contour to a counterclockwise convex display boundary."""
+    result = list(points)
+    for a, b in edges(tuple(boundary)):
+        if not result:
+            break
+        output = []
+        previous = result[-1]
+        before = cross(a, b, previous)
+        for current in result:
+            after = cross(a, b, current)
+            if (before >= 0) != (after >= 0):
+                t = before/(before-after)
+                output.append(tuple(previous[k]+t*(current[k]-previous[k]) for k in (0,1)))
+            if after >= 0:
+                output.append(current)
+            previous, before = current, after
+        result = output
+    return tuple(result)
+
+
+def convex_inset(region, margin):
+    """Pure display mask for convex polygon sources; CAD uses exact BRep offset."""
+    if len(region.loops) != 1 or not region.loops[0].outer:
+        raise ValueError('The display boundary must be one convex outer loop.')
+    points = region.loops[0].points
+    if any(cross(points[i-1],points[i],points[(i+1)%len(points)]) < -EPS for i in range(len(points))):
+        raise ValueError('The display boundary must be convex.')
+    if margin == 0:
+        return region
+    result = points
+    # Intersect shifted inward halfplanes with a finite, ample halfplane box.
+    extent = max(dist(a,b) for a in points for b in points)*4+margin*4+1
+    for a,b in edges(points):
+        length=dist(a,b)
+        if length < EPS:
+            continue
+        u=((b[0]-a[0])/length,(b[1]-a[1])/length)
+        n=(-u[1],u[0])
+        p=(a[0]+margin*n[0],a[1]+margin*n[1])
+        box=tuple((p[0]+x*u[0]+y*n[0],p[1]+x*u[1]+y*n[1])
+                  for x,y in ((-extent,0),(extent,0),(extent,extent),(-extent,extent)))
+        result=clip_polygon_convex(result,box)
+        if len(result)<3:
+            raise ValueError('Edge Offset leaves no region for perforation.')
+    return Region((Loop(result),),region.tolerance)
+
+
 def edges(points):
     return zip(points, points[1:] + points[:1])
 

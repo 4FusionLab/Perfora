@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 import unittest
 from demo.engine import compute,prepare,LAYOUTS,cell_path
-from Perfora.geometry import generate,SHAPE_IDS,dist
+from Perfora.geometry import generate,SHAPE_IDS,dist,ORGANIC_SHAPES,convex_inset,rectangle_region,clip_polygon_convex
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -48,6 +48,27 @@ class WebDemoTests(unittest.TestCase):
         for data in ({'width':float('inf')},{'shape':'unknown'},{'layout':'running_bond'},
                      {'layout':'wave','amplitude':-3},{'gap':0}):
             with self.subTest(data=data),self.assertRaises(ValueError):compute(data)
+
+    def test_noise_uses_size_and_web_with_partial_boundary_contours(self):
+        for shape in ORGANIC_SHAPES:
+            data=dict(shape=shape,width=30,height=30)
+            region,s,_=prepare(data)
+            self.assertTrue(s.clip_boundary)
+            result=compute(data)
+            self.assertGreater(result['count'],0,shape)
+            self.assertTrue(result['clip'])
+            self.assertTrue(0<result['open_area']<100)
+            self.assertEqual(compute(dict(data,organic_open='invalid'))['holes'],result['holes'])
+
+    def test_convex_display_mask_preserves_the_requested_edge_offset(self):
+        r=convex_inset(rectangle_region(4,3),.3)
+        points=r.loops[0].points
+        self.assertAlmostEqual(max(x for x,y in points),1.7)
+        self.assertAlmostEqual(min(y for x,y in points),-1.2)
+        clipped=clip_polygon_convex(((-3,-1),(.5,-1),(.5,1),(-3,1)),points)
+        area=abs(sum(a[0]*b[1]-a[1]*b[0] for a,b in zip(clipped,clipped[1:]+clipped[:1])))/2
+        self.assertAlmostEqual(area,4.4)
+        with self.assertRaises(ValueError):convex_inset(rectangle_region(4,3),5)
 
     def test_generated_demo_embeds_exact_sources_without_local_paths(self):
         from scripts.build_web_demo import build,MODULES

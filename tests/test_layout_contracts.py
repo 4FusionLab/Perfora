@@ -12,7 +12,7 @@ from pathlib import Path
 from types import SimpleNamespace as NS
 import unittest
 from Perfora.geometry import Settings, LENGTH_SHAPES, ORGANIC_SHAPES, ORGANIC_FIELDS, generate
-from Perfora.organic import PARAMETERS as ORGANIC_PARAMETERS, LABELS as ORGANIC_LABELS
+from Perfora.organic import PARAMETERS as ORGANIC_PARAMETERS, LABELS as ORGANIC_LABELS, DEFAULT_OPEN
 from Perfora.distributions import VARIANT_PARAMETERS, LAYOUT_PARAMETERS
 from Perfora.feature_data import metadata, decode
 
@@ -239,7 +239,7 @@ class DialogContractTests(unittest.TestCase):
             self.assertFalse(s.inputs['path'].isVisible)
             self.assertTrue(s.inputs['seed'].isVisible)
             self.assertTrue(s.inputs['organic_direction'].isVisible)
-            self.assertEqual(s.inputs['organic_open'].isVisible,shape in ORGANIC_FIELDS)
+            self.assertFalse(s.inputs['organic_open'].isVisible)
             self.assertEqual(s.inputs['organic_variation'].isVisible,shape=='blue_noise')
             s.inputs['path_spacing'].isValidExpression=False
             settings=s.read()[1]
@@ -257,9 +257,9 @@ class DialogContractTests(unittest.TestCase):
         model=NS(native=lambda x:x,source_component=lambda x:NS(),point_position=lambda *args:None,
                  guide_reference=lambda *args:None,source_support_body=lambda x:None)
         ui=definitions('Perfora.py',dict(math=math,Path=Path,Settings=Settings,LENGTH_SHAPES=LENGTH_SHAPES,
-                       VARIANT_PARAMETERS=VARIANT_PARAMETERS,ORGANIC_PARAMETERS=ORGANIC_PARAMETERS,ORGANIC_SHAPES=ORGANIC_SHAPES,ORGANIC_FIELDS=ORGANIC_FIELDS,ORGANIC_LABELS=ORGANIC_LABELS,LAYOUT_PARAMETERS=LAYOUT_PARAMETERS,
+                       VARIANT_PARAMETERS=VARIANT_PARAMETERS,ORGANIC_PARAMETERS=ORGANIC_PARAMETERS,ORGANIC_SHAPES=ORGANIC_SHAPES,ORGANIC_FIELDS=ORGANIC_FIELDS,ORGANIC_LABELS=ORGANIC_LABELS,DEFAULT_OPEN=DEFAULT_OPEN,LAYOUT_PARAMETERS=LAYOUT_PARAMETERS,
                        multi_region=NS(sources=lambda selected:selected),surface=SURFACE,parametric=f,model=model,adsk=ADSK),
-                       methods=('chosen','shape_key','set_shape','selected_source','selected_sources','legacy_spread_radius','dimension_id','update_visibility','read','restore_feature'))
+                       methods=('chosen','shape_key','set_shape','field_threshold','selected_source','selected_sources','legacy_spread_radius','dimension_id','update_visibility','read','restore_feature'))
         s=ui.Session()
         s.updating=False
         s._extrude_inputs=None
@@ -272,7 +272,7 @@ class DialogContractTests(unittest.TestCase):
         s.numeric_inputs={}
         # Extract constructor declarations so new/missing controls cannot be
         # silently absent in the offline fixture. No constructor/API execution.
-        for key in ('area_group','height','pattern_type','organic_shape','shape','shape_angle','result','material','operation','direction','boundary',
+        for key in ('area_group','field_options','height','pattern_type','organic_shape','shape','shape_angle','result','material','operation','direction','boundary',
                     'source_info','cylinder_group','surface_layout','path','path_reverse','path_orientation','layout','layout_orientation','orientation','source','clip_boundary','organic_bridges','round_corners','seed','new_pattern','irregularity',
                     'center_point','guide1','guide2','guide_reverse','start_mode','reverse','side2','bodies','output_group',
                     'preview','preview_mode','preview_color','distance1','distance2','taper1','taper2','start','target1',
