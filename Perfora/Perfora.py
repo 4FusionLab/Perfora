@@ -10,11 +10,12 @@ from uuid import uuid4
 import adsk.core
 import adsk.fusion
 
-from .geometry import Settings, LENGTH_SHAPES
+from .geometry import Settings, LENGTH_SHAPES, ORGANIC_SHAPES, ORGANIC_FIELDS
 from . import model, ui_resources, cylindrical, surface, multi_region, feature as parametric
 from .preview import Renderer, PREVIEW_COLORS
 from .numeric_inputs import NumericInput
 from .distributions import VARIANT_PARAMETERS, LAYOUT_PARAMETERS
+from .organic import PARAMETERS as ORGANIC_PARAMETERS, LABELS as ORGANIC_LABELS
 
 COMMAND_ID = 'DiegoV_Perforator'  # Stable ID for existing installations.
 PANEL_ID = 'SolidCreatePanel'
@@ -24,7 +25,7 @@ _sessions = []
 SHAPES = [('circle', 'Circle'), ('hexagon', 'Hexagon'), ('square', 'Square'), ('slot', 'Slot'),
           ('triangle', 'Triangle'), ('rectangle', 'Rectangle'), ('diamond', 'Diamond'),
           ('ellipse', 'Ellipse'), ('pentagon', 'Pentagon'), ('octagon', 'Octagon'),
-          ('cross', 'Cross'), ('star', 'Star'), ('voronoi', 'Voronoi')]
+          ('cross', 'Cross'), ('star', 'Star')] + list(zip(ORGANIC_SHAPES, ORGANIC_LABELS)) + [('voronoi', 'Voronoi')]
 SIZE_HELP = {
     'circle': 'Diameter of the circular hole.',
     'hexagon': 'Distance between opposite flats of the hexagon.',
@@ -39,6 +40,8 @@ SIZE_HELP = {
     'cross': 'Overall width and height of the cross. Arm Width controls the width of each arm.',
     'star': 'Outer diameter of the star. Inner Radius is a percentage of the outer radius.',
     'voronoi': 'Nominal distance between Voronoi sites. Smaller spacing creates more holes. Web Thickness is independent.'}
+SIZE_HELP.update({key: 'Physical scale of the organic field. Larger values create broader, fewer openings; Web Thickness is independent.' for key in ORGANIC_FIELDS})
+SIZE_HELP['blue_noise'] = 'Maximum circular hole diameter. Size Variation and Size Gradient control smaller holes; Web Thickness is checked using both radii.'
 SIZE_FIELDS = {
     'size': ('Diameter', ('circle', 'pentagon', 'star')),
     'size_flats': ('Across Flats', ('hexagon', 'octagon')),
@@ -47,7 +50,9 @@ SIZE_FIELDS = {
     'size_diagonal': ('Diagonal 1', ('diamond',)),
     'size_minor': ('Minor Axis', ('ellipse',)),
     'size_overall': ('Overall Size', ('cross',)),
-    'cell_spacing': ('Cell Spacing', ('voronoi',))}
+    'cell_spacing': ('Cell Spacing', ('voronoi',)),
+    'organic_scale': ('Pattern Scale', ORGANIC_FIELDS),
+    'blue_diameter': ('Maximum Diameter', ('blue_noise',))}
 LENGTH_FIELDS = {
     'slot_length': ('Length', ('slot', 'rectangle')),
     'length_diagonal': ('Diagonal 2', ('diamond',)),
@@ -156,6 +161,12 @@ class Session:
         self.inputs['new_pattern'].text = 'New Pattern'
         self.inputs['new_pattern'].isFullWidth = True
         self.inputs['new_pattern'].tooltip = 'Increment Seed to explore another pattern without changing its spacing.'
+        for key, (label, unit, expression) in ORGANIC_PARAMETERS.items():
+            self.number(pattern, key, label, expression, unit)
+        self.inputs['organic_open'].tooltip = ('Raw open fraction of the field (15–75%). Web Thickness, bridges, rounded tips, Edge Offset and boundary trimming reduce the final open area. Use Full Preview to inspect the actual result.')
+        self.inputs['organic_direction'].tooltip = ('Field direction in sketch axes, or the local circumferential / meridian chart on curved faces. 0 deg aligns long fibers with X (around a cylinder); 90 deg aligns them with Y (along its axis).')
+        self.inputs['organic_variation'].tooltip = '0 creates equal diameters; 65% permits diameters down to 35% of Maximum Diameter. Range: 0–90%.'
+        self.inputs['organic_gradient'].tooltip = 'Signed size gradient along Direction. 0 varies sizes randomly; +100% grows toward +X, −100% reverses the gradient.'
         self.check(pattern, 'round_corners', 'Round Corners', False)
         self.number(pattern, 'corner_radius', 'Corner Radius', '0.5 mm')
         self.inputs['corner_radius'].tooltip = ('Maximum corner radius. Short bevels are absorbed; the radius is reduced only for narrow holes. '
@@ -296,7 +307,7 @@ class Session:
             layout = ('staggered' if settings['staggered'] else 'rows') if layout == 'grid' else layout
             d['layout'].listItems.item(next(i for i, (key, _) in enumerate(LAYOUTS) if key == layout)).isSelected = True
             defaults = Settings()
-            for key in VARIANT_PARAMETERS:
+            for key in (*VARIANT_PARAMETERS, *ORGANIC_PARAMETERS):
                 d[key].value = settings.get(key, getattr(defaults, key))
             d['guide_reverse'].value = settings.get('guide_reverse', False)
             if surface.supported(self.selected_source()): self.sync_surface_layouts(self.selected_source())
@@ -592,11 +603,17 @@ class Session:
             visible('arm_width', shape == 'cross')
             visible('star_points', shape == 'star')
             visible('star_ratio', shape == 'star')
-            layout = (self.chosen('surface_layout', self.surface_choices) if is_curved else self.chosen('layout', LAYOUTS)) if shape != 'voronoi' else 'grid'
+            organic = shape in ORGANIC_SHAPES
+            field_shape = organic or shape == 'voronoi'
+            layout = (self.chosen('surface_layout', self.surface_choices) if is_curved else self.chosen('layout', LAYOUTS)) if not field_shape else 'grid'
             for identifier in ('irregularity', 'round_corners'):
                 visible(identifier, shape == 'voronoi')
             for identifier in ('seed', 'new_pattern'):
-                visible(identifier, shape == 'voronoi' or layout == 'poisson')
+                visible(identifier, field_shape or layout == 'poisson')
+            for key in ORGANIC_PARAMETERS:
+                visible(key, organic and (key == 'organic_direction' or
+                    (key == 'organic_open' and shape in ORGANIC_FIELDS) or
+                    (key in ('organic_variation', 'organic_gradient') and shape == 'blue_noise')))
             for key in VARIANT_PARAMETERS:
                 visible(key, key in LAYOUT_PARAMETERS.get(layout, ()))
             if layout == 'fan':
@@ -604,8 +621,8 @@ class Session:
             for key in ('guide1', 'guide2', 'guide_reverse'):
                 visible(key, layout == 'between_curves')
             visible('corner_radius', shape == 'voronoi' and d['round_corners'].value)
-            visible('layout', shape != 'voronoi' and not is_curved)
-            visible('surface_layout', shape != 'voronoi' and is_curved)
+            visible('layout', not field_shape and not is_curved)
+            visible('surface_layout', not field_shape and is_curved)
             circular = layout == 'circular'
             along_path = layout == 'path'
             for identifier in ('path', 'path_spacing', 'path_start', 'path_end', 'path_position', 'path_reverse'):
@@ -614,7 +631,7 @@ class Session:
             boundary_anchored = layout in ('contour', 'between_curves')
             scoped = self.legacy_spread_radius() > 0
             visible('center_point', not along_path and (not boundary_anchored or scoped))
-            visible('grid_angle', not is_curved and not along_path and not boundary_anchored)
+            visible('grid_angle', not organic and not is_curved and not along_path and not boundary_anchored)
             for key in ('offset_x', 'offset_y'):
                 visible(key, not along_path and (not boundary_anchored or scoped))
             visible('start_radius', circular or layout == 'fan')
@@ -630,7 +647,7 @@ class Session:
             for identifier, axis in (('offset_x', 'X'), ('offset_y', 'Y')):
                 d[identifier].tooltip = (('Circumferential' if axis=='X' else 'Meridian / axial')+' pattern phase from Start Point or the automatic origin.' if is_curved else axis + ' offset from Start Point, or the boundary center when no point is selected, in sketch axes.'
                     if circular else axis + ' offset from Start Point, or the automatic center, in pattern axes. Without a spread limit, offsets are periodic.')
-            visible('shape_angle', shape not in ('circle', 'voronoi'))
+            visible('shape_angle', shape not in ('circle', 'voronoi') and not organic)
             is_feature = self.chosen('result', RESULTS) == 'feature'
             is_extrude = self.chosen('result', RESULTS) in ('extrude', 'feature')
             if (is_feature or is_curved) and self._extrude_inputs is None:
@@ -698,13 +715,16 @@ class Session:
         selected = self.selected_sources()
         # Hidden optional inputs must not block a different mode after an edit.
         shape = self.chosen('shape', SHAPES)
+        organic = shape in ORGANIC_SHAPES
         size_id = self.dimension_id(SIZE_FIELDS, shape)
         length_id = self.dimension_id(LENGTH_FIELDS, shape)
         required = [size_id, 'gap', 'margin', 'offset_x', 'offset_y', 'limit']
-        if not is_curved: required.append('grid_angle')
+        if not is_curved and not organic: required.append('grid_angle')
         if is_curved and isinstance(source.geometry,(adsk.core.Cylinder,adsk.core.Cone)):
             required += list(surface.ZONE_PARAMETERS)
-        layout = (self.chosen('surface_layout', self.surface_choices) if is_curved else self.chosen('layout', LAYOUTS)) if shape != 'voronoi' else 'grid'
+        layout = (self.chosen('surface_layout', self.surface_choices) if is_curved else self.chosen('layout', LAYOUTS)) if shape != 'voronoi' and not organic else 'grid'
+        organic_keys = [key for key in ORGANIC_PARAMETERS if d[key].isVisible]
+        if organic: required += organic_keys + ['seed']
         circular = layout == 'circular'
         variant_keys = [key for key in LAYOUT_PARAMETERS.get(layout, ()) if d[key].isVisible]
         required += variant_keys
@@ -722,7 +742,7 @@ class Session:
             model.path_entity(d['path'].selection(0).entity, model.source_component(source))
         if circular or layout == 'fan':
             required.append('start_radius')
-        if shape not in ('circle', 'voronoi'):
+        if shape not in ('circle', 'voronoi') and not organic:
             required.append('shape_angle')
         if shape in LENGTH_SHAPES:
             required.append(length_id)
@@ -773,7 +793,7 @@ class Session:
                             gap=d['gap'].value, margin=d['margin'].value,
                             staggered=shape != 'voronoi' and layout == 'staggered',
                             grid_angle=d['grid_angle'].value if 'grid_angle' in required else 0,
-                            shape_angle=d['shape_angle'].value if shape not in ('circle', 'voronoi') else 0,
+                            shape_angle=d['shape_angle'].value if shape not in ('circle', 'voronoi') and not organic else 0,
                             offset_x=d['offset_x'].value if 'offset_x' in required else 0,
                             offset_y=d['offset_y'].value if 'offset_y' in required else 0, limit=d['limit'].value,
                             clip_boundary=d['clip_boundary'].value,
@@ -781,7 +801,7 @@ class Session:
                             star_ratio=d['star_ratio'].value / 100 if shape == 'star' else 0.45,
                             star_points=d['star_points'].value if shape == 'star' else 5,
                             irregularity=d['irregularity'].value / 100 if shape == 'voronoi' else 0.8,
-                            seed=d['seed'].value if shape == 'voronoi' or layout == 'poisson' else 1,
+                            seed=d['seed'].value if shape == 'voronoi' or organic or layout == 'poisson' else 1,
                             corner_radius=d['corner_radius'].value
                                 if shape == 'voronoi' and d['round_corners'].value else 0,
                             layout='grid' if layout in ('staggered', 'rows') else layout,
@@ -799,7 +819,7 @@ class Session:
                             tangential_orientation=circular and shape != 'circle' and
                                 self.chosen('orientation', ORIENTATIONS) == 'tangential',
                             guide_reverse=d['guide_reverse'].value if layout == 'between_curves' else False,
-                            **variant_values)
+                            **variant_values, **{key:d[key].value for key in organic_keys})
         settings.validate()
         if self.edited_feature:
             parametric.validate_path_parameters(self.edited_feature, settings)
@@ -860,6 +880,9 @@ class Session:
             for key in VARIANT_PARAMETERS:
                 if key not in variant_keys:
                     expressions.pop(key, None)
+            for key in ORGANIC_PARAMETERS:
+                if key not in organic_keys:
+                    expressions[key] = str(getattr(settings, key)) + (' rad' if key == 'organic_direction' else '')
             for key in ('grid_angle', 'offset_x', 'offset_y', 'start_radius'):
                 if key not in required:
                     expressions.pop(key, None)

@@ -143,7 +143,14 @@ def conical_cells(region, settings, low, high, anchor=None):
 def periodic_cells(radius, height, sweep, settings, depth, closed=True, anchor=None):
     """Stable chart phase, including boundary candidates for exact later trim."""
     width = radius*sweep
-    if settings.shape == 'voronoi' and settings.layout == 'grid':
+    if settings.shape in geo.ORGANIC_SHAPES:
+        region = geo.rectangle_region(width, height)
+        base = geo.generate(region, replace(settings, clip_boundary=True, margin=0,
+            spread_radius=0, grid_angle=0, offset_x=0, offset_y=0, origin_x=None, origin_y=None))
+        # Each field contour is a finite tangent-plane tool. Periodic phase is
+        # applied once below; actual seam/depth webs are enforced in 3D.
+        cells = [(c.center[0]+width/2, c.center[1]+height/2, local_cell(c)) for c in base]
+    elif settings.shape == 'voronoi' and settings.layout == 'grid':
         source = CylinderRegion(radius, height, sweep)
         holes = generate_voronoi(source, replace(settings, grid_angle=0, clip_boundary=False),
                                  min(depth, radius*.9), 0, sweep, 0, height, retain_boundary_cells=True)
@@ -179,7 +186,7 @@ def periodic_cells(radius, height, sweep, settings, depth, closed=True, anchor=N
         if settings.grid_angle:
             dx,dy = geo.rotate((x-width/2,y-height/2), settings.grid_angle)
             x,y = dx+width/2,dy+height/2
-            if cell.shape == 'voronoi':
+            if cell.shape == 'voronoi' or cell.shape in geo.ORGANIC_FIELDS:
                 cell = replace(cell, polygon=tuple(geo.rotate(v,settings.grid_angle) for v in cell.vertices))
             else:
                 cell = replace(cell, angle=cell.angle+settings.grid_angle)

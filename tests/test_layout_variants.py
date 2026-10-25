@@ -3,6 +3,7 @@
 from dataclasses import replace
 import math
 import unittest
+from Perfora.geometry import ORGANIC_SHAPES
 from Perfora.geometry import (Settings, Loop, Region, SHAPE_IDS, VARIANT_LAYOUTS,
                               rectangle_region, disk_region, generate, dist, fits,
                               enclosing_radius, edges, segment_distance, rotate)
@@ -24,7 +25,7 @@ class VariantGeometryTests(unittest.TestCase):
     def test_all_distributions_and_rotated_real_shapes_keep_web(self):
         region = rectangle_region(4,3)
         for layout in VARIANT_LAYOUTS:
-            for shape in SHAPE_IDS:
+            for shape in (s for s in SHAPE_IDS if s not in ORGANIC_SHAPES):
                 if shape == 'voronoi':
                     continue
                 with self.subTest(layout=layout, shape=shape):

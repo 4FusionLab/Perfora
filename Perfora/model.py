@@ -346,7 +346,7 @@ def add_cell(sketch, cell):
     curves = sketch.sketchCurves
     if cell.shape == 'circle' or (cell.shape == 'slot' and abs(cell.length - cell.size) < 1e-9):
         tag(curves.sketchCircles.addByCenterRadius(point(cell.center), cell.size / 2), 'cell')
-    elif cell.shape == 'voronoi' and cell.corner_radius > 0:
+    elif cell.shape in ('smooth_noise', 'reaction_diffusion', 'directional_fibers', 'topographic', 'gyroid') or cell.shape == 'voronoi' and cell.corner_radius > 0:
         first = previous = None
         for i, edge in enumerate(cell.contour):
             start = previous or point(edge.start)
@@ -356,8 +356,11 @@ def add_cell(sketch, cell):
             else:
                 curve = curves.sketchArcs.addByThreePoints(start, point(edge.at(.5)), end)
             tag(curve, 'cell')
-            first = first or curve.startSketchPoint
-            previous = curve.endSketchPoint
+            # Fusion sketch arcs are always CCW, even when the supplied three
+            # points describe a clockwise concave turn of an organic contour.
+            backwards = edge.center is not None and edge.sweep < 0
+            first = first or (curve.endSketchPoint if backwards else curve.startSketchPoint)
+            previous = curve.startSketchPoint if backwards else curve.endSketchPoint
     elif cell.shape in POLYGON_SHAPES:
         add_polygon(sketch, cell.vertices, 'cell')
     elif cell.shape == 'ellipse':

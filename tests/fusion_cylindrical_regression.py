@@ -82,7 +82,7 @@ def tube(name, rotated=False, solid=False, inner=False, sector=False):
 try:
     doc = app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
     design = adsk.fusion.Design.cast(app.activeProduct)
-    for shape in (*geo.SHAPE_IDS, 'voronoi_rounded'):
+    for shape in (*(s for s in geo.SHAPE_IDS if s not in geo.ORGANIC_SHAPES), 'voronoi_rounded'):
 
         def shape_cut(shape=shape):
             comp, body, face = tube('Cylinder ' + shape)

@@ -546,8 +546,19 @@ def prepare(source,settings,config,chart=None):
         sweep=config['cylinder_sweep']
         closed=abs(sweep-math.tau)<1e-8
         zone_anchor=(anchor[0]-config['cylinder_start']*chart.radius,anchor[1]-ymin) if anchor is not None else None
-        if chart.kind=='cylinder' or settings.shape=='voronoi' or settings.layout=='circular':
+        if chart.kind=='cylinder' or settings.shape=='voronoi' or settings.shape in geo.ORGANIC_SHAPES or settings.layout=='circular':
             candidates=sg.periodic_cells(chart.radius,height,sweep,settings,depth,closed,zone_anchor)
+            if chart.kind=='cone' and settings.shape in geo.ORGANIC_SHAPES:
+                # Keep physical opening dimensions; redistribute center phases
+                # by each local circumference instead of compressing tools at
+                # the cone tip. Local axis/singularity guards still act below.
+                adapted=[]
+                for x,y,cell in candidates:
+                    radius_at=chart.radius0+chart.slope*(y+ymin)/chart.slant
+                    if radius_at<=depth+enclosing_radius(cell)+TOLERANCE:continue
+                    if closed:x=(x*chart.radius/radius_at) % (chart.radius*sweep)
+                    adapted.append((x,y,cell))
+                candidates=adapted
         else:
             region=sg.ConeRegion(chart.radius0,chart.slope,chart.radius,ymin,height,sweep)
             candidates=sg.conical_cells(region,settings,low,high,zone_anchor)
@@ -561,7 +572,7 @@ def prepare(source,settings,config,chart=None):
         layout=replace(settings,clip_boundary=True,margin=0,spread_radius=0,
             origin_x=anchor[0]-chart.width/2 if anchor else None,
             origin_y=anchor[1]-chart.height/2 if anchor else None)
-        if settings.shape=='voronoi':
+        if settings.shape=='voronoi' or settings.shape in geo.ORGANIC_SHAPES:
             cells=geo.generate(region,layout)
         else:
             prototype=sg.tool_cell(settings)
@@ -610,6 +621,8 @@ def prepare(source,settings,config,chart=None):
     coordinates=[]
     rims=[]
     placements=[]
+    material_probe = (manager.copy(source.body) if settings.shape in geo.ORGANIC_SHAPES
+                      and settings.margin < 4*TOLERANCE else None)
     for x,y,cell in candidates:
         try:
             frame=chart.frame(x,y)
@@ -625,7 +638,7 @@ def prepare(source,settings,config,chart=None):
                 continue
         sections.append((frame,seed,cell))
         placements.append((*frame,low,high,enclosing_radius(cell)))
-    if settings.shape!='voronoi':
+    if settings.shape!='voronoi' and settings.shape not in geo.ORGANIC_FIELDS:
         selected=sg.spaced_indices(placements,settings.gap)
         sections=[sections[i] for i in selected]
         placements=[placements[i] for i in selected]
@@ -639,7 +652,7 @@ def prepare(source,settings,config,chart=None):
                 if len(polygon)<3:
                     continue
                 cell=replace(cell,polygon=polygon)
-            else:
+            elif cell.shape not in geo.ORGANIC_FIELDS:
                 # Repeating dimensions are never silently reduced to meet webs.
                 points=cell.vertices if cell.shape in geo.POLYGON_SHAPES else (
                     cell.ellipse_points(96,enclosing=True) if cell.shape=='ellipse' else
@@ -647,6 +660,19 @@ def prepare(source,settings,config,chart=None):
                 if any(any(nx*x+ny*y>bound+TOLERANCE for x,y in points) for nx,ny,bound in planes):
                     raise ValueError('Surface curvature reduces Web Thickness through Distance. Increase Web Thickness or reduce Distance.')
         sheet=clipping.sheet([clipping.cell_curves(cell)])
+        if planes and cell.shape in geo.ORGANIC_FIELDS:
+            # Scalar contours can be concave. Clip the exact sheet against a
+            # convex separating mask, rather than applying a convex-polygon
+            # algorithm to a concave loop. This also protects periodic seams.
+            r=enclosing_radius(cell)+TOLERANCE
+            polygon=((-r,-r),(r,-r),(r,r),(-r,r))
+            for nx,ny,bound in planes:
+                polygon=geo._clip_halfplane(polygon,nx,ny,bound)
+            if len(polygon)<3:continue
+            mask=clipping.sheet([clipping.polygon_curves(polygon)])
+            if not manager.booleanOperation(sheet,mask,adsk.fusion.BooleanTypes.IntersectionBooleanType):
+                raise ValueError('Unable to preserve the organic surface web.')
+            if not sheet.faces.count or sheet.area<TOLERANCE*TOLERANCE:continue
         # A collapsed boundary inside the local trim box can project to a
         # self-intersecting wire. Omit that local site, not the regular face.
         size=enclosing_radius(cell)+settings.margin+10*TOLERANCE
@@ -691,7 +717,19 @@ def prepare(source,settings,config,chart=None):
                 a=min_z-TOLERANCE
         if config['_start']==0 and (a>=min_z-TOLERANCE or b<=max_z+TOLERANCE):
             if not (a<min_z+2*TOLERANCE and b>max_z-2*TOLERANCE):
+                if cell.shape in geo.ORGANIC_FIELDS:
+                    continue  # One overlong local normal tool must not reject the regular surface.
                 raise ValueError('Distance is too small for the local surface curvature. Increase Distance.')
+        if material_probe is not None:
+            tool=solid.extrude([sheet],a,b)
+            if not manager.transform(tool,matrix(*frame)):
+                raise ValueError('Unable to check the organic boundary tool.')
+            remaining=manager.copy(material_probe)
+            if not manager.booleanOperation(remaining,tool,adsk.fusion.BooleanTypes.DifferenceBooleanType):
+                raise ValueError('Unable to check material connectivity at the surface boundary.')
+            if remaining.lumps.count>material_probe.lumps.count:
+                continue
+            material_probe=remaining
         # The one preparation supplies both preview rims and final straight solids.
         prepared.append(Section(frame,sheet,cell,seed,a,b))
         rims.append(tuple(rim))
@@ -699,7 +737,7 @@ def prepare(source,settings,config,chart=None):
             raise ValueError('The hole count exceeds Maximum Holes. Increase spacing or reduce the zone.')
     if not prepared:
         raise ValueError('No holes fit the surface with the current boundary and Edge Offset.')
-    if settings.shape!='voronoi':
+    if settings.shape!='voronoi' and settings.shape not in geo.ORGANIC_FIELDS:
         actual=[(*s.frame,s.low,s.high,enclosing_radius(s.cell)) for s in prepared]
         selected=sg.spaced_indices(actual,settings.gap)
         prepared=[prepared[i] for i in selected]

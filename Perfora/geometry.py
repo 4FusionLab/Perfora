@@ -5,9 +5,11 @@ from functools import cached_property
 import math
 
 EPS = 1e-9
-POLYGON_SHAPES = ('hexagon', 'square', 'triangle', 'rectangle', 'diamond', 'pentagon', 'octagon', 'cross', 'star', 'voronoi')
+ORGANIC_FIELDS = ('smooth_noise', 'reaction_diffusion', 'directional_fibers', 'topographic', 'gyroid')
+ORGANIC_SHAPES = ORGANIC_FIELDS + ('blue_noise',)
+POLYGON_SHAPES = ('hexagon', 'square', 'triangle', 'rectangle', 'diamond', 'pentagon', 'octagon', 'cross', 'star') + ORGANIC_FIELDS + ('voronoi',)
 LENGTH_SHAPES = ('slot', 'rectangle', 'diamond', 'ellipse')
-SHAPE_IDS = ('circle', 'slot', 'ellipse') + POLYGON_SHAPES
+SHAPE_IDS = ('circle', 'slot', 'ellipse', 'blue_noise') + POLYGON_SHAPES
 VARIANT_LAYOUTS = ('contour', 'fan', 'phyllotaxis', 'poisson', 'wave', 'chevron', 'running_bond', 'between_curves')
 
 
@@ -189,6 +191,10 @@ class Settings:
     path_orientation: str = 'fixed'
     # Transient, immutable (x, y, tangent angle) samples; never serialized.
     path_samples: tuple = ()
+    organic_open: float = 48.0  # Requested pre-web threshold percentile, not CAD area.
+    organic_direction: float = 0.0
+    organic_variation: float = 65.0
+    organic_gradient: float = 75.0
 
     def validate(self):
         if self.distribution_revision not in (1, 2):
@@ -206,6 +212,9 @@ class Settings:
             raise ValueError('Unknown hole shape.')
         if self.layout not in ('grid', 'circular', 'path') + VARIANT_LAYOUTS:
             raise ValueError('Unknown distribution.')
+        if self.shape in ORGANIC_SHAPES:
+            from .organic import validate
+            validate(self)
         if self.layout in VARIANT_LAYOUTS:
             from .distributions import validate
             validate(self)
@@ -270,13 +279,19 @@ class Cell:
     star_points: int = 5
     polygon: tuple = ()  # Explicit world-plane vertices for non-repeating cells.
     corner_radius: float = 0.0
+    curve_tolerance: float = 0.0
 
     @cached_property
     def contour(self):
+        if self.shape in ORGANIC_FIELDS:
+            from .organic import fit_contour
+            return fit_contour(self.polygon, self.curve_tolerance)
         return rounded_polygon(self.vertices, self.corner_radius)
 
-    @property
+    @cached_property
     def vertices(self):
+        if self.shape in ORGANIC_FIELDS:
+            return tuple(p for edge in self.contour for p in edge.samples(self.curve_tolerance/2)[:-1])
         if self.shape == 'voronoi':
             return self.polygon
         if self.shape == 'hexagon':
@@ -669,6 +684,9 @@ def generate(region, settings):
         region = Region(region.loops, region.tolerance, placement_center(region, settings), settings.spread_radius)
     if settings.shape == 'voronoi':
         return generate_voronoi(region, settings)
+    if settings.shape in ORGANIC_SHAPES:
+        from .organic import generate as generate_organic
+        return generate_organic(region, settings)
     if settings.layout == 'circular':
         return generate_circular(region, settings)
     if settings.layout in VARIANT_LAYOUTS:
@@ -918,7 +936,7 @@ def outline_coordinates(cells, region, panel=False):
         for loop in region.loops:
             add_loop(loop.points)
     for cell in cells:
-        if cell.shape == 'voronoi' and cell.corner_radius > 0:
+        if cell.shape in ORGANIC_FIELDS or cell.shape == 'voronoi' and cell.corner_radius > 0:
             for edge in cell.contour:
                 points = edge.samples()
                 for a, b in zip(points, points[1:]):

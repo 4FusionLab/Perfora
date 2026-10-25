@@ -68,3 +68,10 @@ Reload through the registered Script's native stop/run lifecycle. Executing the 
 `fusion_layout_variants_regression.py` accepts `layouts` and `shapes` subsets for bounded runs. Keep the full report before another run overwrites it. For native UI acceptance retain separate reports for real OK and Cancel; stage `ready` is not acceptance.
 
 `fusion_release_selection.py` verifies native preselection: a cylinder/cone pair retains one compatible source with a notice, while two cylinders retain both. Click the real Cancel before `finish()`. `fusion_release_ui.py` accepts surface kind, region count, layout and result mode; use `prepare()` from the native Python console after opening through MCP, then `preview()`, real OK/Cancel and `finish()`. See the integration report for the executed matrix.
+
+
+## Organic fields (development)
+
+See [ORGANIC_PATTERNS.md](docs/ORGANIC_PATTERNS.md). Run the complete offline suite including `test_organic.py`, `test_solid_topology.py` and the actual dialog method contracts. In Fusion run `fusion_organic_regression.py` against the registered checkout, with optional `kinds`, `shapes`, `modes` and `trims` subsets. `archive=True` tests local F3D import/recompute; `capture=True` exports real viewport images. Keep reports outside the repository. An active document is never a fixture: each case creates a disposable document and restores the original.
+
+Use `fusion_organic_ui.py` from the native Python console for each shape and affected result mode. Call `prepare()`, request Fast/Full with `preview()`, then `check_preview()`. Click the actual OK/Cancel button and call `verify(created)`. For Feature, run `begin_edit()`, then `edit_preview()`, click the actual OK/Cancel button and call `end_edit(accepted)`. Native Undo/Redo must be followed by `verify_undo()` / `verify(True)`. `finish()` restores the user's original document. A ready stage or Python geometry pass alone is not native transaction acceptance. Recheck zero-border material connectivity, seam/depth separation, inner cutouts, multiple homogeneous regions and current packaging.

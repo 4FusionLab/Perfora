@@ -81,7 +81,7 @@ try:
         return dict(whole_holes=count,edge_offset_mm=3.,tangent_holes_preserved=True,real_crossing_still_trimmed=True)
     case('exact_edge_offset_retains_whole_cells',exact_edge_offset)
 
-    for shape in geo.SHAPE_IDS:
+    for shape in (s for s in geo.SHAPE_IDS if s not in geo.ORGANIC_SHAPES):
         if shape == 'voronoi':
             continue
 

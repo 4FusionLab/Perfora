@@ -248,12 +248,12 @@ class CurveIntegrationTests(unittest.TestCase):
         s.updating=False;s._extrude_inputs={} if result=='feature' else None;s.edited_feature=None
         s.units=NS(evaluateExpression=lambda expression,unit:float(expression))
         numeric=dict(size=.3,size_flats=.3,size_side=.3,size_width=.3,size_diagonal=.3,size_minor=.3,
-            size_overall=.3,cell_spacing=.3,slot_length=.6,length_diagonal=.6,length_major=.6,
+            size_overall=.3,cell_spacing=.3,organic_scale=.3,blue_diameter=.3,slot_length=.6,length_diagonal=.6,length_major=.6,
             gap=.1,margin=.05,grid_angle=0,shape_angle=.21,offset_x=0,offset_y=0,limit=1500,
             spread_radius=0,start_radius=0,path_spacing=.8,path_start=.1,path_end=.2,path_position=.3,
             width=4,area_diameter=4,height=3,taper1=0,taper2=0,distance1=.2,distance2=.2,start=0,
             cylinder_start=0,cylinder_sweep=6.283185307179586,axial_start=0,axial_length=0,object_offset1=0,object_offset2=0,arm_width=.15,star_ratio=45,star_points=5,irregularity=80,seed=1,corner_radius=.05)
-        numeric.update({key:getattr(self.settings,key) for key in VARIANT_PARAMETERS})
+        numeric.update({key:getattr(self.settings,key) for key in (*VARIANT_PARAMETERS, *e.ORGANIC_PARAMETERS)})
         s.numeric_inputs={k:Number(v) for k,v in numeric.items()};s.inputs=dict(s.numeric_inputs)
         d=s.inputs
         for key,options,value in (('shape',e.SHAPES,shape),('layout',e.LAYOUTS,layout),('result',e.RESULTS,result),

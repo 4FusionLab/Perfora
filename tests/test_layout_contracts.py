@@ -11,7 +11,8 @@ import math
 from pathlib import Path
 from types import SimpleNamespace as NS
 import unittest
-from Perfora.geometry import Settings, LENGTH_SHAPES, generate
+from Perfora.geometry import Settings, LENGTH_SHAPES, ORGANIC_SHAPES, ORGANIC_FIELDS, generate
+from Perfora.organic import PARAMETERS as ORGANIC_PARAMETERS, LABELS as ORGANIC_LABELS
 from Perfora.distributions import VARIANT_PARAMETERS, LAYOUT_PARAMETERS
 from Perfora.feature_data import metadata, decode
 
@@ -60,7 +61,7 @@ def model_definitions():
 
 
 def feature_definitions(model=None):
-    return definitions('feature.py',dict(Settings=Settings,VARIANT_PARAMETERS=VARIANT_PARAMETERS,
+    return definitions('feature.py',dict(Settings=Settings,VARIANT_PARAMETERS=VARIANT_PARAMETERS,ORGANIC_PARAMETERS=ORGANIC_PARAMETERS,ORGANIC_SHAPES=ORGANIC_SHAPES,ORGANIC_FIELDS=ORGANIC_FIELDS,ORGANIC_LABELS=ORGANIC_LABELS,
         decode=decode,metadata=metadata,surface=SURFACE,model=model or NS(native=lambda x:x),replace=replace,json=json,math=math,Path=Path,adsk=ADSK))
 
 
@@ -79,7 +80,7 @@ def custom_feature(f, old=False, **changes):
                  (.2 if k.startswith('distance') else 0 if k=='start' else cfg[k]),
                  expression='0') for k in f.PARAMETERS}
     if old:
-        for key in tuple(VARIANT_PARAMETERS)+('start_radius','spread_radius'):
+        for key in tuple(VARIANT_PARAMETERS)+tuple(ORGANIC_PARAMETERS)+('start_radius','spread_radius'):
             params.pop(key)
             data['settings'].pop(key)
         for key in ('guide_rows','guide_reverse','guide1','guide2'):
@@ -211,13 +212,36 @@ class Control:
 
 
 class DialogContractTests(unittest.TestCase):
+    def test_organic_fields_hide_incompatible_controls_and_restore_repeating_layout(self):
+        ui,s=self.session()
+        s.inputs['layout'].selectedItem.index=next(i for i,(k,_) in enumerate(ui.LAYOUTS) if k=='path')
+        for shape in ORGANIC_SHAPES:
+            s.inputs['shape'].selectedItem.index=next(i for i,(k,_) in enumerate(ui.SHAPES) if k==shape)
+            s.update_visibility()
+            self.assertFalse(s.inputs['layout'].isVisible)
+            self.assertFalse(s.inputs['shape_angle'].isVisible)
+            self.assertFalse(s.inputs['path'].isVisible)
+            self.assertTrue(s.inputs['seed'].isVisible)
+            self.assertTrue(s.inputs['organic_direction'].isVisible)
+            self.assertEqual(s.inputs['organic_open'].isVisible,shape in ORGANIC_FIELDS)
+            self.assertEqual(s.inputs['organic_variation'].isVisible,shape=='blue_noise')
+            s.inputs['path_spacing'].isValidExpression=False
+            settings=s.read()[1]
+            self.assertEqual(settings.shape,shape)
+            self.assertEqual(settings.layout,'grid')
+        self.assertEqual(ui.SHAPES[-1][0],'voronoi')
+        s.inputs['shape'].selectedItem.index=0
+        s.update_visibility()
+        self.assertTrue(s.inputs['path'].isVisible)
+        self.assertTrue(s.inputs['layout'].isVisible)
+
     def session(self):
         f=feature_definitions()
         f.validate=lambda *args:None
         model=NS(native=lambda x:x,source_component=lambda x:NS(),point_position=lambda *args:None,
                  guide_reference=lambda *args:None,source_support_body=lambda x:None)
         ui=definitions('Perfora.py',dict(math=math,Path=Path,Settings=Settings,LENGTH_SHAPES=LENGTH_SHAPES,
-                       VARIANT_PARAMETERS=VARIANT_PARAMETERS,LAYOUT_PARAMETERS=LAYOUT_PARAMETERS,
+                       VARIANT_PARAMETERS=VARIANT_PARAMETERS,ORGANIC_PARAMETERS=ORGANIC_PARAMETERS,ORGANIC_SHAPES=ORGANIC_SHAPES,ORGANIC_FIELDS=ORGANIC_FIELDS,ORGANIC_LABELS=ORGANIC_LABELS,LAYOUT_PARAMETERS=LAYOUT_PARAMETERS,
                        multi_region=NS(sources=lambda selected:selected),surface=SURFACE,parametric=f,model=model,adsk=ADSK),
                        methods=('chosen','selected_source','selected_sources','legacy_spread_radius','dimension_id','update_visibility','read','restore_feature'))
         s=ui.Session()

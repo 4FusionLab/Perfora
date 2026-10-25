@@ -107,11 +107,21 @@ Fusion selection highlighting can tint or cover custom graphics while an entity 
 
 ## Voronoi
 
-**Voronoi** is the thirteenth hole shape, available since 0.2.0. Select **Hole Shape → Voronoi**, then adjust **Cell Spacing**, **Irregularity (%)**, and **Seed**. **New Pattern** advances the seed while keeping the other settings. A seed reproduces the same pattern for the same source and settings.
+**Voronoi** was introduced as the thirteenth hole shape in 0.2.0 and remains the last entry. Select **Hole Shape → Voronoi**, then adjust **Cell Spacing**, **Irregularity (%)**, and **Seed**. **New Pattern** advances the seed while keeping the other settings. A seed reproduces the same pattern for the same source and settings.
 
 Cell Spacing controls the nominal distance between sites, rather than the size of every hole. Irregularity ranges from regular square cells at 0% to varied convex polygons at 100%. **Web Thickness** sets the minimum gap between holes; a large web can consume small cells. **Distribution** and **Hole Angle** are hidden in this mode. Pattern rotation, X/Y offsets, edge clearance, exact trimming, Fast/Full Preview, sketch profiles, and native Extrude remain available.
 
 Enable **Round Corners** to add tangent circular fillets to the Voronoi holes. **Corner Radius** sets the maximum radius. Short bevels are absorbed by the rounded contour; the radius is reduced only when the hole is too narrow. Rounding is off by default and preserves the minimum web. Fast Preview follows the same arcs used by the sketch and Extrude. New convex corners at straight and circular trim boundaries are rounded too. Existing concave source corners and elliptical/spline boundary segments retain their exact geometry.
+
+## Organic patterns (development)
+
+Six additional **Hole Shape** entries precede Voronoi: **Smooth Noise**, **Reaction Diffusion**, **Directional Fibers**, **Ridged Noise / Topographic**, **Gyroid Field**, and **Blue Noise / Size Gradient**. Voronoi remains last; the original 13 shape IDs and saved parameters are unchanged. These additions are unpublished.
+
+The first five use **Pattern Scale**, **Field Fill (%)**, **Direction**, **Seed / New Pattern**, **Web Thickness** and **Edge Offset**. Field Fill controls the raw threshold, so bridges, rounded tips, webs and trimming reduce the final open area. Blue Noise uses **Maximum Diameter**, **Size Variation (%)** and a signed **Size Gradient (%)**, with radius-aware spacing. It complements the existing fixed-size Poisson Disk Distribution.
+
+These shapes define their own bounded field; Distribution, Pattern Angle and Hole Angle are hidden. Direction rotates the field in sketch axes. On a curved face, 0° follows the circumferential chart axis and 90° follows the axial/meridian axis, including fibers. All six connect to Sketch, Extrude, Feature, Fast/Full Preview, Trim to Boundary and inner-cutout clearance on planar, cylindrical, conical and regular freeform sources. Multiple selections must still have one surface type. Curved openings are finite straight tools, with conservative seam/depth separation; the motif can become sparser at high curvature or a cone tip.
+
+Material islands are joined before contour extraction. Overlong slots receive bridges; conflicting small fragments are omitted to protect the actual contour web. With a zero edge border, boundary fragments that would detach material are retained as solid material. Sampling and contour budgets give actionable errors instead of unbounded CAD work. See [algorithms, controls, surface behavior and validation](docs/ORGANIC_PATTERNS.md).
 
 ## Multiple regions (development)
 

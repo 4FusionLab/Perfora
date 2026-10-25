@@ -83,7 +83,7 @@ try:
     doc = app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
     design = adsk.fusion.Design.cast(app.activeProduct)
     for kind in ('line', 'arc', 'spline', 'circle'):
-        for shape in geo.SHAPE_IDS:
+        for shape in (s for s in geo.SHAPE_IDS if s not in geo.ORGANIC_SHAPES):
             if shape == 'voronoi':
                 continue
 

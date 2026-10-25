@@ -43,6 +43,8 @@ def enclosing_radius(cell):
 
 def generate(region, settings, depth, start=0., sweep=math.tau, axial_start=0., axial_length=0.):
     settings.validate()
+    if settings.shape in ('smooth_noise', 'reaction_diffusion', 'directional_fibers', 'topographic', 'gyroid', 'blue_noise'):
+        raise ValueError('Organic fields require the common curved-surface workflow, not the legacy radial adapter.')
     values = (region.radius, region.height, region.sweep, depth, start, sweep, axial_start, axial_length)
     if not all(math.isfinite(v) for v in values):
         raise ValueError('Cylinder settings must be finite.')

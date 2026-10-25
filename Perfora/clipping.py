@@ -6,7 +6,7 @@ import adsk.core
 import adsk.fusion
 
 from . import model
-from .geometry import (Loop, Region, ContourEdge, POLYGON_SHAPES, dist, edges, fits, generate,
+from .geometry import (Loop, Region, ContourEdge, POLYGON_SHAPES, ORGANIC_FIELDS, ORGANIC_SHAPES, dist, edges, fits, generate,
                        overlaps, placement_center, point_segment_distance, round_contour, stitch)
 
 
@@ -15,7 +15,7 @@ def polygon_curves(points):
 
 
 def cell_curves(cell):
-    if cell.shape == 'voronoi' and cell.corner_radius > 0:
+    if cell.shape in ORGANIC_FIELDS or cell.shape == 'voronoi' and cell.corner_radius > 0:
         return contour_curves(cell.contour)
     if cell.shape in POLYGON_SHAPES:
         return polygon_curves(cell.vertices)
@@ -282,6 +282,8 @@ def layout(original, trimmed, region, settings, candidates=None):
     candidates = generate(region, settings) if candidates is None else candidates
     trim_segments = trim_region.indexed_segments(len(candidates))
     cells, whole, partial, partial_bodies = [], [], [], []
+    material = (manager.copy(original) if settings.shape in ORGANIC_SHAPES
+                and settings.margin < 4*model.TOLERANCE else None)
     for cell in candidates:
         if fits(cell, trim_region, trim_segments, 0):
             cells.append(cell)
@@ -293,6 +295,13 @@ def layout(original, trimmed, region, settings, candidates=None):
             if cut.faces.count and cut.area > 1e-10:
                 if settings.shape=='voronoi' and settings.corner_radius>0:
                     cut=rounded_body(cut,settings.corner_radius)
+                if material is not None:
+                    remaining=manager.copy(material)
+                    if not manager.booleanOperation(remaining,cut,adsk.fusion.BooleanTypes.DifferenceBooleanType):
+                        raise ValueError('Unable to check material connectivity at the boundary.')
+                    if remaining.faces.count>material.faces.count:
+                        continue  # Retain this local boundary fragment as a material bridge.
+                    material=remaining
                 cells.append(cell)
                 partial.extend(body_loops(cut))
                 partial_bodies.append(cut)

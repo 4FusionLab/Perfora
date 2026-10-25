@@ -3,6 +3,7 @@ from dataclasses import replace
 import math
 import unittest
 
+from Perfora.geometry import ORGANIC_SHAPES
 from Perfora.geometry import Settings, SHAPE_IDS
 from Perfora.cylindrical_geometry import CylinderRegion, generate, tool_cell, enclosing_radius
 
@@ -32,7 +33,7 @@ class CylindricalTests(unittest.TestCase):
 
     def test_all_repeating_shapes_respect_zone_and_margins(self):
         region = CylinderRegion(2., 3., sweep=math.pi)
-        for shape in SHAPE_IDS:
+        for shape in (s for s in SHAPE_IDS if s not in ORGANIC_SHAPES):
             if shape == 'voronoi':
                 continue
             settings = Settings(shape=shape, size=.3, slot_length=.55, gap=.12, margin=.1, shape_angle=.4)

@@ -12,6 +12,7 @@ import adsk.fusion
 from . import clipping, model, solid, surface
 from .geometry import Settings, generate
 from .distributions import VARIANT_PARAMETERS
+from .organic import PARAMETERS as ORGANIC_PARAMETERS
 from .feature_data import SCHEMA, decode, metadata
 
 DEFINITION_ID = '4FusionLab.Perfora.Parametric'
@@ -40,10 +41,12 @@ PARAMETERS = {
     'distance2': ('Distance 2', 'mm'),
 }
 PARAMETERS.update({key: (label, unit) for key, (label, unit, _) in VARIANT_PARAMETERS.items()})
+PARAMETERS.update({key: (label, unit) for key, (label, unit, _) in ORGANIC_PARAMETERS.items()})
 OPTIONAL_PARAMETERS = ('start_radius', 'spread_radius') + tuple(VARIANT_PARAMETERS)
 INTEGER_PARAMETERS = ('star_points', 'seed', 'limit', 'fan_rays', 'guide_rows')
 PATH_PARAMETERS = ('path_spacing', 'path_start', 'path_end', 'path_position')
 OPTIONAL_PARAMETERS += PATH_PARAMETERS
+OPTIONAL_PARAMETERS += tuple(ORGANIC_PARAMETERS)
 
 
 def register():

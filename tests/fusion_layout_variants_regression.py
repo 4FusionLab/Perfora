@@ -77,7 +77,7 @@ doc=app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType)
 try:
     design=adsk.fusion.Design.cast(app.activeProduct)
     for layout in globals().get('layouts', geo.VARIANT_LAYOUTS):
-        for shape in globals().get('shapes',tuple(s for s in geo.SHAPE_IDS if s!='voronoi')):
+        for shape in globals().get('shapes',tuple(s for s in geo.SHAPE_IDS if s!='voronoi' and s not in geo.ORGANIC_SHAPES)):
             for trim in (False,True):
                 def check(layout=layout,shape=shape,trim=trim):
                     comp=fixture.component(design,layout+' '+shape)

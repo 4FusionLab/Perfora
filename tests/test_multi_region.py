@@ -51,7 +51,7 @@ class FrameTests(unittest.TestCase):
     def test_common_phase_is_independent_of_region_bounds_for_all_shapes(self):
         a, b = rectangle(-4,-2,-.2,2), rectangle(.2,-2,4,2)
         union_bounds = rectangle(-4,-2,4,2)
-        for shape in g.SHAPE_IDS:
+        for shape in (s for s in g.SHAPE_IDS if s not in g.ORGANIC_SHAPES):
             for trim in (False, True):
                 s = g.Settings(shape=shape, size=.4, slot_length=.7, gap=.15, margin=.1,
                                origin_x=0., origin_y=0., grid_angle=.32, clip_boundary=trim)

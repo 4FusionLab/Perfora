@@ -47,7 +47,7 @@ class PerforaDialogRegression(adsk.core.CommandCreatedEventHandler):
             session.update_visibility()
             assert session.inputs['margin'].isEnabled, 'Clipping must keep the edge margin active'
             session.inputs['clip_boundary'].value = False
-            assert len(_dialog_entry.SHAPES) == 13
+            assert len(_dialog_entry.SHAPES) == 19 and _dialog_entry.SHAPES[-1][0]=='voronoi'
             for index, (shape, _) in enumerate(_dialog_entry.SHAPES):
                 session.inputs['shape'].listItems.item(index).isSelected = True
                 session.update_visibility()
@@ -61,7 +61,8 @@ class PerforaDialogRegression(adsk.core.CommandCreatedEventHandler):
                 assert session.inputs['star_ratio'].isVisible == (shape == 'star')
                 assert session.inputs['star_points'].isVisible == (shape == 'star')
                 for identifier in ('irregularity', 'seed', 'new_pattern'):
-                    assert session.inputs[identifier].isVisible == (shape == 'voronoi')
+                    assert session.inputs[identifier].isVisible == (shape == 'voronoi' or
+                        identifier!='irregularity' and shape in _dialog_entry.ORGANIC_SHAPES)
                 assert session.inputs['round_corners'].isVisible == (shape == 'voronoi')
                 assert not session.inputs['corner_radius'].isVisible
                 if shape == 'voronoi':
@@ -70,8 +71,8 @@ class PerforaDialogRegression(adsk.core.CommandCreatedEventHandler):
                     assert session.inputs['corner_radius'].isVisible
                     session.inputs['round_corners'].value = False
                     session.update_visibility()
-                assert session.inputs['layout'].isVisible == (shape != 'voronoi')
-                assert session.inputs['shape_angle'].isVisible == (shape not in ('circle', 'voronoi'))
+                assert session.inputs['layout'].isVisible == (shape != 'voronoi' and shape not in _dialog_entry.ORGANIC_SHAPES)
+                assert session.inputs['shape_angle'].isVisible == (shape not in ('circle', 'voronoi') and shape not in _dialog_entry.ORGANIC_SHAPES)
                 assert session.inputs[size_id].tooltip == _dialog_entry.SIZE_HELP[shape]
             session.inputs['shape'].listItems.item(0).isSelected = True
             session.update_visibility()

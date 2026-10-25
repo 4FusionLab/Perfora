@@ -1,7 +1,34 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Temporary, exact straight extrusion. Safe during a custom-feature compute."""
+import math
 import adsk.core
 import adsk.fusion
+
+
+class PointKeys:
+    """Stable topology IDs for coincident kernel points, including bucket edges.
+
+    Rounding coordinates independently can put the two copies of an exact .5
+    decimal coordinate in different buckets after a ruled-surface operation.
+    Search neighboring buckets and compare distance before sharing a vertex.
+    """
+    def __init__(self,tolerance=2e-6):
+        self.tolerance=tolerance
+        self.buckets={}
+        self.count=0
+
+    def key(self,point):
+        p=tuple(point.asArray());bucket=tuple(math.floor(v/self.tolerance) for v in p)
+        matches=[]
+        for x in (-1,0,1):
+            for y in (-1,0,1):
+                for z in (-1,0,1):
+                    for q,index in self.buckets.get((bucket[0]+x,bucket[1]+y,bucket[2]+z),()):
+                        if math.dist(p,q)<=self.tolerance:matches.append(index)
+        if matches:return min(matches)
+        index=self.count;self.count+=1
+        self.buckets.setdefault(bucket,[]).append((p,index))
+        return index
 
 
 def translated(body, distance):
@@ -53,9 +80,7 @@ def extrude(sheets, start, end):
                     faces.append((f, flip))
             shell = definition.lumpDefinitions.add().shellDefinitions.add()
             vertices, edges, uses = {}, {}, {}
-
-            def key(point):
-                return tuple(round(v, 7) for v in point.asArray())
+            key = PointKeys().key
 
             def vertex(point):
                 k = key(point)

@@ -4,6 +4,7 @@ from dataclasses import replace
 import math
 import unittest
 
+from Perfora.geometry import ORGANIC_SHAPES
 from Perfora.geometry import (Loop, Region, Settings, SHAPE_IDS, disk_region, dist,
                              edges, fits, generate, rectangle_region, rotate,
                              segment_distance)
@@ -23,7 +24,7 @@ class CircularTests(unittest.TestCase):
 
     def test_all_repeating_shapes_preserve_boundary_and_true_contour_gap(self):
         region = rectangle_region(4, 3)
-        for shape in SHAPE_IDS:
+        for shape in (s for s in SHAPE_IDS if s not in ORGANIC_SHAPES):
             if shape == 'voronoi':
                 continue
             for radial, tangential in ((False, False), (True, False), (False, True)):

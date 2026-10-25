@@ -41,7 +41,7 @@ class OptimizationTests(unittest.TestCase):
                            g.Loop(g.rectangle_region(.2, .3).loops[0].points, False)))
         indexed = g.BoundaryIndex(region.segments)
         rng = random.Random(241026)
-        for shape in g.SHAPE_IDS:
+        for shape in (s for s in g.SHAPE_IDS if s not in g.ORGANIC_SHAPES):
             settings = g.Settings(shape=shape, size=.4, slot_length=.8, gap=.13, margin=.1)
             if shape == 'voronoi':
                 cells = g.generate(region, settings)

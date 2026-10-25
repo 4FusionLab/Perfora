@@ -8,6 +8,7 @@ import unittest
 from Perfora.cache import GeometryCache
 from Perfora.curve_layout import (MAX_SAMPLES, PATH_TOLERANCE, PLANE_TOLERANCE,
                                   path_distances, sample_path)
+from Perfora.geometry import ORGANIC_SHAPES
 from Perfora.geometry import (Loop, Region, Settings, SHAPE_IDS, dist, edges,
                              enclosing_radius, fits, generate, rectangle_region,
                              segment_distance)
@@ -113,7 +114,7 @@ class CurveLayoutTests(unittest.TestCase):
         self.assertTrue(all(c.angle == .3 for c in generate(self.region,fixed)))
 
     def test_all_repeating_shapes_preserve_true_web_in_both_orientations(self):
-        for shape in SHAPE_IDS:
+        for shape in (s for s in SHAPE_IDS if s not in ORGANIC_SHAPES):
             if shape == 'voronoi': continue
             for orientation in ('fixed','tangent'):
                 with self.subTest(shape=shape,orientation=orientation):

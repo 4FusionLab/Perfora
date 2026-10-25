@@ -4,6 +4,7 @@ from dataclasses import replace
 import math
 import unittest
 
+from Perfora.geometry import ORGANIC_SHAPES
 from Perfora.geometry import (Settings, SHAPE_IDS, Region, Loop, rectangle_region, generate,
                              dist, fits, placement_center, rotate)
 
@@ -20,7 +21,7 @@ class OriginTests(unittest.TestCase):
 
     def test_spread_applies_to_every_shape_and_distribution(self):
         region = rectangle_region(6, 5)
-        for shape in SHAPE_IDS:
+        for shape in (s for s in SHAPE_IDS if s not in ORGANIC_SHAPES):
             for layout in ('grid', 'circular') if shape != 'voronoi' else ('grid',):
                 with self.subTest(shape=shape, layout=layout):
                     s = Settings(layout=layout, shape=shape, size=.3, slot_length=.55,
