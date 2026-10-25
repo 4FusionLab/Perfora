@@ -49,7 +49,7 @@ def validate(s):
     if s.radial_orientation or s.tangential_orientation or s.start_radius:
         raise ValueError('Organic fields do not use circular placement or hole orientation.')
     if s.size < s.gap * .6:
-        raise ValueError('Increase Pattern Scale relative to Web Thickness to leave open organic holes.')
+        raise ValueError('Increase Cell Size relative to Web Thickness to leave open organic holes.')
 
 
 def _hash(seed, x, y):
@@ -434,7 +434,7 @@ def field_grid(width, height, scale):
             step *= 1.01
             nx, ny = dimensions(step)
         if step > scale/8:
-            raise ValueError('Organic field exceeds the sampling budget. Increase Pattern Scale or select a smaller region.')
+            raise ValueError('Organic field exceeds the sampling budget. Increase Cell Size or select a smaller region.')
     return step, nx, ny
 
 
@@ -496,7 +496,7 @@ def generate(region,s):
             vertices=cell.vertices
             if not _simple(vertices):continue
             candidates.append(cell);edge_count+=len(cell.contour)
-            if edge_count>MAX_EDGES*2:raise ValueError('Organic contours exceed the edge budget. Increase Pattern Scale or reduce the region.')
+            if edge_count>MAX_EDGES*2:raise ValueError('Organic contours exceed the edge budget. Increase Cell Size or reduce the region.')
         repairs=[]
         candidates=_separated(candidates,s.gap,s.size,lambda point,distance:repairs.append((point,distance)))
         if not repairs or attempt==3:break
@@ -512,9 +512,9 @@ def generate(region,s):
     for cell in _separated(candidates,s.gap,s.size):
         if not (g.overlaps(cell,region,segments) if s.clip_boundary else g.fits(cell,region,segments,s.margin)):continue
         result.append(cell);edge_count+=len(cell.contour)
-        if len(result)>s.limit:raise ValueError('The hole count exceeds Maximum Holes. Increase Pattern Scale or Maximum Holes.')
-        if edge_count>MAX_EDGES:raise ValueError('Organic contours exceed the edge budget. Increase Pattern Scale or reduce the region.')
-    if not result:raise ValueError('No organic holes fit. Increase Pattern Scale or Field Fill, or reduce Web Thickness / Edge Offset.')
+        if len(result)>s.limit:raise ValueError('The hole count exceeds Maximum Holes. Increase Cell Size or Maximum Holes.')
+        if edge_count>MAX_EDGES:raise ValueError('Organic contours exceed the edge budget. Increase Cell Size or reduce the region.')
+    if not result:raise ValueError('No organic holes fit. Increase Cell Size or reduce Web Thickness / Edge Offset.')
     return result
 
 
@@ -566,6 +566,6 @@ def blue_noise(region,s):
         cell=g.Cell(g.rotate((x,y),angle),'circle',2*r,2*r,0)
         if g.overlaps(cell,region,segments) if s.clip_boundary else g.fits(cell,region,segments,s.margin):
             result.append(cell)
-            if len(result)>s.limit:raise ValueError('The hole count exceeds Maximum Holes. Increase Pattern Scale or Maximum Holes.')
+            if len(result)>s.limit:raise ValueError('The hole count exceeds Maximum Holes. Increase Cell Size or Maximum Holes.')
     if not result:raise ValueError('No Blue Noise holes fit. Reduce Pattern Scale or Edge Offset.')
     return result

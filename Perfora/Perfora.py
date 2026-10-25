@@ -199,7 +199,7 @@ class Session:
         self.dropdown(pattern, 'surface_layout', 'Distribution', self.surface_choices, icons=True)
         self.dropdown(pattern, 'layout_orientation', 'Orientation', [('tangent', 'Follow Pattern'), ('fixed', 'Fixed')])
         for key, (label, unit, expression) in VARIANT_PARAMETERS.items():
-            self.number(field_options if key in ('organic_variation','organic_gradient') else pattern, key, label, expression, unit)
+            self.number(pattern, key, label, '0.5 mm' if key == 'contour_tolerance' else expression, unit)
         self.inputs['along_spacing'].tooltip = ('Center spacing measured along each row. 0 is automatic. '
             'Spacing is raised to the enclosing hole diameter plus Web Thickness; nearby candidates may be omitted to keep the web.')
         self.inputs['row_spacing'].tooltip = 'Row spacing. 0 is automatic; the enclosing hole diameter plus Web Thickness is the minimum.'
@@ -1110,6 +1110,8 @@ class ActivateDefaults(adsk.core.CommandEventHandler):
             self.session.initial_defaults_applied = True
             self.session.inputs['result'].listItems.item(2).isSelected = True
             self.session.inputs['preview_color'].listItems.item(0).isSelected = True
+            if self.session.shape_key() in ORGANIC_SHAPES:
+                self.session.field_defaults()
             self.session.apply_preselected_sources()
         self.session.restore_empty_inputs()
 

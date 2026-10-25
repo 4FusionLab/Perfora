@@ -179,18 +179,22 @@ def apply_spread(body, region, settings):
 
 
 def inset_body(source, original, margin, scratch=None):
-    """Use native offsets, then the shared bounded boundary sweep if they fail."""
-    try:
+    """Use simple native offsets and bounded sweeps for complex boundaries."""
+    if margin <= 1e-9:
+        return original
+    loops = list(body_loops(original))
+    curves = loops[0][0] if len(loops) == 1 else ()
+    simple = (len(curves) == 4 and all(isinstance(c, adsk.core.Line3D) for c in curves)
+              or len(curves) == 1 and isinstance(curves[0], adsk.core.Circle3D))
+    if simple:
         return _wire_inset(source, original, margin, scratch)
-    except (RuntimeError, ValueError):
-        # The same exact-mask fallback already supports projected curved faces.
-        # Planar imported/base-feature faces can produce crossing offset wires
-        # too, even when a substantial interior remains usable.
-        from .surface import erode_boundary
-        result = erode_boundary(original, margin)
-        if result is None:
-            raise ValueError('Edge Offset leaves no region for perforation.')
-        return result
+    # Do not first submit crossing wires: within a preview transaction Fusion
+    # can retain that native error and reject even a subsequent manager.get().
+    from .surface import erode_boundary
+    result = erode_boundary(original, margin)
+    if result is None:
+        raise ValueError('Edge Offset leaves no region for perforation.')
+    return result
 
 
 def _wire_inset(source, original, margin, scratch=None):

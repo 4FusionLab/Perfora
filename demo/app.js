@@ -68,7 +68,7 @@
     current=result;currentParameters={...config};
     const [x,y,w,h]=result.box,pad=Math.max(w,h)*.13;
     $('preview').setAttribute('viewBox',`${x-pad} ${y-pad} ${w+pad*2} ${h+pad*2}`);
-    $('preview').setAttribute('aria-label',`${config.shape==='voronoi'?'Voronoi':$('layout').selectedOptions[0].textContent} pattern, ${result.count} holes, ${result.open_area}% open area`);
+    $('preview').setAttribute('aria-label',`${organics.has(config.shape)||config.shape==='voronoi'?$('shape').selectedOptions[0].textContent:$('layout').selectedOptions[0].textContent} pattern, ${result.count} holes, ${result.open_area}% open area`);
     $('panel-geometry').innerHTML=result.clip?`<defs><clipPath id="cut-boundary"><path d="${result.clip}"/></clipPath><mask id="panel-cut" maskUnits="userSpaceOnUse" x="${x}" y="${y}" width="${w}" height="${h}"><path d="${result.outer}" fill="white"/><path d="${result.holes}" fill="black" clip-path="url(#cut-boundary)"/></mask></defs><path d="${result.outer}" fill="#343c38" mask="url(#panel-cut)" filter="url(#panel-shadow)"/>`:`<path d="${result.outer} ${result.holes}" fill="#343c38" fill-rule="evenodd" filter="url(#panel-shadow)"/>`;
     $('guide-geometry').innerHTML=result.guides.map(d=>`<path d="${d}"/>`).join('');
     $('guide-geometry').toggleAttribute('hidden',!$('show-guides').checked);
