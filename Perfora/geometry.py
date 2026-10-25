@@ -180,7 +180,7 @@ class Settings:
     guide_reverse: bool = False
     guide1: tuple = ()  # Prepared 2D strokes only; live references stay in config.
     guide2: tuple = ()
-    # Opt-in offline candidate. Legacy files/defaults retain revision 1.
+    # Legacy files/defaults retain revision 1; new native commands select 2.
     distribution_revision: int = 1
     layout_orientation: str = 'fixed'
     path_spacing: float = 0.8

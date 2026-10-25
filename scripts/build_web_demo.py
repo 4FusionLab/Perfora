@@ -16,15 +16,16 @@ import sys
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from demo.engine import compute,LAYOUTS
-from Perfora.geometry import VARIANT_LAYOUTS
+from Perfora.geometry import VARIANT_LAYOUTS, ORGANIC_SHAPES
+from Perfora.organic import LABELS as ORGANIC_LABELS
 
 SHAPES=(('circle','Circle'),('hexagon','Hexagon'),('square','Square'),('slot','Slot'),
         ('triangle','Triangle'),('rectangle','Rectangle'),('diamond','Diamond'),('ellipse','Ellipse'),
-        ('pentagon','Pentagon'),('octagon','Octagon'),('cross','Cross'),('star','Star'),('voronoi','Voronoi'))
+        ('pentagon','Pentagon'),('octagon','Octagon'),('cross','Cross'),('star','Star')) + tuple(zip(ORGANIC_SHAPES,ORGANIC_LABELS)) + (('voronoi','Voronoi'),)
 LABELS={'staggered':'Staggered','rows':'Rectangular','circular':'Circular','path':'Along Path','contour':'Contour',
         'fan':'Fan','phyllotaxis':'Phyllotaxis','poisson':'Poisson Disk','wave':'Wave','chevron':'Chevron','between_curves':'Between Curves'}
 MODULES=('Perfora/__init__.py','Perfora/geometry.py','Perfora/curves.py','Perfora/curve_layout.py',
-         'Perfora/distributions.py','Perfora/distribution_fields.py','studies/__init__.py',
+         'Perfora/distributions.py','Perfora/distribution_fields.py','Perfora/organic.py','studies/__init__.py',
          'studies/source_fixtures.py','demo/__init__.py','demo/engine.py')
 
 

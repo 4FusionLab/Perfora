@@ -8,7 +8,7 @@ from dataclasses import replace
 import json
 import math
 from time import perf_counter
-from Perfora.geometry import Settings, Region, Loop, rectangle_region, generate, VARIANT_LAYOUTS, SHAPE_IDS, LENGTH_SHAPES
+from Perfora.geometry import Settings, Region, Loop, rectangle_region, generate, VARIANT_LAYOUTS, SHAPE_IDS, LENGTH_SHAPES, ORGANIC_SHAPES, ORGANIC_FIELDS
 from Perfora.curve_layout import sample_path
 from studies.source_fixtures import ArcEvaluator
 
@@ -42,8 +42,13 @@ def prepare(data):
     # Hidden controls must not invalidate another pattern. Inactive values are
     # intentionally replaced by defaults at the adapter boundary.
     active={'shape','layout','width','height','size','gap','margin','boundary','orientation','spacing'}
+    organic=shape in ORGANIC_SHAPES
+    if organic:
+        layout='rows'
+        active={'shape','layout','width','height','size','gap','margin','boundary','seed','organic_direction'}
+        active.update(('organic_variation','organic_gradient') if shape=='blue_noise' else ('organic_open','organic_bridges'))
     if shape in LENGTH_SHAPES:active.add('length')
-    if shape!='circle':active.add('angle')
+    if shape!='circle' and not organic:active.add('angle')
     if shape=='cross':active.add('arm_width')
     if shape=='star':active.update(('star_ratio','star_points'))
     if shape=='voronoi':active.update(('seed','irregularity','corner_radius'));layout='rows'
@@ -55,7 +60,7 @@ def prepare(data):
     width=number(data,'width',120,30,300)/10
     kind=data.get('boundary','rectangle')
     height=width if kind=='disk' else number(data,'height',100,30,300)/10
-    size=number(data,'size',2.5,1,20)/10
+    size=number(data,'size',5 if organic else 2.5,1,20)/10
     length=number(data,'length',5.2,1,40)/10
     gap=number(data,'gap',1.2,.3,10)/10
     margin=number(data,'margin',1.8,0,20)/10
@@ -77,12 +82,17 @@ def prepare(data):
         start_radius=number(data,'start_radius',0,0,30)/10,
         distribution_revision=2 if layout in VARIANT_LAYOUTS else 1,
         layout_orientation='tangent' if orientation!='fixed' else 'fixed',
+        organic_open=number(data,'organic_open',48,15,75),
+        organic_direction=math.radians(number(data,'organic_direction',0,-180,180)),
+        organic_variation=number(data,'organic_variation',80,0,90),
+        organic_gradient=number(data,'organic_gradient',100,-100,100),
+        organic_bridges=bool(data.get('organic_bridges',False)) if shape in ORGANIC_FIELDS else False,
         tangential_orientation=layout=='circular' and orientation=='tangent',
         radial_orientation=layout=='circular' and orientation=='radial')
     if shape not in LENGTH_SHAPES:s=replace(s,slot_length=max(length,size))
     # Explicit spacings remain minimums. The shared planner may increase them
     # coherently to preserve full rows and requested clearances.
-    if shape=='voronoi':along=normal=size+gap
+    if shape=='voronoi' or organic:along=normal=size+gap
     elif shape in ('circle','slot'):
         along=(length if shape=='slot' else size)+gap
         normal=size+gap
@@ -107,7 +117,7 @@ def prepare(data):
                   path_orientation='tangent' if orientation!='fixed' else 'fixed')
         s=replace(s,path_samples=sample_path(evaluator,s,lambda p:(p.x,p.y,p.z),lambda p:(p.x,p.y,p.z)))
         guides=[tuple((p.x,p.y) for p in evaluator.getStrokes(evaluator.start,evaluator.end,.01)[1])]
-    if shape=='voronoi':s=replace(s,layout='grid',distribution_revision=1)
+    if shape=='voronoi' or organic:s=replace(s,layout='grid',distribution_revision=1)
     return region,s,guides
 
 
@@ -136,6 +146,11 @@ def cell_path(c):
         a,b=c.at((-c.length/2,0)),c.at((c.length/2,0))
         rx,ry=c.length/2,c.size/2;angle=-math.degrees(c.angle)
         return f'M{fmt(a[0])},{fmt(-a[1])}A{fmt(rx)},{fmt(ry)} {fmt(angle)} 1 0 {fmt(b[0])},{fmt(-b[1])}A{fmt(rx)},{fmt(ry)} {fmt(angle)} 1 0 {fmt(a[0])},{fmt(-a[1])}Z'
+    if c.shape in ORGANIC_FIELDS:
+        result='M'+fmt(c.contour[0].start[0])+','+fmt(-c.contour[0].start[1])
+        for edge in c.contour:
+            result+='C'+','.join(fmt(v) for p in (edge.control1,edge.control2,edge.end) for v in (p[0],-p[1]))
+        return result+'Z'
     if c.shape=='voronoi' and c.corner_radius>0:
         result='M'+fmt(c.contour[0].start[0])+','+fmt(-c.contour[0].start[1])
         for edge in c.contour:

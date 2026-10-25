@@ -68,8 +68,9 @@ STARTS = [('profile', 'Profile Plane'), ('offset', 'Offset')]
 LAYOUTS = [('staggered', 'Staggered'), ('rows', 'Rectangular'), ('circular', 'Circular'), ('path', 'Along Path')]
 LAYOUTS += [('contour', 'Contour'), ('fan', 'Fan'), ('phyllotaxis', 'Phyllotaxis'),
             ('poisson', 'Poisson Disk'), ('wave', 'Wave'), ('chevron', 'Chevron'),
-            ('running_bond', 'Running Bond'), ('between_curves', 'Between Curves')]
-SURFACE_LAYOUTS = LAYOUTS[:2] + [(key, label) for key, label in LAYOUTS if key in ('running_bond', 'poisson', 'wave', 'chevron')]
+            ('between_curves', 'Between Curves')]
+LEGACY_BOND = ('running_bond', 'Running Bond (Legacy)')
+SURFACE_LAYOUTS = LAYOUTS[:2] + [(key, label) for key, label in LAYOUTS if key in ('poisson', 'wave', 'chevron')]
 PATH_ORIENTATIONS = [('fixed', 'Fixed'), ('tangent', 'Tangent')]
 ORIENTATIONS = [('fixed', 'Fixed'), ('radial', 'Radial'), ('tangential', 'Tangential')]
 PREVIEW_MODES = [('fast', 'Fast'), ('exact', 'Full')]
@@ -84,6 +85,9 @@ class Session:
     def __init__(self, command, edited_feature=None):
         self.command = command
         self.edited_feature = edited_feature
+        saved_settings = parametric.stored(edited_feature)['settings'] if edited_feature else {}
+        self.distribution_revision = saved_settings.get('distribution_revision', 1) if edited_feature else 2
+        self.layout_choices = LAYOUTS + ([LEGACY_BOND] if saved_settings.get('layout') == 'running_bond' else [])
         self.restore_marker = None
         self._extrude_inputs = None
         self._planar_material = None
@@ -107,7 +111,7 @@ class Session:
         self.renderer = Renderer()
         self.selection_notice = ''
         self.surface_notice = ''
-        self.surface_choices = SURFACE_LAYOUTS
+        self.surface_choices = SURFACE_LAYOUTS + ([LEGACY_BOND] if saved_settings.get('layout') == 'running_bond' else [])
         self.cylinder_source = None
         self.cylinder_frame = None
         self.cylinder_layout_key = None
@@ -183,8 +187,9 @@ class Session:
         self.check(pattern, 'clip_boundary', 'Trim to Boundary', False)
         self.inputs['clip_boundary'].tooltip = ('Trim intersecting holes to the boundary after applying Edge Offset. '
             'Clear this option to keep only complete holes.')
-        self.dropdown(pattern, 'layout', 'Distribution', LAYOUTS, icons=True)
-        self.dropdown(pattern, 'surface_layout', 'Distribution', SURFACE_LAYOUTS, icons=True)
+        self.dropdown(pattern, 'layout', 'Distribution', self.layout_choices, icons=True)
+        self.dropdown(pattern, 'surface_layout', 'Distribution', self.surface_choices, icons=True)
+        self.dropdown(pattern, 'layout_orientation', 'Orientation', [('tangent', 'Follow Pattern'), ('fixed', 'Fixed')])
         for key, (label, unit, expression) in VARIANT_PARAMETERS.items():
             self.number(pattern, key, label, expression, unit)
         self.inputs['along_spacing'].tooltip = ('Center spacing measured along each row. 0 is automatic. '
@@ -309,7 +314,7 @@ class Session:
                 d[key].listItems.item(next(i for i, (k, _) in enumerate(options) if k == chosen)).isSelected = True
             layout = settings.get('layout', 'grid')
             layout = ('staggered' if settings['staggered'] else 'rows') if layout == 'grid' else layout
-            d['layout'].listItems.item(next(i for i, (key, _) in enumerate(LAYOUTS) if key == layout)).isSelected = True
+            d['layout'].listItems.item(next(i for i, (key, _) in enumerate(self.layout_choices) if key == layout)).isSelected = True
             defaults = Settings()
             for key in (*VARIANT_PARAMETERS, *ORGANIC_PARAMETERS):
                 d[key].value = settings.get(key, getattr(defaults, key))
@@ -319,6 +324,7 @@ class Session:
             choices = getattr(self, 'surface_choices', SURFACE_LAYOUTS)
             if layout in dict(choices):
                 d['surface_layout'].listItems.item(next(i for i, item in enumerate(choices) if item[0] == layout)).isSelected = True
+            d['layout_orientation'].listItems.item(0 if settings.get('layout_orientation', 'fixed') == 'tangent' else 1).isSelected = True
             d['path_orientation'].listItems.item(1 if settings.get('path_orientation') == 'tangent' else 0).isSelected = True
             d['path_reverse'].value = settings.get('path_reverse', False)
             for key, fallback in (('path_spacing', .8), ('path_start', 0), ('path_end', 0), ('path_position', 0)):
@@ -531,7 +537,7 @@ class Session:
         kind = ('cylinder' if isinstance(source.geometry, adsk.core.Cylinder) else
                 'cone' if isinstance(source.geometry, adsk.core.Cone) else 'freeform')
         allowed = surface.sg.SURFACE_DISTRIBUTIONS[kind]
-        choices = [item for item in SURFACE_LAYOUTS if item[0] in ('staggered', 'rows') or item[0] in allowed]
+        choices = [item for item in SURFACE_LAYOUTS + ([LEGACY_BOND] if LEGACY_BOND in self.layout_choices else []) if item[0] in ('staggered', 'rows') or item[0] in allowed]
         previous = getattr(self, 'surface_choices', SURFACE_LAYOUTS)
         if choices != previous:
             key = self.chosen('surface_layout', previous)
@@ -617,7 +623,7 @@ class Session:
                     d['clip_boundary'].value=self._organic_trim
                     self._organic_trim=None
             field_shape = organic or shape == 'voronoi'
-            layout = (self.chosen('surface_layout', self.surface_choices) if is_curved else self.chosen('layout', LAYOUTS)) if not field_shape else 'grid'
+            layout = (self.chosen('surface_layout', self.surface_choices) if is_curved else self.chosen('layout', self.layout_choices)) if not field_shape else 'grid'
             for identifier in ('irregularity', 'round_corners'):
                 visible(identifier, shape == 'voronoi')
             for identifier in ('seed', 'new_pattern'):
@@ -648,9 +654,10 @@ class Session:
             for key in ('offset_x', 'offset_y'):
                 visible(key, not along_path and (not boundary_anchored or scoped))
             visible('start_radius', circular or layout == 'fan')
-            d['start_radius'].tooltip = ('Radius of the first hole center on each ray. Nearby holes are omitted to preserve Web Thickness.'
+            d['start_radius'].tooltip = ('Common inner radius of the rays. It may increase coherently to preserve Web Thickness.'
                 if layout == 'fan' else 'Radius of the first ring, measured to hole centers. 0 starts with a center hole; ring spacing preserves Web Thickness.')
             visible('orientation', circular and shape != 'circle')
+            visible('layout_orientation', self.distribution_revision == 2 and layout in LAYOUT_PARAMETERS and layout not in ('poisson', 'running_bond') and shape != 'circle' and not field_shape)
             visible('clip_boundary', True)
             visible('spread_radius',False)
             d['spread_radius'].tooltip = ('Limit the surface to the 3D distance from Start Point, including X/Y Offset. '
@@ -735,7 +742,7 @@ class Session:
         if not is_curved and not organic: required.append('grid_angle')
         if is_curved and isinstance(source.geometry,(adsk.core.Cylinder,adsk.core.Cone)):
             required += list(surface.ZONE_PARAMETERS)
-        layout = (self.chosen('surface_layout', self.surface_choices) if is_curved else self.chosen('layout', LAYOUTS)) if shape != 'voronoi' and not organic else 'grid'
+        layout = (self.chosen('surface_layout', self.surface_choices) if is_curved else self.chosen('layout', self.layout_choices)) if shape != 'voronoi' and not organic else 'grid'
         organic_keys = [key for key in ORGANIC_PARAMETERS if d[key].isVisible]
         if organic: required += organic_keys + ['seed']
         circular = layout == 'circular'
@@ -831,6 +838,8 @@ class Session:
                                 self.chosen('orientation', ORIENTATIONS) == 'radial',
                             tangential_orientation=circular and shape != 'circle' and
                                 self.chosen('orientation', ORIENTATIONS) == 'tangential',
+                            distribution_revision=self.distribution_revision,
+                            layout_orientation=self.chosen('layout_orientation', [('tangent', ''), ('fixed', '')]) if self.distribution_revision == 2 else 'fixed',
                             guide_reverse=d['guide_reverse'].value if layout == 'between_curves' else False,
                             organic_bridges=d['organic_bridges'].value if shape in ORGANIC_FIELDS else False,
                             **variant_values, **{key:d[key].value for key in organic_keys})

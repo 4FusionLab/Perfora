@@ -16,9 +16,9 @@
 
 ## Make the pattern. Keep the native model.
 
-Development visual acceptance: [the offline Distribution test](studies/README.md) exports all 12 current Distribution entries to one self-contained HTML file using the shared geometry kernel. Revision 2 is opt-in and awaits visual acceptance and native integration; installed Fusion behavior is unchanged.
+Development visual acceptance: [the offline Distribution test](studies/README.md) renders the 11 Distribution families from the shared geometry kernel. New native commands use revision 2 for the revised families, including partial boundary candidates and Follow Pattern orientation. Existing Features retain their saved revision; legacy Running Bond remains editable.
 
-[Pattern playground](demo/README.md) is the browser demo and fast visual test bench. It executes the same Python geometry sources as Fusion, with 11 Distribution families, 13 hole shapes and shareable parameters. Build with `python3 scripts/build_web_demo.py`; serve the repository and open `/demo/`. It is prepared for static hosting; no deployment is performed by the build.
+[Pattern playground](demo/README.md) is the browser demo and fast visual test bench. It executes the same Python geometry sources as Fusion, with 11 Distribution families, 19 hole shapes, including six organic fields and shareable parameters. Build with `python3 scripts/build_web_demo.py`; serve the repository and open `/demo/`. It is prepared for static hosting; no deployment is performed by the build.
 
 Select a planar face, a closed sketch profile, or a construction plane. Choose a hole shape, set the spacing and edge clearance, and preview the result. Perfora creates ordinary sketch profiles, a native Fusion Extrude, or a parametric Perfora timeline feature.
 

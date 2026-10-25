@@ -108,11 +108,15 @@ class DistributionStudyTests(unittest.TestCase):
                 self.assertLess(math.dist(transform(before.center),after.center),1e-7)
                 self.assertAlmostEqual(before.angle+angle,after.angle,places=7)
 
-    def test_candidate_rejects_unimplemented_trim_and_scope(self):
+    def test_partial_candidates_and_legacy_scope_use_shared_kernel(self):
+        from Perfora.geometry import overlaps
         a=self.samples['wave','circle','fixed']
-        for changes in ({'clip_boundary':True},{'spread_radius':2}):
-            with self.assertRaisesRegex(ValueError,'revision 2'):
-                kernel_generate(a.region,replace(a.settings,**changes))
+        partial=kernel_generate(a.region,replace(a.settings,clip_boundary=True))
+        self.assertTrue(any(not fits(c,a.region,a.region.segments,a.settings.margin) for c in partial))
+        self.assertTrue(all(overlaps(c,a.region,a.region.segments) for c in partial))
+        scoped=kernel_generate(a.region,replace(a.settings,spread_radius=2))
+        self.assertTrue(scoped)
+        self.assertTrue(all(math.hypot(*c.center)+c.size/2+a.settings.margin<=2+1e-8 for c in scoped))
 
     def test_circular_fixture_fills_the_center_by_default(self):
         for shape,orientation in (('circle','fixed'),('slot','fixed'),('slot','tangent')):

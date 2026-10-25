@@ -27,7 +27,7 @@ class WebDemoTests(unittest.TestCase):
     def test_all_hole_shapes_generate_real_preview_geometry(self):
         for shape in SHAPE_IDS:
             with self.subTest(shape=shape):
-                result=compute({'shape':shape,'layout':'chevron','arm_width':.8,'size':7 if shape=='voronoi' else 2.5})
+                result=compute({'shape':shape,'layout':'chevron','arm_width':.8,'size':7 if shape=='voronoi' else 5 if shape in ('smooth_noise','reaction_diffusion','directional_fibers','topographic','gyroid','blue_noise') else 2.5})
                 self.assertGreater(result['count'],5)
                 self.assertTrue(0<result['open_area']<100)
                 self.assertTrue(result['holes'].startswith('M'))

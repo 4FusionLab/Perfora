@@ -31,7 +31,7 @@ async (page) => {
       }
     }
     await p.locator('#layout').selectOption('chevron');
-    for(const shape of ['circle','hexagon','square','slot','triangle','rectangle','diamond','ellipse','pentagon','octagon','cross','star','voronoi']){
+    for(const shape of ['circle','hexagon','square','slot','triangle','rectangle','diamond','ellipse','pentagon','octagon','cross','star','smooth_noise','reaction_diffusion','directional_fibers','topographic','gyroid','blue_noise','voronoi']){
       await p.locator('#shape').selectOption(shape);
       await p.waitForTimeout(250);
       await sample('shape-'+shape);

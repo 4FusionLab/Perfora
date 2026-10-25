@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""Visual acceptance candidate, independent of Fusion. All lengths are cm.
+"""Shared revision 2 fields, independent of Fusion. All lengths are cm.
 
 Unlike the shipped candidate rejection scheme, solve a whole field's spacing
 before clipping it to the source. A clearance conflict rebuilds the field; it
-never silently punches a missing sample out of a row. Revision 2 is opt-in until visual acceptance and native integration.
+never silently punches a missing sample out of a row. Legacy features keep revision 1; new native commands select revision 2.
 """
 from dataclasses import dataclass
 import math
 from time import perf_counter
-from .geometry import (EPS, Cell, Settings, Loop, Region, fits, dist, segment_distance, rotate, placement_center, enclosing_radius)
+from .geometry import (EPS, Cell, Settings, Loop, Region, fits, overlaps, dist, segment_distance, rotate, placement_center, enclosing_radius)
 from .curves import ArcPath
 from .distributions import _poisson, _DistanceTree
 from bisect import bisect_right
@@ -226,23 +226,26 @@ def _draft(name, region, s, factor, orientation):
         raise ValueError('Unknown study.')
     cells=[Cell(p,s.shape,s.size,s.slot_length,(a if orientation=='tangent' else 0)+s.shape_angle,
                 s.arm_width,s.star_ratio,s.star_points) for p,a in samples]
-    # Trim off whole boundary holes only; internal samples never undergo culling.
-    cells=[c for c in cells if fits(c,region,region._boundary_index,s.margin)]
+    # Exact partial contours are resolved by the common CAD clipping adapter.
+    # Keep every intersecting candidate here, including centers outside the face.
+    cells=[c for c in cells if (overlaps(c,region,region._boundary_index) if s.clip_boundary
+                               else fits(c,region,region._boundary_index,s.margin))]
     return cells,strokes
 
 
 def build_field(region,s):
     """Shared versioned kernel used by geometry.generate and visual regression.
 
-    Revision 2 accepts repeating shapes and whole holes. It stays
-    opt-in until the user's acceptance and full CAD integration are complete.
+    Revision 2 accepts repeating shapes. Partial-hole candidates go through
+    the same exact clipping path as grid, circular and legacy distributions.
     """
-    if s.shape=='voronoi' or s.clip_boundary or s.spread_radius or region.scope_center is not None:
-        raise ValueError('Distribution revision 2 currently requires repeating shapes and whole holes.')
+    if s.shape=='voronoi':
+        raise ValueError('Distribution revision 2 requires repeating hole shapes.')
     s.validate()
     origin=placement_center(region,s)
     def local(p):return rotate((p[0]-origin[0],p[1]-origin[1]),-s.grid_angle)
-    local_region=Region(tuple(Loop(tuple(local(p) for p in l.points),l.outer) for l in region.loops),region.tolerance)
+    local_region=Region(tuple(Loop(tuple(local(p) for p in l.points),l.outer) for l in region.loops),region.tolerance,
+                        local(region.scope_center) if region.scope_center is not None else None,region.scope_radius)
     from dataclasses import replace
     local_s=replace(s,grid_angle=0,origin_x=0,origin_y=0,offset_x=0,offset_y=0,
                     guide1=tuple(local(p) for p in s.guide1),guide2=tuple(local(p) for p in s.guide2))

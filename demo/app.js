@@ -4,44 +4,48 @@
   const bundle=JSON.parse(document.getElementById('demo-bundle').textContent);
   const $=id=>document.getElementById(id);
   const fields=[...document.querySelectorAll('[data-parameter]')];
-  const defaults=Object.fromEntries(fields.map(el=>[el.id,el.value]));
+  const defaults=Object.fromEntries(fields.map(el=>[el.id,el.type==='checkbox'?el.checked:el.value]));
+  const organics=new Set(['smooth_noise','reaction_diffusion','directional_fibers','topographic','gyroid','blue_noise']);
   const lengths=new Set(['slot','ellipse','rectangle','diamond']);
   const descriptions={staggered:'Offset rows. A classic, balanced rhythm.',rows:'Straight rows and columns. Clean and precise.',circular:'Concentric rings, filled from the center.',path:'One continuous row along a guide curve.',contour:'Closed rows that follow the panel boundary.',fan:'Unbroken rays with a shared inner arc.',phyllotaxis:'The golden angle. A sunflower’s natural rhythm.',poisson:'An irregular field, with a consistent minimum gap.',wave:'Smooth, continuous rows. A rhythm that flows.',chevron:'Mirrored rows. A clear directional pattern.',between_curves:'Aligned rows between two flowing guides.'};
   const sizeLabels={circle:'Diameter',hexagon:'Across Flats',square:'Side Length',slot:'Width',triangle:'Side Length',rectangle:'Width',diamond:'Diagonal 1',ellipse:'Minor Axis',pentagon:'Diameter',octagon:'Across Flats',cross:'Overall Size',star:'Outer Diameter',voronoi:'Cell Spacing'};
   let worker,ready=false,busy=false,latestId=0,wanted=null,current=null,currentParameters=null,timer,watchdog,workerGeneration=0;
   const cache=new Map();
-  function parameters(){return Object.fromEntries(fields.map(el=>[el.id,el.tagName==='SELECT'?el.value:Number(el.value)]));}
+  function parameters(){return Object.fromEntries(fields.map(el=>[el.id,el.type==='checkbox'?el.checked:el.tagName==='SELECT'?el.value:Number(el.value)]));}
   function status(message,mode='ready'){$('status-text').textContent=message;$('status-dot').className='status-dot'+(mode==='ready'?'':' '+mode);}
   function visibility(){
-    const layout=$('layout').value,shape=$('shape').value,voronoi=shape==='voronoi';
-    $('layout').disabled=voronoi;
-    $('layout-help').textContent=voronoi?'Organic polygonal cells. One field, its own distribution.':descriptions[layout];
-    $('size-label').textContent=sizeLabels[shape];
+    const layout=$('layout').value,shape=$('shape').value,voronoi=shape==='voronoi',organic=organics.has(shape),field=voronoi||organic;
+    $('layout').disabled=field;
+    $('layout-help').textContent=organic?'This shape creates its own field. Pattern Scale sets its physical size.':voronoi?'Organic polygonal cells. One field, its own distribution.':descriptions[layout];
+    $('size-label').textContent=organic?(shape==='blue_noise'?'Maximum Diameter':'Pattern Scale'):sizeLabels[shape];
     $('length-field').hidden=!lengths.has(shape);
     $('length-field').firstChild.textContent=shape==='ellipse'?'Major Axis':shape==='diamond'?'Diagonal 2':'Length';
-    $('orientation-field').hidden=voronoi||shape==='circle'||['staggered','rows','poisson'].includes(layout);
+    $('orientation-field').hidden=field||shape==='circle'||['staggered','rows','poisson'].includes(layout);
     $('radial-option').hidden=layout!=='circular';
     if(layout!=='circular'&&$('orientation').value==='radial')$('orientation').value='tangent';
-    $('seed-field').hidden=!(voronoi||layout==='poisson');
-    $('spacing-field').hidden=voronoi||!bundle.variants.includes(layout);
-    $('angle-field').hidden=voronoi||shape==='circle';
+    $('seed-field').hidden=!(field||layout==='poisson');
+    $('spacing-field').hidden=field||!bundle.variants.includes(layout);
+    $('angle-field').hidden=field||shape==='circle';
     $('arm-field').hidden=shape!=='cross';
     $('star-points-field').hidden=$('star-ratio-field').hidden=shape!=='star';
     $('irregularity-field').hidden=$('corners-field').hidden=!voronoi;
-    for(const field of document.querySelectorAll('[data-for]'))field.hidden=voronoi||field.dataset.for!==layout;
+    for(const field of document.querySelectorAll('[data-for]'))field.hidden=voronoi||organic||field.dataset.for!==layout;
     $('spacing-value').textContent=Number($('spacing').value).toFixed(2)+'×';
     const disk=$('boundary').value==='disk';
     $('height').closest('label').hidden=disk;
     $('width').closest('label').firstChild.textContent=disk?'Diameter':'Width';
     document.querySelectorAll('.pattern-tile').forEach(el=>el.setAttribute('aria-pressed',String(!voronoi&&el.dataset.layout===layout)));
-    $('show-guides').disabled=voronoi;
+    $('show-guides').disabled=field;
+    $('organic-fields').hidden=!organic;
+    $('organic-open-field').hidden=$('organic-bridges-field').hidden=shape==='blue_noise';
+    $('organic-variation-field').hidden=$('organic-gradient-field').hidden=shape!=='blue_noise';
   }
   function setValues(values){
     for(const el of fields){
       if(!(el.id in values))continue;
       const value=String(values[el.id]);
       if(el.tagName==='SELECT'&&![...el.options].some(o=>o.value===value))continue;
-      el.value=value;
+      if(el.type==='checkbox')el.checked=Boolean(values[el.id]);else el.value=value;
     }
     visibility();
   }
@@ -137,6 +141,7 @@
       const sh=el.value;
       if(sh==='slot'){$('size').value='1.7';$('length').value='5.2';}
       else if(sh==='voronoi')$('size').value='7';
+      else if(organics.has(sh))$('size').value='5';
       else $('size').value='2.5';
       if(sh==='cross')$('arm_width').value='.8';
     }
@@ -148,7 +153,7 @@
   $('browse').addEventListener('click',()=>{const visible=$('pattern-gallery').hidden;$('pattern-gallery').hidden=!visible;$('browse').setAttribute('aria-expanded',String(visible));$('browse').textContent=visible?'Close patterns ↗':'Explore patterns ↘';});
   document.querySelectorAll('.pattern-tile').forEach(button=>button.addEventListener('click',()=>{
     $('layout').value=button.dataset.layout;
-    if($('shape').value==='voronoi'){$('shape').value='circle';$('size').value='2.5';}
+    if($('shape').value==='voronoi'||organics.has($('shape').value)){$('shape').value='circle';$('size').value='2.5';}
     $('boundary').value=button.dataset.layout==='contour'?'rounded':button.dataset.layout==='phyllotaxis'?'disk':'rectangle';
     schedule();
   }));

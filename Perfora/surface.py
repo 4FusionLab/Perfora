@@ -608,8 +608,14 @@ def prepare(source,settings,config,chart=None):
             # worst-case pitch starves the whole face. Generate regular chart
             # sites and enforce full-sized tool separation in actual 3D below.
             pitch=chart.physical_pitch(r,settings.gap,settings.margin,low,high)
-            centers=geo.generate(region,replace(layout,shape='circle',size=2*r,shape_angle=0,gap=pitch-2*r))
-            cells=[]
+            if settings.distribution_revision == 2 and settings.layout in geo.VARIANT_LAYOUTS:
+                # Keep the accepted field's actual shapes and tangent angles.
+                # A circle-only adapter erased Chevron/Wave slot orientation.
+                cells=geo.generate(region,replace(layout,gap=max(settings.gap,pitch-2*r)))
+                centers=()
+            else:
+                centers=geo.generate(region,replace(layout,shape='circle',size=2*r,shape_angle=0,gap=pitch-2*r))
+                cells=[]
             for c in centers:
                 angle=settings.shape_angle+settings.grid_angle
                 if settings.layout=='circular' and (settings.radial_orientation or settings.tangential_orientation):
