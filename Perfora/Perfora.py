@@ -26,6 +26,9 @@ SHAPES = [('circle', 'Circle'), ('hexagon', 'Hexagon'), ('square', 'Square'), ('
           ('triangle', 'Triangle'), ('rectangle', 'Rectangle'), ('diamond', 'Diamond'),
           ('ellipse', 'Ellipse'), ('pentagon', 'Pentagon'), ('octagon', 'Octagon'),
           ('cross', 'Cross'), ('star', 'Star')] + list(zip(ORGANIC_SHAPES, ORGANIC_LABELS)) + [('voronoi', 'Voronoi')]
+PATTERN_SHAPES = [(key, label) for key, label in SHAPES if key not in ORGANIC_SHAPES]
+FIELD_SHAPES = list(zip(ORGANIC_SHAPES, ORGANIC_LABELS))
+PATTERN_TYPES = [('pattern', 'Pattern'), ('organic', 'Organic Field')]
 SIZE_HELP = {
     'circle': 'Diameter of the circular hole.',
     'hexagon': 'Distance between opposite flats of the hexagon.',
@@ -149,7 +152,10 @@ class Session:
         self.number(area, 'height', 'Height', '60 mm')
 
         pattern = self.group(root, 'pattern_group', 'Pattern')
-        self.dropdown(pattern, 'shape', 'Hole Shape', SHAPES)
+        self.dropdown(pattern, 'pattern_type', 'Pattern Type', PATTERN_TYPES)
+        self.inputs['pattern_type'].tooltip = 'Pattern repeats a hole shape using a Distribution. Organic Field creates flowing openings from noise or variable-size blue noise.'
+        self.dropdown(pattern, 'shape', 'Hole Shape', PATTERN_SHAPES)
+        self.dropdown(pattern, 'organic_shape', 'Field', FIELD_SHAPES)
         for identifier, (label, _) in SIZE_FIELDS.items():
             self.number(pattern, identifier, label, '5 mm')
         for identifier, (label, _) in LENGTH_FIELDS.items():
@@ -307,10 +313,11 @@ class Session:
         d = self.inputs
         self.updating = True
         try:
-            for key, options in (('shape', SHAPES), ('material', MATERIALS),
+            self.set_shape(settings['shape'])
+            for key, options in (('material', MATERIALS),
                                  ('operation', OPERATIONS), ('direction', DIRECTIONS),
                                  ('boundary', [('rectangle', 'Rectangle'), ('circle', 'Circle')])):
-                chosen = settings[key] if key == 'shape' else config[key]
+                chosen = config[key]
                 d[key].listItems.item(next(i for i, (k, _) in enumerate(options) if k == chosen)).isSelected = True
             layout = settings.get('layout', 'grid')
             layout = ('staggered' if settings['staggered'] else 'rows') if layout == 'grid' else layout
@@ -471,6 +478,24 @@ class Session:
     def chosen(self, identifier, options):
         return options[self.inputs[identifier].selectedItem.index][0]
 
+    def shape_key(self):
+        if self.chosen('pattern_type', PATTERN_TYPES) == 'organic':
+            return self.chosen('organic_shape', FIELD_SHAPES)
+        return self.chosen('shape', PATTERN_SHAPES)
+
+    def set_shape(self, key):
+        """Restore either family without losing the other family's selection."""
+        previous = self.updating
+        self.updating = True
+        try:
+            organic = key in ORGANIC_SHAPES
+            self.inputs['pattern_type'].listItems.item(1 if organic else 0).isSelected = True
+            options = FIELD_SHAPES if organic else PATTERN_SHAPES
+            self.inputs['organic_shape' if organic else 'shape'].listItems.item(
+                next(i for i, (value, _) in enumerate(options) if value == key)).isSelected = True
+        finally:
+            self.updating = previous
+
     def selected_source(self):
         selection = self.inputs['source']
         return model.native(selection.selection(0).entity) if selection.selectionCount else None
@@ -605,7 +630,9 @@ class Session:
             for identifier, (_, shapes) in AREA_FIELDS.items():
                 visible(identifier, boundary in shapes)
             visible('height', boundary == 'rectangle')
-            shape = self.chosen('shape', SHAPES)
+            shape = self.shape_key()
+            visible('shape', shape not in ORGANIC_SHAPES)
+            visible('organic_shape', shape in ORGANIC_SHAPES)
             for fields in (SIZE_FIELDS, LENGTH_FIELDS):
                 for identifier, (_, shapes) in fields.items():
                     visible(identifier, shape in shapes)
@@ -734,7 +761,7 @@ class Session:
         if surface.supported(source):self.capture_surface(source)
         selected = self.selected_sources()
         # Hidden optional inputs must not block a different mode after an edit.
-        shape = self.chosen('shape', SHAPES)
+        shape = self.shape_key()
         organic = shape in ORGANIC_SHAPES
         size_id = self.dimension_id(SIZE_FIELDS, shape)
         length_id = self.dimension_id(LENGTH_FIELDS, shape)

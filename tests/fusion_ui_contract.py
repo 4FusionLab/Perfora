@@ -73,6 +73,8 @@ def model_body(body):
 
 
 def choose(s, identifier, options, key):
+    if identifier=='shape':
+        s.set_shape(key);s.update_visibility();return
     s.inputs[identifier].listItems.item(next(i for i, (k, _) in enumerate(options) if k == key)).isSelected = True
     s.update_visibility()
 

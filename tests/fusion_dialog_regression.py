@@ -50,7 +50,7 @@ class PerforaDialogRegression(adsk.core.CommandCreatedEventHandler):
             assert len(_dialog_entry.SHAPES) == 19 and _dialog_entry.SHAPES[-1][0]=='voronoi'
             assert not session.inputs['organic_bridges'].value
             for index, (shape, _) in enumerate(_dialog_entry.SHAPES):
-                session.inputs['shape'].listItems.item(index).isSelected = True
+                session.set_shape(shape)
                 session.update_visibility()
                 size_id = session.dimension_id(_dialog_entry.SIZE_FIELDS, shape)
                 length_id = session.dimension_id(_dialog_entry.LENGTH_FIELDS, shape)
@@ -88,7 +88,7 @@ class PerforaDialogRegression(adsk.core.CommandCreatedEventHandler):
             assert session.inputs['orientation'].isVisible
             session.inputs['orientation'].listItems.item(2).isSelected = True
             assert session.chosen('orientation', _dialog_entry.ORIENTATIONS) == 'tangential'
-            session.inputs['shape'].listItems.item(12).isSelected = True
+            session.set_shape('voronoi')
             session.update_visibility()
             assert session.inputs['center_point'].isVisible
             assert not session.inputs['start_radius'].isVisible and not session.inputs['orientation'].isVisible

@@ -19,9 +19,11 @@
     <div class="workspace">
       <aside class="controls" aria-label="Pattern settings">
         <div class="control-heading"><h2>Your pattern</h2><button id="reset" class="text-button" type="button">Reset</button></div>
-        <label class="field">Distribution<select id="layout" data-parameter><option value="staggered">Staggered</option><option value="rows">Rectangular</option><option value="circular">Circular</option><option value="path">Along Path</option><option value="contour">Contour</option><option value="fan">Fan</option><option value="phyllotaxis">Phyllotaxis</option><option value="poisson">Poisson Disk</option><option value="wave" selected>Wave</option><option value="chevron">Chevron</option><option value="between_curves">Between Curves</option></select></label>
+        <div class="mode-switch" role="group" aria-label="Pattern type"><button type="button" data-mode="pattern" aria-pressed="true">Pattern</button><button type="button" data-mode="organic" aria-pressed="false">Organic Field</button></div>
+        <p class="mode-caption" id="mode-caption">Choose a shape and arrange it.</p>
+        <label class="field" id="distribution-field">Distribution<select id="layout" data-parameter><option value="staggered">Staggered</option><option value="rows">Rectangular</option><option value="circular">Circular</option><option value="path">Along Path</option><option value="contour">Contour</option><option value="fan">Fan</option><option value="phyllotaxis">Phyllotaxis</option><option value="poisson">Poisson Disk</option><option value="wave" selected>Wave</option><option value="chevron">Chevron</option><option value="between_curves">Between Curves</option></select></label>
         <p class="field-help" id="layout-help">Smooth, continuous rows. A rhythm that flows.</p>
-        <label class="field">Hole Shape<select id="shape" data-parameter>__SHAPE_OPTIONS__</select></label>
+        <label class="field"><span id="shape-label">Hole Shape</span><select id="shape" data-parameter>__SHAPE_OPTIONS__</select></label>
         <div class="pair">
           <label class="field"><span id="size-label">Width</span><span class="number-field"><input id="size" data-parameter type="number" min="1" max="20" step=".1" value="1.7"><span>mm</span></span></label>
           <label class="field" id="length-field">Length<span class="number-field"><input id="length" data-parameter type="number" min="1" max="40" step=".1" value="5.2"><span>mm</span></span></label>

@@ -11,10 +11,19 @@
   const sizeLabels={circle:'Diameter',hexagon:'Across Flats',square:'Side Length',slot:'Width',triangle:'Side Length',rectangle:'Width',diamond:'Diagonal 1',ellipse:'Minor Axis',pentagon:'Diameter',octagon:'Across Flats',cross:'Overall Size',star:'Outer Diameter',voronoi:'Cell Spacing'};
   let worker,ready=false,busy=false,latestId=0,wanted=null,current=null,currentParameters=null,timer,watchdog,workerGeneration=0;
   const cache=new Map();
+  const familySettings={};
+  let activeFamily='pattern';
   function parameters(){return Object.fromEntries(fields.map(el=>[el.id,el.type==='checkbox'?el.checked:el.tagName==='SELECT'?el.value:Number(el.value)]));}
   function status(message,mode='ready'){$('status-text').textContent=message;$('status-dot').className='status-dot'+(mode==='ready'?'':' '+mode);}
   function visibility(){
     const layout=$('layout').value,shape=$('shape').value,voronoi=shape==='voronoi',organic=organics.has(shape),field=voronoi||organic;
+    const family=organic?'organic':'pattern';activeFamily=family;
+    $('distribution-field').hidden=organic;
+    $('layout-help').hidden=organic;
+    $('shape-label').textContent=organic?'Field':'Hole Shape';
+    $('mode-caption').textContent=organic?'Create flowing openings from a field.':'Choose a shape and arrange it.';
+    for(const option of $('shape').options)option.hidden=organics.has(option.value)!==organic;
+    for(const button of document.querySelectorAll('[data-mode]'))button.setAttribute('aria-pressed',String(button.dataset.mode===family));
     $('layout').disabled=field;
     $('layout-help').textContent=organic?'This shape creates its own field. Pattern Scale sets its physical size.':voronoi?'Organic polygonal cells. One field, its own distribution.':descriptions[layout];
     $('size-label').textContent=organic?(shape==='blue_noise'?'Maximum Diameter':'Pattern Scale'):sizeLabels[shape];
@@ -147,6 +156,13 @@
     }
     schedule();
   });
+  document.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>{
+    const family=button.dataset.mode;if(family===activeFamily)return;
+    familySettings[activeFamily]=parameters();
+    const panel={width:$('width').value,height:$('height').value,boundary:$('boundary').value};
+    setValues({...defaults,...(familySettings[family]||{shape:family==='organic'?'smooth_noise':'slot',size:family==='organic'?5:1.7}),...panel});
+    schedule();
+  }));
   $('new-seed').addEventListener('click',()=>{$('seed').value=(Number($('seed').value)+1)%2147483648;schedule();});
   $('reset').addEventListener('click',()=>{setValues(defaults);history.replaceState(null,'',location.pathname+location.search);schedule();});
   $('show-guides').addEventListener('change',()=>{$('guide-geometry').toggleAttribute('hidden',!$('show-guides').checked);});

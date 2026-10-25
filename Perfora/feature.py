@@ -321,17 +321,18 @@ def build(source, settings, config, cache=None):
     previous_busy = _busy
     _busy = True
     try:
-        # Capture dependencies before our Boolean operations consume the source
-        # face/body. Adding the custom feature afterwards binds to its own result
-        # and leaves it rolled back, producing a dependency cycle.
-        custom = component.features.customFeatures.add(data)
-        custom.customNamedValues.addOrSetValue('perfora', json.dumps(metadata(settings, config)))
+        # Face-backed reference sketches must precede the empty Custom Feature.
+        # During native preview on a Base Feature result, creating them after
+        # that placeholder can bind their support to the placeholder itself.
         if not config.get('surface'):
             frame = (component.sketches.addWithoutEdges(component.xYConstructionPlane)
                      if config.get('surface') else model.new_source_sketch(source))
             frame.name = 'Perfora Reference'
             scratch = model.new_source_sketch(source)
             scratch.name = 'Perfora Edge Offset'
+        # Still capture dependencies before Boolean operations consume faces.
+        custom = component.features.customFeatures.add(data)
+        custom.customNamedValues.addOrSetValue('perfora', json.dumps(metadata(settings, config)))
         body, count = make_body(source, settings, config, frame, scratch, cache)
         base = component.features.baseFeatures.add()
         base.name = 'Perfora Geometry'

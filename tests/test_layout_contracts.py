@@ -212,11 +212,27 @@ class Control:
 
 
 class DialogContractTests(unittest.TestCase):
+    def test_pattern_family_keeps_independent_shape_selections(self):
+        ui,s=self.session()
+        self.assertEqual(ui.PATTERN_SHAPES[-1][0],'voronoi')
+        self.assertFalse(set(dict(ui.PATTERN_SHAPES)) & set(ORGANIC_SHAPES))
+        s.set_shape('slot');s.update_visibility()
+        self.assertTrue(s.inputs['shape'].isVisible)
+        self.assertFalse(s.inputs['organic_shape'].isVisible)
+        s.set_shape('gyroid');s.update_visibility()
+        self.assertEqual(s.shape_key(),'gyroid')
+        self.assertFalse(s.inputs['shape'].isVisible)
+        self.assertTrue(s.inputs['organic_shape'].isVisible)
+        s.inputs['pattern_type'].listItems.item(0).isSelected=True;s.update_visibility()
+        self.assertEqual(s.shape_key(),'slot')
+        s.inputs['pattern_type'].listItems.item(1).isSelected=True;s.update_visibility()
+        self.assertEqual(s.shape_key(),'gyroid')
+
     def test_organic_fields_hide_incompatible_controls_and_restore_repeating_layout(self):
         ui,s=self.session()
         s.inputs['layout'].selectedItem.index=next(i for i,(k,_) in enumerate(ui.LAYOUTS) if k=='path')
         for shape in ORGANIC_SHAPES:
-            s.inputs['shape'].selectedItem.index=next(i for i,(k,_) in enumerate(ui.SHAPES) if k==shape)
+            s.set_shape(shape)
             s.update_visibility()
             self.assertFalse(s.inputs['layout'].isVisible)
             self.assertFalse(s.inputs['shape_angle'].isVisible)
@@ -230,7 +246,7 @@ class DialogContractTests(unittest.TestCase):
             self.assertEqual(settings.shape,shape)
             self.assertEqual(settings.layout,'grid')
         self.assertEqual(ui.SHAPES[-1][0],'voronoi')
-        s.inputs['shape'].selectedItem.index=0
+        s.set_shape('circle')
         s.update_visibility()
         self.assertTrue(s.inputs['path'].isVisible)
         self.assertTrue(s.inputs['layout'].isVisible)
@@ -243,7 +259,7 @@ class DialogContractTests(unittest.TestCase):
         ui=definitions('Perfora.py',dict(math=math,Path=Path,Settings=Settings,LENGTH_SHAPES=LENGTH_SHAPES,
                        VARIANT_PARAMETERS=VARIANT_PARAMETERS,ORGANIC_PARAMETERS=ORGANIC_PARAMETERS,ORGANIC_SHAPES=ORGANIC_SHAPES,ORGANIC_FIELDS=ORGANIC_FIELDS,ORGANIC_LABELS=ORGANIC_LABELS,LAYOUT_PARAMETERS=LAYOUT_PARAMETERS,
                        multi_region=NS(sources=lambda selected:selected),surface=SURFACE,parametric=f,model=model,adsk=ADSK),
-                       methods=('chosen','selected_source','selected_sources','legacy_spread_radius','dimension_id','update_visibility','read','restore_feature'))
+                       methods=('chosen','shape_key','set_shape','selected_source','selected_sources','legacy_spread_radius','dimension_id','update_visibility','read','restore_feature'))
         s=ui.Session()
         s.updating=False
         s._extrude_inputs=None
@@ -256,7 +272,7 @@ class DialogContractTests(unittest.TestCase):
         s.numeric_inputs={}
         # Extract constructor declarations so new/missing controls cannot be
         # silently absent in the offline fixture. No constructor/API execution.
-        for key in ('area_group','height','shape','shape_angle','result','material','operation','direction','boundary',
+        for key in ('area_group','height','pattern_type','organic_shape','shape','shape_angle','result','material','operation','direction','boundary',
                     'source_info','cylinder_group','surface_layout','path','path_reverse','path_orientation','layout','layout_orientation','orientation','source','clip_boundary','organic_bridges','round_corners','seed','new_pattern','irregularity',
                     'center_point','guide1','guide2','guide_reverse','start_mode','reverse','side2','bodies','output_group',
                     'preview','preview_mode','preview_color','distance1','distance2','taper1','taper2','start','target1',

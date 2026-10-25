@@ -147,10 +147,10 @@ class Activate(adsk.core.CommandEventHandler):
                     assert 'radius' in str(error)
             s.inputs['distance1'].expression = '3 mm'
             for shape, _ in entry.SHAPES:
-                s.inputs['shape'].listItems.item(next(i for i, p in enumerate(entry.SHAPES) if p[0] == shape)).isSelected = True
+                s.set_shape(shape)
                 s.update_visibility()
                 s.read()
-            s.inputs['shape'].listItems.item(next(i for i,p in enumerate(entry.SHAPES) if p[0]==pattern)).isSelected = True
+            s.set_shape(pattern)
             if pattern=='voronoi':
                 s.inputs['cell_spacing'].expression = '7 mm'
                 s.sync_dimensions('cell_spacing')

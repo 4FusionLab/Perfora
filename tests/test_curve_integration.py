@@ -257,7 +257,7 @@ class CurveIntegrationTests(unittest.TestCase):
         numeric.update({key:getattr(self.settings,key) for key in (*VARIANT_PARAMETERS, *e.ORGANIC_PARAMETERS)})
         s.numeric_inputs={k:Number(v) for k,v in numeric.items()};s.inputs=dict(s.numeric_inputs)
         d=s.inputs
-        for key,options,value in (('shape',e.SHAPES,shape),('layout',e.LAYOUTS,layout),('result',e.RESULTS,result),
+        for key,options,value in (('shape',e.PATTERN_SHAPES,shape),('pattern_type',e.PATTERN_TYPES,'pattern'),('organic_shape',e.FIELD_SHAPES,'smooth_noise'),('layout',e.LAYOUTS,layout),('result',e.RESULTS,result),
             ('direction',e.DIRECTIONS,'one'),('start_mode',e.STARTS,'profile'),('operation',e.OPERATIONS,'body'),
             ('material',e.MATERIALS,'cells'),('orientation',e.ORIENTATIONS,'fixed'),
             ('layout_orientation',[('tangent','Follow Pattern'),('fixed','Fixed')],'tangent'),

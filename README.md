@@ -293,3 +293,5 @@ Perfora is the goddess of holes, guardian of clean edges, and sworn enemy of rep
 [GPL-3.0-only](LICENSE). An independent **4FusionLab** project, not affiliated with or endorsed by Autodesk. Native operation icons are resolved from the user's Fusion installation; Autodesk graphics are not bundled.
 
 Large organic fields adapt their sampling within 8–16 samples per Pattern Scale and the fixed node budget. Previously accepted small regions retain their grid; physical Pattern Scale and Web Thickness stay explicit.
+
+The native Pattern Type selector separates Pattern (13 hole shapes, with Voronoi last) from Organic Field (six fields). Each family retains its selected shape; only relevant controls are shown. The browser playground uses the same two-family navigation.

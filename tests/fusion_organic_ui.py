@@ -38,6 +38,7 @@ def save():output.write_text(json.dumps(report,indent=2))
 
 
 def choose(s,key,options,value):
+    if key=='shape':s.set_shape(value);return
     s.inputs[key].listItems.item(next(i for i,(k,_) in enumerate(options) if k==value)).isSelected=True
 
 
