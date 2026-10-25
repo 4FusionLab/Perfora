@@ -411,6 +411,28 @@ def _add_bridges(mask,nx,ny,s):
                 for k in min(options)[1]:mask[k]=False
 
 
+def field_grid(width, height, scale):
+    """Bound raster work, retaining 8–16 samples per physical Pattern Scale.
+
+    Previously accepted regions retain their exact grid. Larger regions use
+    a coarser grid within a fixed resolution floor; the physical field scale
+    is unchanged and curve/web allowances continue to use the actual step.
+    """
+    step = scale/16
+    def dimensions(h):
+        return math.ceil(width/h)+1, math.ceil(height/h)+1
+    nx, ny = dimensions(step)
+    if nx*ny > MAX_NODES:
+        step *= math.sqrt(nx*ny/MAX_NODES)*1.01
+        nx, ny = dimensions(step)
+        while nx*ny > MAX_NODES:
+            step *= 1.01
+            nx, ny = dimensions(step)
+        if step > scale/8:
+            raise ValueError('Organic field exceeds the sampling budget. Increase Pattern Scale or select a smaller region.')
+    return step, nx, ny
+
+
 def generate(region,s):
     validate(s)
     if s.shape=='blue_noise':return blue_noise(region,s)
@@ -420,11 +442,9 @@ def generate(region,s):
     y0,y1=min(p[1] for p in outer),max(p[1] for p in outer)
     # Normalized field units; one Pattern Scale contains 16 intervals. Halo
     # keeps candidates outside the exact source, enabling genuine partial trim.
-    h=s.size/16;pad=2*s.size
+    pad=2*s.size
     x0,y0=x0-pad,y0-pad
-    nx,ny=math.ceil((x1-x0+pad)/h)+1,math.ceil((y1-y0+pad)/h)+1
-    if nx*ny>MAX_NODES:
-        raise ValueError('Organic field exceeds the sampling budget. Increase Pattern Scale or select a smaller region.')
+    h,nx,ny=field_grid(x1-x0+pad,y1-y0+pad,s.size)
     origin=g.rotate(g.placement_center(region,replace(s,grid_angle=angle)), -angle)
     if s.shape=='reaction_diffusion':
         # Solver wavelength is ~8 grid nodes; resample its physical scale onto

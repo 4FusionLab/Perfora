@@ -291,3 +291,5 @@ The build produces `dist/Perfora-1.0.1.zip` and its `.sha256` file. Version come
 Perfora is the goddess of holes, guardian of clean edges, and sworn enemy of repeating the same pattern by hand — from **4FusionLab's own mythology**, with a playful nod to ancient Greece.
 
 [GPL-3.0-only](LICENSE). An independent **4FusionLab** project, not affiliated with or endorsed by Autodesk. Native operation icons are resolved from the user's Fusion installation; Autodesk graphics are not bundled.
+
+Large organic fields adapt their sampling within 8–16 samples per Pattern Scale and the fixed node budget. Previously accepted small regions retain their grid; physical Pattern Scale and Web Thickness stay explicit.
