@@ -46,13 +46,13 @@ for shape in globals().get('shapes',entry.ORGANIC_SHAPES):
             sketch,feature,built=(entry.parametric.build if mode=='feature' else entry.model.build)(face,s,cfg,cache=renderer.geometry_cache)
             assert built==count and count>0,(built,count)
             assert body.isSolid and 0<body.volume<before,(before,body.volume)
-            assert feature.healthState!=adsk.fusion.FeatureHealthStates.ErrorFeatureHealthState,feature.errorOrWarningMessage
+            assert feature.healthState==adsk.fusion.FeatureHealthStates.HealthyFeatureHealthState,feature.errorOrWarningMessage
             item.update(build_seconds=perf_counter()-t,volume_before=before,volume_after=body.volume)
             if mode=='feature':
                 item['stage']='recompute';before_edit=body.volume
                 p=feature.parameters.itemById('organic_gradient' if shape=='blue_noise' else 'organic_open');p.value-=5
                 assert design.computeAll()
-                assert feature.healthState!=adsk.fusion.FeatureHealthStates.ErrorFeatureHealthState,feature.errorOrWarningMessage
+                assert feature.healthState==adsk.fusion.FeatureHealthStates.HealthyFeatureHealthState,feature.errorOrWarningMessage
                 assert abs(body.volume-before_edit)>1e-7
                 item['recomputed_volume']=body.volume
             if globals().get('capture',False):

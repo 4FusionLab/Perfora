@@ -64,19 +64,28 @@ class Renderer:
         self.color_key = None
         self.drawn_key = None
 
-    def show_edit_solid(self, custom, source, settings, config):
+    def show_feature_solid(self, custom, source, settings, config):
         """Exact temporary BRep preview; never edit the node being previewed."""
         from . import feature, multi_region, surface
         self.clear()
-        frames = [f for f in custom.features if isinstance(f, adsk.fusion.Sketch)]
+        frames = [f for f in custom.features if isinstance(f, adsk.fusion.Sketch)] if custom else []
         selected = list(source) if isinstance(source, (tuple, list)) else [source]
+        component = model.source_component(selected[0])
         if len(selected) > 1:
-            plans = multi_region.prepare(selected, settings, config, self.geometry_cache, frames)
+            plans = multi_region.prepare(selected, settings, config, self.geometry_cache, frames or None)
             tool = surface.merge([multi_region.make_body(plan, config) for plan in plans])
             count = sum(len(plan.cells) for plan in plans)
         else:
-            tool, count = feature.make_body(source, settings, config, frames[0],
-                frames[1] if len(frames) > 1 else None, self.geometry_cache)
+            temporary = None
+            if not frames and not config.get('surface'):
+                temporary = model.new_source_sketch(source)
+                frames = [temporary]
+            try:
+                tool, count = feature.make_body(source, settings, config, frames[0] if frames else None,
+                    frames[1] if len(frames) > 1 else None, self.geometry_cache)
+            finally:
+                if temporary and temporary.isValid:
+                    temporary.deleteMe()
         manager = adsk.fusion.TemporaryBRepManager.get()
         bodies = []
         targets = [model.native(b) for b in config['bodies']]
@@ -92,7 +101,7 @@ class Renderer:
         else:
             bodies.append(tool)
         try:
-            self.graphics = custom.parentComponent.customGraphicsGroups.add()
+            self.graphics = component.customGraphicsGroups.add()
             self.graphics.isSelectable = False
             for body in bodies:
                 graphic = self.graphics.addBRepBody(body)

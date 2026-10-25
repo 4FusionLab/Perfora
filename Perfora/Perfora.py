@@ -27,9 +27,9 @@ SHAPES = [('circle', 'Circle'), ('hexagon', 'Hexagon'), ('square', 'Square'), ('
           ('triangle', 'Triangle'), ('rectangle', 'Rectangle'), ('diamond', 'Diamond'),
           ('ellipse', 'Ellipse'), ('pentagon', 'Pentagon'), ('octagon', 'Octagon'),
           ('cross', 'Cross'), ('star', 'Star')] + list(zip(ORGANIC_SHAPES, ORGANIC_LABELS)) + [('voronoi', 'Voronoi')]
-PATTERN_SHAPES = [(key, label) for key, label in SHAPES if key not in ORGANIC_SHAPES]
-FIELD_SHAPES = list(zip(ORGANIC_SHAPES, ORGANIC_LABELS))
-PATTERN_TYPES = [('pattern', 'Pattern'), ('organic', 'Organic Field')]
+PATTERN_SHAPES = [(key, label) for key, label in SHAPES if key not in ORGANIC_SHAPES and key != 'voronoi']
+FIELD_SHAPES = list(zip(ORGANIC_SHAPES, ORGANIC_LABELS)) + [('voronoi', 'Voronoi')]
+PATTERN_TYPES = [('pattern', 'Pattern'), ('organic', 'Noise')]
 SIZE_HELP = {
     'circle': 'Diameter of the circular hole.',
     'hexagon': 'Distance between opposite flats of the hexagon.',
@@ -156,7 +156,7 @@ class Session:
         pattern = self.group(root, 'pattern_group', 'Pattern')
         field_options = self.group(root, 'field_options', 'Field Options', expanded=False)
         self.dropdown(pattern, 'pattern_type', 'Pattern Type', PATTERN_TYPES)
-        self.inputs['pattern_type'].tooltip = 'Pattern repeats a hole shape using a Distribution. Organic Field creates flowing openings from noise or variable-size blue noise.'
+        self.inputs['pattern_type'].tooltip = 'Pattern repeats a hole shape using a Distribution. Noise creates organic or Voronoi cells with independent cell size and web thickness.'
         self.dropdown(pattern, 'shape', 'Hole Shape', PATTERN_SHAPES)
         self.dropdown(pattern, 'organic_shape', 'Field', FIELD_SHAPES)
         for identifier, (label, _) in SIZE_FIELDS.items():
@@ -492,7 +492,7 @@ class Session:
         previous = self.updating
         self.updating = True
         try:
-            organic = key in ORGANIC_SHAPES
+            organic = key in ORGANIC_SHAPES or key == 'voronoi'
             self.inputs['pattern_type'].listItems.item(1 if organic else 0).isSelected = True
             options = FIELD_SHAPES if organic else PATTERN_SHAPES
             self.inputs['organic_shape' if organic else 'shape'].listItems.item(
@@ -663,8 +663,8 @@ class Session:
                 visible(identifier, boundary in shapes)
             visible('height', boundary == 'rectangle')
             shape = self.shape_key()
-            visible('shape', shape not in ORGANIC_SHAPES)
-            visible('organic_shape', shape in ORGANIC_SHAPES)
+            visible('shape', shape not in ORGANIC_SHAPES and shape != 'voronoi')
+            visible('organic_shape', shape in ORGANIC_SHAPES or shape == 'voronoi')
             for fields in (SIZE_FIELDS, LENGTH_FIELDS):
                 for identifier, (_, shapes) in fields.items():
                     visible(identifier, shape in shapes)
@@ -1160,8 +1160,8 @@ class Execute(adsk.core.CommandEventHandler):
                 self.session.status('%d holes. Fast preview.' % count)
                 return
             self.session.renderer.clear()
-            if self.preview and self.session.edited_feature:
-                count = self.session.renderer.show_edit_solid(self.session.edited_feature,
+            if self.preview and config['result'] == 'feature':
+                count = self.session.renderer.show_feature_solid(self.session.edited_feature,
                     source, settings, config)
                 self.session.status('%d holes. Full preview.' % count)
                 return
