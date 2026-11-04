@@ -11,8 +11,6 @@
 
 <p align="center"><a href="https://github.com/4FusionLab/Perfora/releases/latest"><strong>Download Perfora</strong></a> · <a href="README.ru.md">Русский</a> · <a href="https://github.com/4FusionLab/Perfora/issues">Report an issue</a></p>
 
-Perfora is an open-source **Fusion 360 add-in** for creating procedural perforation, hole patterns, honeycomb ventilation grilles, Voronoi patterns, and perforated CAD panels.
-
 ---
 
 ## See what you can make
@@ -29,6 +27,8 @@ Perfora is an open-source **Fusion 360 add-in** for creating procedural perforat
 </table>
 
 ## What Perfora does
+
+Perfora is a **Fusion 360 add-in** for creating procedural perforations, hole patterns, honeycomb ventilation grilles, Voronoi patterns, and perforated CAD panels.
 
 - **Flexible patterns:** 12 repeating hole shapes, 11 distribution families, six organic fields, and Voronoi.
 - **Control the boundaries:** adjust spacing, web thickness, edge clearance, rotation, and trimming.
