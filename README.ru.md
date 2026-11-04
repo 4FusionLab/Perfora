@@ -11,6 +11,8 @@
 
 <p align="center"><a href="https://github.com/4FusionLab/Perfora/releases/latest"><strong>Скачать Perfora</strong></a> · <a href="README.md">English</a> · <a href="https://github.com/4FusionLab/Perfora/issues">Сообщить о проблеме</a></p>
 
+**Perfora** — бесплатный аддон **Fusion 360** для создания массивов отверстий, сотовой и декоративной перфорации, вентиляционных решёток, узоров Вороного и параметрических панелей.
+
 ---
 
 ## Что можно создать
@@ -50,6 +52,8 @@
 [Подробное руководство](docs/README_REFERENCE.ru.md) · [Геометрия отверстий](docs/PERFORATIONS.md) · [Органические узоры](docs/ORGANIC_PATTERNS.md) · [Что нового в 1.1.0](docs/releases/v1.1.0.md) · [История изменений](CHANGELOG.md)
 
 [Участие в разработке](CONTRIBUTING.md) · [Лицензия](LICENSE) · [Сообщить о проблеме](https://github.com/4FusionLab/Perfora/issues)
+
+**Другие аддоны Fusion 360 от 4FusionLab:** [Selectra — выбор похожей геометрии](https://github.com/4FusionLab/Selectra) · [Ejix — извлечение объёмов](https://github.com/4FusionLab/Ejix) · [RuEn — горячие клавиши при русской раскладке](https://github.com/4FusionLab/RuEn) · [Planara — будущая развёртка поверхностей](https://github.com/4FusionLab/Planara)
 
 ## Немного мифологии
 
