@@ -4,9 +4,9 @@ Releases are built by [Check and release](https://github.com/4FusionLab/Perfora/
 
 ## Prepare a version
 
-1. Update `Perfora/Perfora.manifest`, the version source of truth. Versions are MAJOR.MINOR.PATCH.
+1. Derive the next numeric `MAJOR.MINOR.PATCH` from GitVersion 6.8.2 (`dotnet-gitversion /showvariable MajorMinorPatch`). The checked-in Fusion manifest is not rewritten: release packaging embeds this version into the ZIP manifest.
 2. Update `CHANGELOG.md`, both READMEs, and `docs/releases/vVERSION.md`. Include install instructions, actual validation, benchmark methodology, and material limitations.
-3. Run unit tests, compile checks, and `python3 install.py --zip`. Verify archive contents and two installations into a disposable `--api-root`, including backups.
+3. Run unit tests, compile checks, and `python3 install.py --zip --version X.Y.Z`. Verify that the archived manifest, ZIP name and checksum match GitVersion; also test two installations into a disposable `--api-root`, including backups.
 4. Run the relevant CAD checks in separate unsaved Fusion documents. Complete the acceptance matrix in `CONTRIBUTING.md`, including real OK/Cancel, Undo/Redo, native Extrude editing, Feature recompute/edit, and local F3D reopen. Record Fusion/OS versions and distinguish native CAD from Python CI. Never imply unperformed Windows CAD or cloud-save acceptance.
 5. Capture product images in real Fusion with the same neutral background, framing, and palette as the existing gallery. Validate the actual geometry; do not illustrate unavailable features.
 6. Review the final diff for private files, credentials, local paths, reports, caches, backups, and Autodesk assets, then push the reviewed commit to `main`.
@@ -19,9 +19,9 @@ The maintainer chooses the release channel. Validation records describe the plat
 
 ## Automated publication
 
-Pushes to `main` run compile, geometry, installation, and packaging checks on Linux, macOS, and Windows. Pull requests run the same checks without release permissions.
+Pushes to `main` run compile, geometry, installation, and packaging checks on Linux, macOS, and Windows. Release publication is skipped if nonempty, reviewed `docs/releases/vX.Y.Z.md` notes are missing for the GitVersion-calculated version. Pull requests run the same checks without release permissions.
 
-After all three OS jobs pass, the release job builds the tested commit and creates a draft at that exact SHA. `scripts/release.py` derives the channel from the manifest, uploads the ZIP and SHA-256 file, downloads both to verify their bytes, then publishes with the correct prerelease/Latest flags. Only that job has `contents: write`; it uses the built-in GitHub Actions token. No personal token is stored in the project.
+After all three OS jobs pass, the release job derives `MajorMinorPatch` using GitVersion and builds that tested commit only if matching release notes exist. The generated ZIP and embedded Fusion manifest use this numeric version. `scripts/release.py` derives the channel from the numeric version (legacy 0.x experimental), uploads ZIP and SHA-256, downloads both to verify their bytes, then publishes with the correct prerelease/Latest flags. Only that job has `contents: write`; it uses the built-in GitHub Actions token. No personal token is stored in the project.
 
 An existing published version is immutable. Retrying a failed upload is allowed only for a draft belonging to the same exact commit. A draft targeting another commit stops publication for inspection. Never move a published tag or replace its assets to repair a code defect; publish a new patch version.
 
