@@ -1,5 +1,7 @@
 # 4FusionLab — automatic runtime release policy
 
+[Русская версия](RELEASE_POLICY.ru.md)
+
 ## Trigger
 
 - A direct push to `main` or a PR merge into `main` is the only normal release event. PR checks, manual CI dispatch and version-tag pushes **do not** initiate publication.

@@ -1,111 +1,113 @@
-# Формы перфорации
+# Perforation shapes
 
-По каталогам производителей, проверено 23 октября 2026 года.
+[Русская версия](PERFORATIONS.ru.md)
 
-Перфорация задаётся не только формой отверстия: важны размер, перемычка, шаг, прямое, шахматное или круговое расположение, поворот, отступ и доля открытой площади. В плагине форма ячейки отделена от расположения сетки и операции Extrude.
+> **Historical development reference.** This document combines Perfora 1.0.0 behavior with development notes; statements that features are unreleased or untested describe their original stage. For the released 1.1.0 scope and recorded acceptance, see the [release notes](releases/v1.1.0.md) and [integration report](RELEASE_INTEGRATION.md).
 
-| Тип | Варианты | Поддержка в Perfora 1.0.0 |
-|---|---|---|
-| Базовые отверстия | Круг, квадрат, шестигранник | Диаметр, сторона или размер между гранями |
-| Щелевые | Прямоугольная щель и прорезь с круглыми концами | Прямоугольник и прорезь; ширина и полная длина |
-| Геометрические | Треугольник, ромб, эллипс, пятиугольник, восьмиугольник | Отдельные формы с поворотом |
-| Декоративные | Звёзды, кресты, клевер, цветочные и смешанные узоры | Крест с шириной луча; звезда с 3–12 лучами и внутренним радиусом |
-| Формованные | Жалюзийные, вытяжные и рельефные отверстия | Требуют отдельной трёхмерной операции; плоский контур и Extrude не воспроизводят такую геометрию |
-| Рисунки и переменная плотность | Несколько размеров/форм, изображения из отверстий | Отдельное возможное расширение; текущая команда повторяет одну форму и размер |
+Based on manufacturer catalogs checked on 23 October 2026.
 
-## Круговая раскладка
+Perforation is determined by more than hole shape: size, web, pitch, straight, staggered or circular arrangement, rotation, offset, and open-area ratio all matter. In the add-in, cell shape is separate from grid placement and the Extrude operation.
 
-Distribution → Circular доступна для 12 повторяемых форм; Voronoi использует собственное распределение. Отверстия размещаются концентрическими кольцами, число отверстий на каждом кольце подбирается по хорде. В ветке разработки кольца содержат противоположные пары; нечётная вместимость округляется вниз до чётной, сохраняя минимальную перемычку. Первое обычное кольцо содержит шесть отверстий независимо от формы границы. Центральный круг остаётся одиночным. Расстояние между кольцами равно диаметру описанного вокруг отверстия круга плюс Web Thickness. Это сохраняет минимальную перемычку при Fixed, Radial и Tangential Orientation, но для вытянутых и угловатых форм упаковка консервативна.
+| Type | Variants | Support in Perfora 1.0.0 |
+| --- | --- | --- |
+| Basic openings | Circle, square, hexagon | Diameter, side length, or across-flats size |
+| Slotted | Rectangular slot and slot with rounded ends | Rectangle and slot; width and full length |
+| Geometric | Triangle, diamond, ellipse, pentagon, octagon | Separate rotatable shapes |
+| Decorative | Stars, crosses, clover, floral and mixed patterns | Cross with arm width; star with 3–12 points and inner radius |
+| Formed | Louvered, drawn and embossed openings | Require a separate 3D operation; a planar outline and Extrude do not reproduce this geometry |
+| Patterns and variable density | Multiple sizes/shapes, images made of holes | A possible separate extension; the current command repeats one shape and size |
 
-Start Radius измеряется до центров первого кольца; 0 добавляет одно центральное отверстие. Отверстия могут выступать внутрь этого радиуса. Radial поворачивает отверстия по радиусу, Tangential — вдоль окружности. Hole Angle задаёт дополнительный поворот во всех режимах. Pattern Angle поворачивает рисунок вокруг центра габаритов внешней границы, X/Y Offset сдвигают этот центр в осях эскиза без периодичности. Trim to Boundary и Edge Offset действуют и на внутренние вырезы; радиусы колец задаются до обрезки. На плоскости точное равенство отступу допустимо: скрытый запас 0,001 mm к Edge Offset не добавляется. Касание смещённой границы сохраняет целую ячейку, а действительное пересечение требует обрезки.
+## Circular layout
 
-## Размеры новых ячеек
+Distribution → Circular is available for the 12 repeating shapes; Voronoi uses its own distribution. Holes are placed in concentric rings, with each ring's count chosen by chord spacing. In the development branch, rings contain opposite pairs; odd capacity is rounded down to an even number while preserving the minimum web. The first ordinary ring contains six holes regardless of boundary shape. The central circle remains single. Ring spacing equals the diameter of the circle enclosing a hole plus Web Thickness. This preserves the minimum web with Fixed, Radial, and Tangential Orientation, but packing is conservative for elongated and angular shapes.
 
-В разрабатываемом режиме нескольких плоских областей размеры и формы остаются общими для всех источников. Раскладка привязана к проекции начала и осей компонента: копланарные области используют одинаковую фазу, включая Voronoi и Circular. Start Point проецируется на каждую плоскость. Возле каждой отдельной границы и её внутренних вырезов действует Edge Offset; соседние области не сливаются. Перекрывающиеся заполненные области отклоняются. Лимит Maximum Holes считается суммарно, включая отдельные обрезанные фрагменты одной ячейки в разных областях. Прежние описания автоматического центра относятся к одному источнику. Функция не выпущена и не прошла CAD-приёмку; подробности — [MULTI_REGION.md](MULTI_REGION.md).
+Start Radius is measured to centers of the first ring; 0 adds one central hole. Holes may extend inside that radius. Radial rotates holes along the radius; Tangential follows the circumference. Hole Angle adds rotation in all modes. Pattern Angle rotates the pattern around the outer boundary's bounding-box center; X/Y Offset shifts that center in sketch axes without periodicity. Trim to Boundary and Edge Offset also apply to inner cutouts; ring radii are set before trimming. On a plane, exact equality with the offset is allowed: no hidden 0.001 mm allowance is added to Edge Offset. A cell touching the offset boundary is retained whole; an actual intersection requires trimming.
 
-- Треугольник: сторона равностороннего треугольника.
-- Прямоугольник: ширина и длина.
-- Ромб: вертикальная и горизонтальная диагонали до поворота.
-- Эллипс: полная малая и большая оси, большая должна быть больше малой. Это точный эллипс, а не прорезь с полукруглыми концами.
-- Пятиугольник: диаметр описанной окружности.
-- Восьмиугольник: расстояние между противоположными гранями.
-- Крест: полная ширина/высота и ширина луча.
-- Звезда: диаметр по внешним вершинам, число лучей, внутренний радиус в процентах от внешнего.
+## Dimensions of new cells
 
-Для дополнительных форм шаг сетки выбирается по габаритам повёрнутой фигуры, чтобы перемычка не стала меньше заданной. Это безопасная раскладка; плотнейшая упаковка треугольников с чередованием ориентации и смешанные мозаики не реализованы. При проверке отступов эллипса используется описанный многоугольник; это консервативный отбор целых ячеек. Выходной эскиз содержит точные эллипсы и эллиптические дуги.
+In the developing multi-planar-region mode, dimensions and shapes are shared across sources. The layout is anchored to the projection of the component origin and axes: coplanar regions share a phase, including Voronoi and Circular. Start Point is projected onto each plane. Edge Offset applies near each separate boundary and its inner cutouts; neighboring regions are not merged. Overlapping filled regions are rejected. Maximum Holes is counted across all regions, including separate trimmed fragments of one cell in different regions. Earlier descriptions of the automatic center apply to a single source. At that stage the feature was unreleased and had not passed CAD acceptance; see [MULTI_REGION.md](MULTI_REGION.md).
+
+- Triangle: side of the equilateral triangle.
+- Rectangle: width and length.
+- Diamond: vertical and horizontal diagonals before rotation.
+- Ellipse: full minor and major axes; the major axis must exceed the minor. This is an exact ellipse, not a slot with semicircular ends.
+- Pentagon: diameter of the circumscribed circle.
+- Octagon: distance between opposite faces.
+- Cross: overall width/height and arm width.
+- Star: diameter through outer vertices, number of points, and inner radius as a percentage of the outer radius.
+
+For additional shapes, grid pitch is selected from the rotated shape's bounds so the web does not fall below the specified value. This is a safe layout; densest alternating-orientation triangle packing and mixed tilings are not implemented. Ellipse clearance checks use a circumscribed polygon, conservatively selecting whole cells. The resulting sketch contains exact ellipses and elliptical arcs.
 
 ## Voronoi
 
-Нерегулярные выпуклые многоугольники строятся по диаграмме Вороного. Исходные точки смещаются относительно квадратной решётки; плотность по области постоянна. Эта тринадцатая форма доступна с версии 0.2.0.
+Irregular convex polygons are constructed using a Voronoi diagram. Seed points are displaced relative to a square grid; density across the area is constant. This thirteenth shape has been available since 0.2.0.
 
-- **Cell Spacing** — номинальный шаг исходных точек, а не диаметр отверстия. Меньший шаг даёт больше ячеек; их реальные размеры различаются.
-- **Irregularity (%)** — нерегулярность от 0 до 100%. При 0% получаются квадратные ячейки, при увеличении значения — более разнообразные многоугольники.
-- **Seed** — целое число от 0 до 2147483647. Одинаковые источник, Seed и настройки дают одинаковую раскладку в превью и готовой модели.
-- **New Pattern** — увеличивает Seed на единицу, сохраняя остальные настройки.
-- **Round Corners** — включает скругление углов ячеек касательными круговыми дугами; по умолчанию выключено. **Corner Radius** — максимальный радиус, по умолчанию 0,5 мм. Слишком короткие фаски поглощаются скруглением вместо микроскопических дуг; радиус уменьшается только при недостаточной ширине отверстия. Контур строится смещением многоугольника внутрь и расширением кругом того же радиуса. Он остаётся внутри исходной ячейки и не уменьшает перемычку.
-- **Web Thickness** — минимальная перемычка. Каждая ячейка отступает внутрь от своих границ на половину этого значения. Толстая перемычка может полностью поглотить маленькие ячейки.
-- **Edge Offset**, **Trim to Boundary**, **Pattern Angle** и сдвиги X/Y действуют так же, как для остальных форм. Отдельный **Hole Angle** и обычный **Distribution** скрыты: многоугольники определяются общей диаграммой.
+- **Cell Spacing** is nominal seed-point pitch, not hole diameter. Smaller spacing creates more cells; their actual sizes vary.
+- **Irregularity (%)** ranges from 0 to 100%. At 0% cells are square; higher values produce more varied polygons.
+- **Seed** is an integer from 0 to 2147483647. Identical source, Seed and settings produce the same layout in preview and final model.
+- **New Pattern** increments Seed by one while retaining the other settings.
+- **Round Corners** rounds cell corners with tangent circular arcs; off by default. **Corner Radius** is the maximum radius, 0.5 mm by default. Very short chamfers are absorbed by rounding instead of producing microscopic arcs; radius is reduced only when hole width is insufficient. The contour is built by offsetting the polygon inward and expanding it with a circle of the same radius. It remains inside the original cell and does not reduce the web.
+- **Web Thickness** is the minimum web. Each cell is inset by half this value; a thick web can absorb small cells entirely.
+- **Edge Offset**, **Trim to Boundary**, **Pattern Angle**, and X/Y offsets work as with the other shapes. Separate **Hole Angle** and ordinary **Distribution** are hidden because polygons are defined by the overall diagram.
 
-Положение решётки отсчитывается от центра габаритов области в системе Pattern Angle. Сдвиги периодичны с периодом Cell Spacing. Изменение границы может переместить центр раскладки; Seed сам по себе не фиксирует её в мировых координатах.
+The grid position is measured from the region's bounding-box center in the Pattern Angle frame. Offsets are periodic with Cell Spacing. Changing the boundary can move the layout center; Seed alone does not fix it in world coordinates.
 
-Поддерживаются Fast/Full Preview, обычные профили, все операции Extrude, рамка и существующие внутренние вырезы. Контуры имеют прямые стороны и, при включённом Round Corners, точные круговые дуги. После обрезки новые выпуклые углы на стыках прямых и круговых дуг скругляются дополнительно. Радиус ограничивается локально, а временная BRep-проверка подтверждает, что отверстие не расширилось. Исходные вогнутые углы, внутренние замкнутые контуры, эллиптические и сплайновые участки границы сохраняются. В режиме целых отверстий отбор остаётся консервативным по исходному многоугольнику. При слишком плотной раскладке расчёт отклоняется до построения CAD; лимит отверстий остаётся общим для всех форм.
+Fast/Full Preview, ordinary profiles, all Extrude operations, the border, and existing inner cutouts are supported. Contours have straight sides and, with Round Corners, exact circular arcs. After trimming, new convex corners at straight/circular-arc junctions are additionally rounded. Radius is limited locally, and a temporary BRep check confirms the opening has not expanded. Original concave corners, inner closed contours, and elliptical and spline boundary segments are preserved. In whole-hole mode selection remains conservative against the original polygon. An overly dense layout is rejected before CAD construction; the hole limit remains shared across all shapes.
 
-## Источники производителей
+## Manufacturer sources
 
-- [Graepels — Standard Perforations](https://www.graepels.com/wp-content/uploads/2024/10/standard-perforation-sizes.pdf): круглые, квадратные, два типа щелей, ромбические, шестигранные и треугольные отверстия.
-- [SCHÄFER — Perforation patterns](https://www.schaefer-lochbleche.com/en/offer/perforated-metal-from-stock/perforation-pattern/): форма, шаг, перемычка, ориентация, открытая площадь и прямое/шахматное расположение.
-- [Hengda — Perforated metal](https://perforated-metal.net/perforatedmetal/aboutus.html): среди предлагаемых форм указаны ромбы, прямоугольники, кресты, восьмиугольники, треугольники, звёзды и овалы.
-- [Dillinger — Special perforations](https://www.df-perforatedsheets.com/en/embossed-panels-special-perforations/special-perforations-embossed-plates): звёздные, цветочные и клеверные орнаменты, формованные отверстия.
-- [Perfopol — Other perforation](https://www.perfopol.com/Other_perforation): клевер, жалюзийные, смешанные и другие специальные варианты.
+- [Graepels — Standard Perforations](https://www.graepels.com/wp-content/uploads/2024/10/standard-perforation-sizes.pdf): round, square, two slot types, diamond, hexagonal and triangular holes.
+- [SCHÄFER — Perforation patterns](https://www.schaefer-lochbleche.com/en/offer/perforated-metal-from-stock/perforation-pattern/): shape, pitch, web, orientation, open area and straight/staggered arrangement.
+- [Hengda — Perforated metal](https://perforated-metal.net/perforatedmetal/aboutus.html): offered shapes include diamonds, rectangles, crosses, octagons, triangles, stars and ovals.
+- [Dillinger — Special perforations](https://www.df-perforatedsheets.com/en/embossed-panels-special-perforations/special-perforations-embossed-plates): star, floral and clover ornaments and formed openings.
+- [Perfopol — Other perforation](https://www.perfopol.com/Other_perforation): clover, louvered, mixed and other special variants.
 
-Каталожные сведения описывают промышленные изделия. Параметры плагина — геометрические настройки модели, а не рекомендация по прочности, акустике или технологии производства.
+Catalog information describes industrial products. Add-in parameters are geometric model settings, not recommendations for strength, acoustics or manufacturing processes.
 
-### Start Point и ориентация
+### Start Point and orientation
 
-**Start Point** выбирает точку эскиза, вершину или конструкционную точку штатным Select. Точка вне плоскости проецируется на Profiles. Без выбранной точки используется автоматический центр. X/Y Offset добавляют сдвиг: в осях раскладки для сеток/Voronoi и в осях эскиза для Circular. **Fixed**, **Radial** и **Tangential** задают ориентацию отверстий; Hole Angle добавляет поворот. Ориентация скрыта для кругов, а настройки колец — для Voronoi. Start Point доступен для всех раскладок.
+**Start Point** selects a sketch point, vertex, or construction point with native Select. A point outside the plane is projected onto Profiles. Without a selected point, the automatic center is used. X/Y Offset adds a shift in layout axes for grids/Voronoi and sketch axes for Circular. **Fixed**, **Radial**, and **Tangential** set hole orientation; Hole Angle adds rotation. Orientation is hidden for circles and ring settings for Voronoi. Start Point is available for all layouts.
 
-### Ограничение области
+### Limiting the area
 
-Spread Radius удалён из диалога. Новые раскладки заполняют выбранную границу; область задаётся выбранной гранью, профилем или Boundary. Старые Feature сохраняют параметр Spread Radius и пересчёт для совместимости.
+Spread Radius was removed from the dialog. New layouts fill the selected boundary; the area is specified by a selected face, profile, or Boundary. Old Features retain the Spread Radius parameter and recompute for compatibility.
 
-### Криволинейные грани (разработка)
+### Curved faces (development)
 
-Размеры форм относятся к плоскому сечению прямого инструмента по нормали к поверхности. На цилиндре X следует окружности, Y — оси; на конусе Y следует образующей с физическим шагом, а число отверстий каждого ряда зависит от местной окружности и глубины инструмента. Rectangular сохраняет начальное угловое направление, Staggered сдвигает через ряд половину местного углового шага. К основанию добавляются отверстия; отдельные колонки разветвляются при изменении числа ячеек. На свободной поверхности используются локальные касательные оси, физическая длина сечений и обратное отображение длины в UV. Шаг повторяемых форм консервативно учитывает сближение инструментов по глубине; на двойной кривизне равномерность сразу по всем направлениям не гарантируется. Hole Angle поворачивает сечение. Например, Diameter 5 mm означает диаметр инструмента, а не постоянную длину дуги отверстия на поверхности.
+Shape dimensions refer to the planar cross-section of a straight tool along the surface normal. On a cylinder X follows the circumference and Y the axis; on a cone Y follows the generator with physical spacing, and each row's hole count depends on local circumference and tool depth. Rectangular retains the initial angular direction; Staggered shifts alternate rows by half the local angular pitch. Holes are added toward the base; individual columns branch as the cell count changes. On a freeform surface, local tangent axes, physical cross-section length, and inverse length-to-UV mapping are used. Repeating-shape pitch conservatively accounts for tools approaching through depth; uniformity in every direction is not guaranteed on double curvature. Hole Angle rotates the section. For example, Diameter 5 mm means tool diameter, not a constant hole arc length on the surface.
 
-Voronoi сохраняет Cell Spacing, Irregularity, Seed/New Pattern и Round Corners. На цилиндре точки периодичны через 360°. Разделяющие плоскости между конечными инструментами защищают Web Thickness по глубине, включая сближение у почти замкнутого сектора. У повторяющихся форм размеры не уменьшаются: конфликтующие точки пропускаются. Это прямые инструменты, а не геодезическая диаграмма на поверхности.
+Voronoi retains Cell Spacing, Irregularity, Seed/New Pattern, and Round Corners. On a cylinder points are periodic across 360°. Separating planes between finite tools protect Web Thickness through depth, including convergence near an almost closed sector. Repeating shapes are not reduced in size: conflicting points are skipped. These are straight tools, not a geodesic surface diagram.
 
-Trim to Boundary сохраняет частичные отверстия; Edge Offset действует на исходную границу, зону и существующие вырезы. Точные проекции кривых сохраняются в маске. Вогнутое/вырождающееся смещение использует консервативное вычитание полос вдоль границы с дополнительным зазором 0,002 mm. Смещение в локальной проекции не является геодезическим.  Circular и Pattern Angle доступны только для плоских источников; X/Y Offset сохраняются на кривых как фаза рисунка.
+Trim to Boundary retains partial openings; Edge Offset applies to the original boundary, zone, and existing cutouts. Exact curve projections are preserved in the mask. A concave/degenerate offset uses conservative subtraction of strips along the boundary with an additional 0.002 mm clearance. Offset in the local projection is not geodesic. Circular and Pattern Angle are available only for planar sources; X/Y Offset remains on curved surfaces as pattern phase.
 
-Distance, Offset, Flip Direction, One Side, Two Sides и Symmetric задают ограниченный прямой инструмент. Дно глухого отверстия плоское, а не на постоянной глубине от поверхности. Для сквозного отверстия задайте Distance немного больше толщины стенки и проверьте Full Preview. Цилиндрический/конический инструмент не должен пересекать ось. All, To Object, Taper и Perforated Panel на криволинейной грани недоступны.
+Distance, Offset, Flip Direction, One Side, Two Sides, and Symmetric define a bounded straight tool. The bottom of a blind hole is flat, not at constant depth from the surface. For a through hole, set Distance slightly greater than wall thickness and inspect Full Preview. A cylindrical/conical tool must not cross the axis. All, To Object, Taper, and Perforated Panel are unavailable on a curved face.
 
-Sketch создаёт фиксированные 3D-контуры, Extrude — фиксированные Base Feature/Combine, Feature — параметрический узел с зависимостями, пересчётом и Edit Feature. Подробнее — обе README. Сферы, торы, mesh и переходы между несколькими гранями исключены.
+Sketch creates fixed 3D contours, Extrude creates fixed Base Feature/Combine, and Feature creates a parametric node with dependencies, recompute, and Edit Feature. See both READMEs for details. Spheres, tori, mesh, and transitions across multiple faces are excluded.
 
-NURBS-грани с вырожденной границей в виде одной точки проверяются по внутренним параметрам. Участки с неопределённым локальным базисом и зоны обрезки, включающие эту точку, пропускаются отдельно; остальная грань остаётся доступной. Лимит Maximum Holes сохраняется: для больших площадей его требуется увеличить явно.
+NURBS faces with a degenerate boundary at a single point are checked using interior parameters. Areas with an undefined local basis and trim regions containing that point are skipped separately; the remainder of the face stays available. Maximum Holes still applies and must be explicitly increased for large areas.
 
-## Новые Distribution в рабочей ветке
+## New Distributions in the working branch
 
-Contour, Fan, Phyllotaxis, Poisson Disk, Wave, Chevron, Running Bond и Between Curves используют существующие 12 повторяемых форм и их размеры. Voronoi с ними не совмещается. Минимальная перемычка проверяется по описанным окружностям реальных форм, независимо от поворота; это консервативная упаковка с возможными пропусками кандидатов. Along Spacing/Row Spacing при 0 автоматические, меньший шаг повышается до безопасного минимума. Новые генераторы подключены к общим путям обрезки и Edge Offset.
+Contour, Fan, Phyllotaxis, Poisson Disk, Wave, Chevron, Running Bond, and Between Curves use the existing 12 repeating shapes and their dimensions. They do not combine with Voronoi. Minimum web is checked against the circumscribed circles of actual shapes regardless of rotation; this is conservative packing and may skip candidates. Along Spacing/Row Spacing at 0 are automatic; smaller spacing is raised to a safe minimum. The new generators are connected to shared trimming and Edge Offset paths.
 
-Contour — приближённые уровни внутреннего расстояния с явным допуском, не точный CAD-offset. Between Curves — ограниченный контракт двух открытых плоских направляющих одного компонента; сложные/пересекающиеся/неплоские полосы не заявлены. **Текущая CAD/UI-приёмка записана в [RELEASE_INTEGRATION.md](RELEASE_INTEGRATION.md).** Полная семантика полей, допуски и проверки: [LAYOUT_VARIANTS.md](LAYOUT_VARIANTS.md).
+Contour uses approximate inner-distance levels with an explicit tolerance, not an exact CAD offset. Between Curves is a bounded contract for two open planar guides in one component; complex, intersecting, or nonplanar strips are not claimed. **Current CAD/UI acceptance is recorded in [RELEASE_INTEGRATION.md](RELEASE_INTEGRATION.md).** Full control semantics, tolerances, and checks: [LAYOUT_VARIANTS.md](LAYOUT_VARIANTS.md).
 
-## Раскладка вдоль кривой — в разработке
+## Along Path layout — in development
 
-Along Path использует одну линию, дугу, окружность или сплайн в плоскости источника. Path Spacing — расстояние между центрами по длине кривой, независимо от размера отверстия и Web Thickness. Минимальная перемычка проверяется между всеми сближенными отверстиями, включая повороты и шов: для кругов точно, для остальных форм по описанным окружностям. Поэтому некруглые формы могут требовать большего шага, чем при проверке точных контуров. Конфликт выдаёт ошибку; автоматического прореживания нет.
+Along Path uses one line, arc, circle, or spline in the source plane. Path Spacing is center-to-center distance along the curve, independent of hole size and Web Thickness. Minimum web is checked between all nearby holes, including turns and the seam: exactly for circles, and using circumscribed circles for other shapes. Noncircular shapes may therefore require greater spacing than with exact contour checks. Conflicts produce an error; holes are not automatically thinned.
 
-Start Offset, End Offset и Position измеряются до центров, а не до края отверстия. Closed Path не дублирует шов; фиксированный шаг не перераспределяется, поэтому короткий остаток у шва может потребовать изменения параметров. Полная область, её внутренние вырезы, Edge Offset и точная Trim to Boundary сохраняют существующий смысл. Функция не выпущена и не проверялась в Fusion; [подробный контракт и будущая приёмка](CURVE_LAYOUT.md).
+Start Offset, End Offset, and Position are measured to centers, not hole edges. Closed Path does not duplicate the seam; fixed spacing is not redistributed, so a short seam remainder may require parameter changes. The complete region, its inner cutouts, Edge Offset, and exact Trim to Boundary retain their existing meaning. At this stage the feature was unreleased and had not been tested in Fusion; [detailed contract and planned acceptance](CURVE_LAYOUT.md).
 
+## Compatibility of layouts and multiple surfaces
 
-## Совместимость раскладок и нескольких поверхностей
+The current matrix is in both READMEs and [RELEASE_INTEGRATION.md](RELEASE_INTEGRATION.md). Running Bond and Poisson Disk were added on cylinders; Running Bond with local row capacity on cones; and Running Bond, Poisson Disk, Wave, and Chevron on freeform surfaces. Centered layouts and planar guides remain limited to planar sources. Unsupported combinations are rejected explicitly without substituting another grid.
 
-Актуальная матрица — в обеих README и [RELEASE_INTEGRATION.md](RELEASE_INTEGRATION.md). На цилиндре добавлены Running Bond и Poisson Disk; на конусе — Running Bond с местной вместимостью ряда; на свободной поверхности — Running Bond, Poisson Disk, Wave и Chevron. Центрические раскладки и плоские направляющие остаются для плоских источников. Неподдержанное сочетание отклоняется явно, без подмены другой сеткой.
+Multiple regions must have one surface type: planar, cylindrical, conical, or freeform. This is checked during selection and Feature construction/recompute. Maximum Holes is shared. All regions are prepared before modifying the body; webs between curved regions are checked using finite tools. Conflicting holes are not reduced in size.
 
-Несколько областей выбираются только одного типа: плоские, цилиндрические, конические или свободные. Проверка действует и при выборе, и при построении/пересчёте Feature. Предел Maximum Holes общий. Все области подготавливаются до изменения тела; перемычки между кривыми областями проверяются по конечным инструментам. Отверстия при конфликте не уменьшаются.
+## Organic fields in the working branch
 
+Smooth Noise, Reaction Diffusion, Directional Fibers, Ridged Noise / Topographic, Gyroid Field, and Blue Noise / Size Gradient are in Hole Shape before the final Voronoi. The first five create bounded smooth fields with Pattern Scale, Field Fill, Direction, and Seed; Blue Noise produces circles of different radii with Maximum Diameter, Size Variation, and signed Size Gradient. Field Fill sets the initial quantile, not the measured open area of the finished body.
 
-## Органические поля в рабочей ветке
+These are independent fields: Circular, Along Path, and additional Distributions do not combine with them. All six use shared Fast/Full Preview, trimming/Edge Offset, and Sketch/Extrude/Feature paths on planes, cylinders, cones, and regular freeform areas. Material islands are joined with bridges; the actual web between finished contours is checked separately. On curved surfaces a web is maintained between finite straight tools, with possible local omissions and thinning near seams, the apex, and high curvature. Multiple regions must have one surface type.
 
-Smooth Noise, Reaction Diffusion, Directional Fibers, Ridged Noise / Topographic, Gyroid Field и Blue Noise / Size Gradient расположены в Hole Shape перед последним Voronoi. Первые пять создают ограниченные плавные поля с Pattern Scale, Field Fill, Direction и Seed; Blue Noise — круги разных радиусов с Maximum Diameter, Size Variation и знаковым Size Gradient. Field Fill задаёт исходный квантиль, а не измеренную открытую площадь готового тела.
-
-Это самостоятельные поля: Circular, Along Path и дополнительные Distribution с ними не совмещаются. Все шесть используют общие пути Fast/Full Preview, обрезки/Edge Offset, Sketch/Extrude/Feature на плоскости, цилиндре, конусе и регулярных частях freeform. Островки материала соединяются мостиками; реальная перемычка готовых контуров проверяется отдельно. На кривых сохраняется перемычка между конечными прямыми инструментами, возможны местные пропуски и разрежение у швов, вершины и высокой кривизны. Несколько областей — только одного типа.
-
-[Полный контракт алгоритмов, размеров, допусков, стоимости, совместимости и проверок](ORGANIC_PATTERNS.md). Возможности не опубликованы в 1.0.1.
+[Full contract for algorithms, dimensions, tolerances, cost, compatibility, and validation](ORGANIC_PATTERNS.md). These features were not published in 1.0.1.
