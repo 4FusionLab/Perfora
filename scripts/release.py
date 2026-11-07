@@ -25,18 +25,22 @@ def resolve_existing_tag_commit(tag):
 
 
 def main(version_override=None):
+    if os.environ.get('GITHUB_REF_TYPE') != 'tag':
+        raise SystemExit('Release publication requires an explicitly pushed Git tag.')
     repository = os.environ['GITHUB_REPOSITORY']
     commit = os.environ['GITHUB_SHA']
+    tag = os.environ['GITHUB_REF_NAME']
     version = version_override or json.loads((ROOT / 'Perfora/Perfora.manifest').read_text(encoding='utf-8'))['version']
     if not re.fullmatch(r'\d+\.\d+\.\d+', version):
         raise SystemExit('Manifest version must be MAJOR.MINOR.PATCH.')
-    stable = int(version.split('.')[0]) >= 1
+    if not re.fullmatch(r'v' + re.escape(version) + r'(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?', tag):
+        raise SystemExit('Release tag does not match GitVersion MajorMinorPatch.')
+    stable = tag == 'v' + version and int(version.split('.')[0]) >= 1
     prerelease = not stable
-    title = 'Perfora ' + version + (' · First stable release' if version == '1.0.0' else ('' if stable else ' · Experimental'))
-    tag = 'v' + version
+    title = 'Perfora ' + tag[1:] + (' · First stable release' if tag == 'v1.0.0' else ('' if stable else ' · Experimental'))
     archive = ROOT / ('dist/Perfora-' + version + '.zip')
     checksum = archive.with_suffix('.zip.sha256')
-    notes = ROOT / ('docs/releases/' + tag + '.md')
+    notes = ROOT / ('docs/releases/v' + version + '.md')
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     if checksum.read_text(encoding='utf-8').split() != [digest, archive.name]:
         raise SystemExit('Archive checksum mismatch.')
@@ -55,7 +59,9 @@ def main(version_override=None):
     # GitHub ignores --target when the tag already exists. Never attach a new
     # release to a historical tag pointing at a different commit.
     tagged_commit = resolve_existing_tag_commit(tag)
-    if tagged_commit is not None and tagged_commit != commit:
+    if tagged_commit is None:
+        raise SystemExit('Tag ' + tag + ' is missing; refusing to create a tag implicitly.')
+    if tagged_commit != commit:
         raise SystemExit('Existing tag ' + tag + ' points to a different commit; refusing publication.')
     if existing.returncode != 0:
         gh('release', 'create', tag, '--repo', repository, '--target', commit,
