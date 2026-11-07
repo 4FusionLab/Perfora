@@ -1,0 +1,3 @@
+# Shipped Fusion add-in and installation/packaging logic.
+Perfora/**
+install.py
