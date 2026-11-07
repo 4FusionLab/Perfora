@@ -25,15 +25,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Calculate GitVersion 6.8.2
+      - name: Resolve GitVersion (shared platform)
         id: gitversion
-        shell: bash
-        run: |
-          set -euo pipefail
-          dotnet tool install GitVersion.Tool --tool-path "$RUNNER_TEMP/gitversion" --version 6.8.2
-          version="$("$RUNNER_TEMP/gitversion/dotnet-gitversion" /showvariable MajorMinorPatch)"
-          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+        uses: 4FusionLab/.github/.github/actions/resolve-version@ad9d60ba4aabc494b4f2c85d6c566a50ca423751
+
   changes:
     name: Check runtime changes
     runs-on: ubuntu-latest
@@ -44,14 +39,15 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Validate release path rules
-        run: python scripts/release_changes.py --self-test
-      - name: Detect shipped runtime changes
+      - name: Detect runtime changes (shared platform)
         id: impact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          BEFORE: ${{ github.event.before }}
-        run: python scripts/release_changes.py --before "$BEFORE" --after "$GITHUB_SHA" --github-output "$GITHUB_OUTPUT"
+        uses: 4FusionLab/.github/.github/actions/runtime-changes@ad9d60ba4aabc494b4f2c85d6c566a50ca423751
+        with:
+          before: ${{ github.event.before }}
+          after: ${{ github.sha }}
+          paths-file: .github/release-paths.txt
+
   check:
     needs: version
     name: Test (${{ matrix.os }})
