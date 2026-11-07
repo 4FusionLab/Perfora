@@ -111,9 +111,9 @@ jobs:
             --output "$RUNNER_TEMP/release-notes.md" --candidate "docs/releases/v$version.md"
           echo "notes=$RUNNER_TEMP/release-notes.md" >> "$GITHUB_OUTPUT"
       - name: Build versioned package for tested commit
-                run: python install.py --zip --version "${{ steps.version.outputs.version }}"
+        run: python install.py --zip --version "${{ steps.version.outputs.version }}"
       - name: Verify GitVersion, manifest, ZIP and SHA-256
-                shell: bash
+        shell: bash
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
@@ -130,6 +130,6 @@ jobs:
             (cd dist && sha256sum -c "Perfora-$VERSION.zip.sha256")
           fi
       - name: Publish ZIP, checksum, and release notes
-                run: python scripts/release.py --version "${{ steps.version.outputs.version }}" --notes "${{ steps.version.outputs.notes }}"
+        run: python scripts/release.py --version "${{ steps.version.outputs.version }}" --notes "${{ steps.version.outputs.notes }}"
         env:
           GH_TOKEN: ${{ github.token }}
