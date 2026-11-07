@@ -97,7 +97,7 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.14'
-      - name: Prepare release notes and version
+      - name: Capture tested GitVersion identity
         id: version
         shell: bash
         env:
@@ -107,9 +107,13 @@ jobs:
           version="$RESOLVED_VERSION"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          python scripts/release_notes.py --product Perfora --version "$version" \
-            --output "$RUNNER_TEMP/release-notes.md" --candidate "docs/releases/v$version.md"
-          echo "notes=$RUNNER_TEMP/release-notes.md" >> "$GITHUB_OUTPUT"
+      - name: Generate release notes (shared platform)
+        uses: 4FusionLab/.github/.github/actions/release-notes@ad9d60ba4aabc494b4f2c85d6c566a50ca423751
+        with:
+          product: Perfora
+          version: ${{ steps.version.outputs.version }}
+          candidate: docs/releases/v${{ steps.version.outputs.version }}.md
+          output: ${{ runner.temp }}/release-notes.md
       - name: Build versioned package for tested commit
         run: python install.py --zip --version "${{ steps.version.outputs.version }}"
       - name: Verify GitVersion, manifest, ZIP and SHA-256
@@ -124,12 +128,20 @@ jobs:
           if [[ "$channel" == stable ]]; then
             python scripts/release_contract.py --version "$VERSION" --tag "v$VERSION" --channel stable \
               --manifest Perfora/Perfora.manifest --archive "dist/Perfora-$VERSION.zip" \
-              --notes "${{ steps.version.outputs.notes }}"
+              --notes "${{ runner.temp }}/release-notes.md"
           else
             python -c "import json,zipfile; p='dist/Perfora-$VERSION.zip'; z=zipfile.ZipFile(p); assert json.loads(z.read('Perfora/Perfora.manifest'))['version']=='$VERSION'"
             (cd dist && sha256sum -c "Perfora-$VERSION.zip.sha256")
           fi
+      - name: Verify ZIP, manifest and SHA-256 (shared platform)
+        uses: 4FusionLab/.github/.github/actions/verify-archive@ad9d60ba4aabc494b4f2c85d6c566a50ca423751
+        with:
+          product: Perfora
+          version: ${{ steps.version.outputs.version }}
+          archives: dist/Perfora-${{ steps.version.outputs.version }}.zip
+          manifest: Perfora/Perfora.manifest
+          notes: ${{ runner.temp }}/release-notes.md
       - name: Publish ZIP, checksum, and release notes
-        run: python scripts/release.py --version "${{ steps.version.outputs.version }}" --notes "${{ steps.version.outputs.notes }}"
+        run: python scripts/release.py --version "${{ steps.version.outputs.version }}" --notes "${{ runner.temp }}/release-notes.md"
         env:
           GH_TOKEN: ${{ github.token }}
