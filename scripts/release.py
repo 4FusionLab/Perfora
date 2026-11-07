@@ -24,7 +24,7 @@ def resolve_existing_tag_commit(tag):
     return result.stdout.strip() if result.returncode == 0 else None
 
 
-def main(version_override=None):
+def main(version_override=None, notes_override=None):
     repository = os.environ['GITHUB_REPOSITORY']
     commit = os.environ['GITHUB_SHA']
     version = version_override or json.loads((ROOT / 'Perfora/Perfora.manifest').read_text(encoding='utf-8'))['version']
@@ -36,7 +36,7 @@ def main(version_override=None):
     tag = 'v' + version
     archive = ROOT / ('dist/Perfora-' + version + '.zip')
     checksum = archive.with_suffix('.zip.sha256')
-    notes = ROOT / ('docs/releases/' + tag + '.md')
+    notes = Path(notes_override) if notes_override else ROOT / ('docs/releases/' + tag + '.md')
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     if checksum.read_text(encoding='utf-8').split() != [digest, archive.name]:
         raise SystemExit('Archive checksum mismatch.')
@@ -85,4 +85,6 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--version', help='GitVersion MajorMinorPatch for the tested release')
-    main(parser.parse_args().version)
+    parser.add_argument('--notes', help='Reviewed or automatically generated release notes')
+    args = parser.parse_args()
+    main(args.version, args.notes)
