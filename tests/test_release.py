@@ -19,7 +19,7 @@ spec.loader.exec_module(release)
 
 
 class ReleaseTests(unittest.TestCase):
-    def exercise(self, version='1.0.0', existing=None, corrupt=False, expected_error=None):
+    def exercise(self, version='1.0.0', existing=None, corrupt=False, expected_error=None, existing_tag_commit=None):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             for name in ('Perfora', 'dist', 'docs/releases'):
@@ -60,6 +60,7 @@ class ReleaseTests(unittest.TestCase):
                 return SimpleNamespace(returncode=0, stdout='')
 
             with patch.object(release, 'ROOT', root), patch.object(release, 'gh', gh), \
+                 patch.object(release, 'resolve_existing_tag_commit', return_value=existing_tag_commit), \
                  patch.dict(os.environ, GITHUB_REPOSITORY='owner/project', GITHUB_SHA='tested-commit'), \
                  contextlib.redirect_stdout(io.StringIO()):
                 if expected_error:
@@ -101,3 +102,17 @@ class ReleaseTests(unittest.TestCase):
         self.assertFalse(state['isDraft'])
         self.assertFalse(state['isPrerelease'])
         self.assertTrue(state['latest'])
+
+    def test_existing_tag_at_different_commit_blocks_publication(self):
+        _, calls = self.exercise(existing_tag_commit='different-commit', expected_error=True)
+        self.assertFalse(any(c[1] in ('create', 'upload', 'edit') for c in calls))
+
+    def test_existing_tag_at_tested_commit_can_be_reused(self):
+        state, calls = self.exercise(existing_tag_commit='tested-commit')
+        self.assertFalse(state['isDraft'])
+        self.assertTrue(any(c[1] == 'create' for c in calls))
+
+    def test_existing_draft_with_retarged_tag_blocks_publication(self):
+        existing = dict(isDraft=True, targetCommitish='tested-commit')
+        _, calls = self.exercise(existing=existing, existing_tag_commit='different-commit', expected_error=True)
+        self.assertFalse(any(c[1] in ('create', 'upload', 'edit') for c in calls))
