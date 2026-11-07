@@ -1,24 +1,21 @@
-# 4FusionLab — release policy
+# 4FusionLab — automatic runtime release policy
 
-This repository follows the organization-wide release contract. The **GitVersion.Tool version is pinned to 6.8.2**. This file defines eligibility; it does not independently start publication.
+## Trigger
 
-## Version identity
+- A direct push to `main` or a PR merge into `main` is the only normal release event. PR checks, manual CI dispatch and version-tag pushes **do not** initiate publication.
+- Before publishing, compare the entire `github.event.before..GITHUB_SHA` range, including renamed/deleted runtime files. A release is eligible **only** if the pushed commits change a shippable add-in/runtime file, runtime resource, native component, or explicitly designated distribution input.
+- The repository's `.github/release-paths.txt` is the audited allowlist; `scripts/release_changes.py` enforces it. Changes limited to README, guides, design documents, screenshots, tests, CI workflows, repository policy or GitVersion config must not publish a release.
+- All required existing CI checks must succeed before publishing. A failed gate means no release, no mutable tag and no replaced assets.
 
-- `GitVersion.yml` plus Git history and existing immutable `v*` tags define the next version. Conventional commit messages `feat:`, `fix:`, `perf:` and breaking-change markers determine the intended bump.
-- A Fusion manifest and filename of a distributable ZIP use the numeric **MAJOR.MINOR.PATCH** from GitVersion (not a PR branch identifier). An optional prerelease suffix belongs to the Git tag and GitHub Release metadata, not to Fusion's numeric manifest.
-- A released artifact, its embedded manifest, checksum, Git tag and GitHub Release must describe the same product version. Do not retarget tags or replace assets of a published release.
-- Product IDs, Fusion manifest compatibility metadata, packaging contents and release-note history must not change as a side effect of version calculation.
+## Version and distribution
 
-## Release gates
+- GitVersion.Tool **6.8.2** derives numeric `MAJOR.MINOR.PATCH` using `GitVersion.yml` and the full Git history. The package ZIP, embedded Fusion manifest (where applicable), auto-created immutable `vMAJOR.MINOR.PATCH` tag and GitHub Release refer to the same commit/version.
+- The pipeline creates the tag **automatically** when it publishes the GitHub Release. Contributors never create or push release tags manually. A pre-existing version tag pointing to another commit is an error; a published release is never overwritten.
+- Existing reviewed, version-specific release notes are used when present; otherwise notes are automatically generated from Git history. No manually prepared release-note file is required just to ship a code change.
+- Stable releases become Latest. Prereleases never become Latest. Project-specific native-CAD acceptance, tests, signed/hashed archives, OS compatibility and publication limitations remain in force.
 
-1. Development changes enter `main` through a reviewed PR with successful required tests; full Git history is fetched to calculate versions.
-2. Every release requires a deliberately prepared, nonempty version-specific release note, recorded compatibility limitations and applicable native Fusion acceptance evidence. A passing Python workflow **is not** proof of native Fusion CAD testing.
-3. Stable: `vMAJOR.MINOR.PATCH`, `prerelease=false`. Prerelease: `vMAJOR.MINOR.PATCH-IDENTIFIER`, `prerelease=true`; never mark a prerelease as Latest. Preserve each project's additional channel-specific gates.
-4. Publish only the tested commit. Before publication, validate archive filenames, embedded manifest version and SHA-256; a failed gate must leave the existing release untouched.
-5. GitHub Actions uses minimum necessary permissions; jobs and pull requests must not gain write permission merely to calculate a version.
-6. Avoid opportunistic releases on a routine PR merge. When required release notes or project-specific approval/evidence is absent, skip publication safely rather than inventing notes or issuing an unintended version.
-7. A broken release is corrected by a new patch version. Existing public tags, release notes and downloadable files remain immutable.
+## This repository
 
-## Repository-specific publishing gate
+Runtime allowlist: `Perfora/**`, `install.py`. Linux/macOS/Windows tests, Fusion manifest and ZIP SHA-256 remain mandatory. Historical 0.x releases remain experimental.
 
-Publication is gated by passing Linux/macOS/Windows tests and reviewed `docs/releases/vX.Y.Z.md` notes. Its existing main-branch publisher remains enabled; absent notes mean no release. The 0.x series is prerelease.
+If a push changes no eligible runtime file, CI may run but the GitHub Release job is skipped, even when GitVersion computes a different candidate version.
