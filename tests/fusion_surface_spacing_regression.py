@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Read-only physical row-spacing audit on large NURBS faces in the open design."""
 import importlib.util
 from importlib import import_module

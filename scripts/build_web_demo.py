@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Build one static HTML playground with the actual Perfora Python kernel.
 
 No JS geometry port, build dependencies, external services or publication.

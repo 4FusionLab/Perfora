@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Exact selected body snapshot, disposable CAD, compact per-face pass/fail.
 
 Pass source_body_name when diagnosing a particular open design. This script

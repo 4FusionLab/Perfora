@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Compatibility entry point for the common curved-face UI acceptance."""
 from pathlib import Path
 import runpy

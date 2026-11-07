@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Run with runpy in Fusion's Python console with the registered add-in running.
 
 Creates one disposable document and opens Edit Feature with a replacement Start

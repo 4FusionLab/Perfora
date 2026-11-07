@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Capture real Fusion 1.0 examples with the registered add-in; no cloud save.
 
 Run with runpy in Fusion, optionally passing addon_path and output_dir. Creates

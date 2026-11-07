@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Execute actual adapter/Feature/UI method bodies against narrow offline doubles.
 
 AST loading avoids importing adsk or contacting Fusion. These verify contracts,

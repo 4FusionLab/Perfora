@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Execute in Fusion's Py console. A separate unsaved document is closed afterwards."""
 import importlib.util
 from importlib import import_module

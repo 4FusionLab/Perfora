@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Bounded deterministic layout generators. Pure 2D, centimeters/radians.
 
 Enclosing disks and a spatial hash guarantee the web for every repeating shape,

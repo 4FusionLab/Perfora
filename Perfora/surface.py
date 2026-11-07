@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """One preparation path for curved-face contours, solids and Custom Features.
 
 Dimensions describe local straight tools. Boundary curves are projected exactly

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Actual point-identity implementation, loaded without the Fusion runtime."""
 import ast
 import math

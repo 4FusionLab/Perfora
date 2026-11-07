@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Shared, dependency-free open planar guide contract (cm).
 
 Adapters supply finite 2D strokes. This module owns normalized arc length,

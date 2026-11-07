@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """One self-contained HTML visual regression from the actual geometry kernel.
 
 python3 scripts/visual_distribution_test.py --output /path/distributions.html

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Bounded, deterministic scalar fields and variable-radius blue noise.
 
 No CAD objects or third-party modules. Field topology is resolved on a finite

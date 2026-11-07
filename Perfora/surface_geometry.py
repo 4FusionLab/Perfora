@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Pure local-tool placement and separation on non-planar surface charts."""
 from dataclasses import dataclass, replace
 import math

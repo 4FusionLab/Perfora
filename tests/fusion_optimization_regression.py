@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Native optimization checks; optional baseline_path compares a frozen package."""
 from dataclasses import replace
 import importlib.util

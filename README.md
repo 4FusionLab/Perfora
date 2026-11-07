@@ -5,7 +5,7 @@
 
 <p align="center">
   <a href="https://github.com/4FusionLab/Perfora/releases/latest"><img src="https://img.shields.io/github/v/release/4FusionLab/Perfora?label=release" alt="Latest release"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="GPL-3.0 license"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm--Noncommercial-blue" alt="PolyForm Noncommercial license"></a>
   <a href="https://github.com/4FusionLab/Perfora/actions/workflows/ci.yml"><img src="https://github.com/4FusionLab/Perfora/actions/workflows/ci.yml/badge.svg" alt="Build"></a>
 </p>
 
@@ -60,3 +60,5 @@ Works with Autodesk Fusion on **Windows and macOS**. Keep the installed folder i
 **Perfora**, goddess of holes, guards clean edges and saves makers from repeating the same pattern by hand. She belongs to the original mythology of **[4FusionLab](https://github.com/4FusionLab)**.
 
 <sub>Independent project, not affiliated with or endorsed by Autodesk.</sub>
+
+Commercial use outside the permitted purposes requires a separate agreement with 4FusionLab.

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Face-backed sketch profiles: no Split Face; run with runpy inside Fusion."""
 import json
 from pathlib import Path

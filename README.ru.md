@@ -5,7 +5,7 @@
 
 <p align="center">
   <a href="https://github.com/4FusionLab/Perfora/releases/latest"><img src="https://img.shields.io/github/v/release/4FusionLab/Perfora?label=release" alt="Последний релиз"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="Лицензия GPL-3.0"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm--Noncommercial-blue" alt="Лицензия PolyForm Noncommercial"></a>
   <a href="https://github.com/4FusionLab/Perfora/actions/workflows/ci.yml"><img src="https://github.com/4FusionLab/Perfora/actions/workflows/ci.yml/badge.svg" alt="Сборка"></a>
 </p>
 
@@ -60,3 +60,5 @@
 **Перфора** — богиня отверстий, хранительница аккуратных кромок и противница ручного повторения узоров. Она входит в авторский пантеон **[4FusionLab](https://github.com/4FusionLab)**.
 
 <sub>Независимый проект, не связанный с Autodesk и не одобренный ею.</sub>
+
+Коммерческое использование за пределами разрешённых лицензией случаев возможно по отдельной договорённости с 4FusionLab.

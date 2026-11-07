@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Replay noise on copies of a selected real body, without saving user files.
 
 Run with runpy init_globals source_face, entry and optional modes/shapes.

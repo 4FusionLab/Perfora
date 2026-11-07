@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Organic geometry invariants; native CAD is checked separately in Fusion."""
 from dataclasses import replace
 import math

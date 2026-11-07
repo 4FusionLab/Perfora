@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Real zero-offset/inner-cutout acceptance in disposable Fusion documents."""
 import json
 from pathlib import Path

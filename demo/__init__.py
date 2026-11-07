@@ -1,2 +1,2 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Static browser demo adapter; not loaded by Autodesk Fusion."""

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Numeric expressions over native string inputs, including observable blanks.
 
 Fusion's ValueCommandInput exposes its last valid expression when the visible

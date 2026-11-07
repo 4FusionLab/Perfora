@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 // Run in the connected Playwright tool. It opens its own tab, preserves the
 // user's playground, and verifies live Python execution rather than fixtures.
 async (page) => {

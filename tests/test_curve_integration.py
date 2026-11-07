@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Offline adapter/storage/dialog contracts using explicitly fake adsk objects.
 
 No Autodesk modules, installed add-in, Application, or running Fusion are used.
