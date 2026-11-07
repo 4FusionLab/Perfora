@@ -49,7 +49,7 @@
 
 ## Подробнее
 
-[Подробное руководство](docs/README_REFERENCE.ru.md) · [Геометрия отверстий](docs/PERFORATIONS.md) · [Органические узоры](docs/ORGANIC_PATTERNS.md) · [Что нового в 1.1.0](docs/releases/v1.1.0.ru.md) · [История изменений](CHANGELOG.ru.md)
+[Подробное руководство](docs/README_REFERENCE.ru.md) · [Геометрия отверстий](docs/PERFORATIONS.ru.md) · [Органические узоры](docs/ORGANIC_PATTERNS.ru.md) · [Что нового в 1.1.0](docs/releases/v1.1.0.ru.md) · [История изменений](CHANGELOG.ru.md)
 
 [Участие в разработке](CONTRIBUTING.ru.md) · [Лицензия](LICENSE) · [Сообщить о проблеме](https://github.com/4FusionLab/Perfora/issues)
 
