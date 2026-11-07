@@ -1,83 +1,45 @@
 # Perfora — Pattern playground
 
-Публичное браузерное демо и штатный стенд быстрой визуальной проверки паттернов.
-Fusion и браузер используют **одно геометрическое ядро Perfora**. Исходники
-`Perfora/geometry.py`, `organic.py`, `distributions.py`, `distribution_fields.py`, `curves.py`
-и `curve_layout.py` встраиваются в страницу без изменения и исполняются в
-Python через Pyodide 0.27.7, в отдельном Web Worker. В JavaScript остаются ввод,
-отображение готовых контуров и ссылки. Экспорт по решению пользователя отсутствует. Отдельной реализации раскладок
-на JavaScript нет. Состав и SHA-256 модулей доступны в `perforaDemo.source`.
+[Русская версия](README.ru.md)
 
-## Возможности
+A public browser demo and standard bench for quick visual pattern checks. Fusion and the browser use **the same Perfora geometry kernel**. The sources `Perfora/geometry.py`, `organic.py`, `distributions.py`, `distribution_fields.py`, `curves.py`, and `curve_layout.py` are embedded in the page unchanged and executed in Python via Pyodide 0.27.7 in a separate Web Worker. JavaScript handles input, display of completed contours, and links. Export was excluded by user decision. There is no separate JavaScript implementation of layouts. Module composition and SHA-256 values are available in `perforaDemo.source`.
 
-- Pattern: 12 повторяемых форм и 11 семейств Distribution.
-- Noise: Smooth Noise, Reaction Diffusion, Directional Fibers, Topographic,
-  Gyroid Field, Blue Noise и последним Voronoi. Distribution скрыта.
-- Running Bond объединён с Staggered; отдельного управления Row Shift нет.
-- Граница Rectangle/Rounded/Circle, размеры панели, размеры отверстий,
-  Web Thickness, Edge Offset, ориентация и параметры выбранного рисунка.
-- Cell Size и Web Thickness вместо процента заполнения; у Voronoi сохраняются
-  Cell Spacing, Irregularity и Round Corners. Seed/New Pattern и ссылки с параметрами.
-- Геометрия пересчитывается в браузере; сервер вычислений и API-ключи не нужны.
-  Первый запуск требует интернета для загрузки закреплённой версии Pyodide с
-  jsDelivr. Страница содержит готовый первый рисунок, поэтому не открывается
-  пустой во время загрузки. Контуры панели не отправляются на сервер.
+## Features
 
-Все шесть шумовых форм используют общее Python-ядро. Add Bridges относится
-к первым пяти полям и включается отдельно от Web Thickness. У обычных Distribution
-дополнительных мостиков нет.
+- Pattern: 12 repeating shapes and 11 Distribution families.
+- Noise: Smooth Noise, Reaction Diffusion, Directional Fibers, Topographic, Gyroid Field, Blue Noise, and Voronoi last. Distribution is hidden.
+- Running Bond is combined with Staggered; there is no separate Row Shift control.
+- Rectangle/Rounded/Circle boundary, panel and hole dimensions, Web Thickness, Edge Offset, orientation, and selected-pattern parameters.
+- Cell Size and Web Thickness instead of fill percentage; Voronoi retains Cell Spacing, Irregularity, and Round Corners. Seed/New Pattern and links with parameters are supported.
+- Geometry is recalculated in the browser; no compute server or API keys are needed. The first run requires internet access to load the pinned Pyodide version from jsDelivr. The page contains a ready first pattern, so it does not open empty during loading. Panel contours are not sent to a server.
 
-## Сборка и локальный запуск
+All six noise shapes use the shared Python kernel. Add Bridges applies to the first five fields and is enabled separately from Web Thickness. Ordinary Distributions have no additional bridges.
+
+## Build and run locally
 
 ```sh
 python3 scripts/build_web_demo.py
 python3 -m http.server 8768 --bind 127.0.0.1
 ```
 
-Откройте `http://127.0.0.1:8768/demo/`. Единственный файл для хостинга —
-`demo/index.html`: оформление, логотип, Python-модули и стартовые образцы уже
-встроены. Его можно разместить в артефакте GitHub Pages либо другом статическом
-хостинге с HTTPS. Для локального запуска предпочтителен HTTP-сервер; ограничения
-`file://`, Web Worker и буфера обмена зависят от браузера. Подготовка страницы
-не является публикацией: push, настройка Pages и запуск deployment выполняются
-только по отдельному указанию пользователя.
+Open `http://127.0.0.1:8768/demo/`. The only file needed for hosting is `demo/index.html`: styling, logo, Python modules, and initial examples are already embedded. It can be hosted in a GitHub Pages artifact or another static HTTPS host. An HTTP server is preferred locally; `file://`, Web Worker, and clipboard restrictions vary by browser. Preparing the page is not publication: push, Pages setup, and deployment are performed only on separate user instruction.
 
-Сборщик не меняет установку Fusion, не требует сторонних Python-пакетов и не
-загружает зависимости. Версия Pyodide закреплена в `worker.js`; при её смене
-повторите реальную проверку браузера. [Pyodide](https://github.com/pyodide/pyodide)
-загружается отдельно и сохраняет собственные условия лицензирования.
+The builder does not modify the Fusion installation, require third-party Python packages, or download dependencies. The Pyodide version is pinned in `worker.js`; repeat real browser validation when changing it. [Pyodide](https://github.com/pyodide/pyodide) is loaded separately and retains its own license terms.
 
-## Проверка изменений
+## Checking changes
 
-1. Изменяйте алгоритмы в общем Python-ядре. Новую версию рисунка сохраняйте
-   явно; прежние Feature продолжают использовать прежнюю ревизию.
-2. Выполните `python3 -m unittest discover -s tests -v`, пересоберите страницу.
-   `tests/test_web_demo.py` проверяет реальные контуры, все формы и семейства,
-   скрытые поля, ограничения и точное встраивание исходников.
-3. Откройте свежую страницу. `browser-smoke.js` содержит сценарий для Playwright:
-   все Distribution, все формы, изменение параметров, восстановление
-   ссылки, ошибочный ввод, Reset и узкий экран. Он создаёт отдельную вкладку и
-   возвращает параметры и хеши полученных контуров. Сравните хеши/координаты с
-   результатом `demo.engine.compute()` на тех же входных данных. Визуально
-   просмотрите затронутые паттерны, обычный и узкий экраны.
-4. Затем выполните относящуюся к изменению CAD-приёмку из `CONTRIBUTING.md`.
-   Веб-проверка не подтверждает BRep, операции, швы криволинейных поверхностей,
-   нативный диалог, транзакции или пересчёт Custom Feature в Fusion.
+1. Change algorithms in the shared Python kernel. Explicitly version a new pattern; existing Features continue using their previous revision.
+2. Run `python3 -m unittest discover -s tests -v` and rebuild the page. `tests/test_web_demo.py` checks real contours, every shape and family, hidden fields, limits, and exact source embedding.
+3. Open the freshly built page. `browser-smoke.js` contains a Playwright scenario covering every Distribution and shape, parameter changes, link restoration, invalid input, Reset, and a narrow screen. It creates a separate tab and returns parameters and hashes of the resulting contours. Compare hashes/coordinates with `demo.engine.compute()` for the same inputs. Visually inspect affected patterns and both ordinary and narrow screens.
+4. Then perform the CAD acceptance relevant to the change from [CONTRIBUTING.md](../CONTRIBUTING.md). A web check does not establish BRep, operations, curved-surface seams, native dialog behavior, transactions, or Custom Feature recompute in Fusion.
 
-Планарная версия 2 сейчас поддерживает целые отверстия; частичная BRep-обрезка
-и криволинейное отображение остаются этапом нативной интеграции. Для остальных
-форм зазор в версии 2 консервативно контролируется описанными окружностями;
-у кругов/щелей используется точное расстояние капсул. Демо является визуальным
-стендом; производственные файлы оно не создаёт. Open area — геометрическая
-оценка для показанных отверстий. При скруглении Voronoi оценка использует
-исходный многоугольник и может быть немного завышена.
+Planar version 2 currently supports whole holes; partial BRep trimming and curved-surface display remain native integration stages. For other shapes, version 2 conservatively checks clearance using circumscribed circles; circles and slots use exact capsule distance. The demo is a visual bench and does not create production files. Open area is a geometric estimate for the displayed holes. With rounded Voronoi, the estimate uses the original polygon and may be slightly high.
 
-## Исходники страницы
+## Page sources
 
-- `engine.py` — адаптация входа и отображения над общим ядром.
-- `app.html`, `style.css`, `app.js` — интерфейс.
-- `worker.js` — изолированное исполнение Python.
-- `scripts/build_web_demo.py` — сборка, образцы и контроль происхождения.
+- `engine.py` — input and display adaptation over the shared kernel.
+- `app.html`, `style.css`, `app.js` — interface.
+- `worker.js` — isolated Python execution.
+- `scripts/build_web_demo.py` — build, examples, and provenance checks.
 
-Лицензия кода проекта — PolyForm Noncommercial 1.0.0. Производные HTML-страницы сохраняют
-лицензию проекта; встроенные исходники доступны внутри файла.
+The project code is licensed under PolyForm Noncommercial 1.0.0. Derived HTML pages retain the project license; embedded source code is available within the file.
