@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="perfora.png" alt="Perfora — goddess of holes" width="200">
+  <img src="../perfora.png" alt="Perfora — goddess of holes" width="200">
 </p>
 
 <h1 align="center">Perfora for Autodesk Fusion</h1>
@@ -8,10 +8,10 @@
 <p align="center">
   <a href="https://github.com/4FusionLab/Perfora/actions/workflows/ci.yml"><img src="https://github.com/4FusionLab/Perfora/actions/workflows/ci.yml/badge.svg" alt="Build and release checks"></a>
   <a href="https://github.com/4FusionLab/Perfora/releases"><img src="https://img.shields.io/github/v/release/4FusionLab/Perfora?color=2077bd" alt="Release"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm--Noncommercial-blue" alt="PolyForm Noncommercial 1.0.0 license"></a>
+  <a href="../LICENSE"><img src="https://img.shields.io/badge/license-PolyForm--Noncommercial-blue" alt="PolyForm Noncommercial 1.0.0 license"></a>
 </p>
 
-<p align="center"><a href="https://github.com/4FusionLab/Perfora/releases/tag/v1.1.0"><strong>Download v1.1.0</strong></a> · <a href="README.ru.md">Русский</a> · <a href="https://github.com/4FusionLab/Perfora/issues">Report a problem</a></p>
+<p align="center"><a href="https://github.com/4FusionLab/Perfora/releases/tag/v1.1.0"><strong>Download v1.1.0</strong></a> · <a href="../README.ru.md">Русский</a> · <a href="https://github.com/4FusionLab/Perfora/issues">Report a problem</a></p>
 
 
 ## Make the pattern. Keep the native model.
@@ -33,47 +33,47 @@ To perforate part of an existing face, draw a closed sketch on that face, finish
 <table>
   <tr>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/honeycomb-panel.jpg"><img src="docs/assets/examples/honeycomb-panel.jpg" alt="Blue rectangular grille with hexagonal perforation and four mounting holes" width="100%"></a>
+      <a href="assets/examples/honeycomb-panel.jpg"><img src="assets/examples/honeycomb-panel.jpg" alt="Blue rectangular grille with hexagonal perforation and four mounting holes" width="100%"></a>
       <p><strong>Honeycomb grille</strong><br>Hexagonal cells, an outer frame, and mounting holes.</p>
     </td>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/voronoi-panel.jpg"><img src="docs/assets/examples/voronoi-panel.jpg" alt="Green rectangular panel with rounded Voronoi perforation" width="100%"></a>
+      <a href="assets/examples/voronoi-panel.jpg"><img src="assets/examples/voronoi-panel.jpg" alt="Green rectangular panel with rounded Voronoi perforation" width="100%"></a>
       <p><strong>Rounded Voronoi</strong><br>An irregular pattern with rounded corners and a defined edge.</p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/slotted-disc.jpg"><img src="docs/assets/examples/slotted-disc.jpg" alt="Orange circular plate with diagonal slots and a central opening" width="100%"></a>
+      <a href="assets/examples/slotted-disc.jpg"><img src="assets/examples/slotted-disc.jpg" alt="Orange circular plate with diagonal slots and a central opening" width="100%"></a>
       <p><strong>Slots on a circular boundary</strong><br>Partial slots follow the outer edge and central opening.</p>
     </td>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/hole-shapes.jpg"><img src="docs/assets/examples/hole-shapes.jpg" alt="Six colored panels showing circular, triangular, star, elliptical, diamond, and cross perforations" width="100%"></a>
+      <a href="assets/examples/hole-shapes.jpg"><img src="assets/examples/hole-shapes.jpg" alt="Six colored panels showing circular, triangular, star, elliptical, diamond, and cross perforations" width="100%"></a>
       <p><strong>A shape for every pattern</strong><br>Circles, triangles, stars, ellipses, diamonds, and crosses.</p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/v1.0.0/circular-tangential.jpg"><img src="docs/assets/examples/v1.0.0/circular-tangential.jpg" alt="Gold circular grille with tangential slots on concentric rings" width="100%"></a>
+      <a href="assets/examples/v1.0.0/circular-tangential.jpg"><img src="assets/examples/v1.0.0/circular-tangential.jpg" alt="Gold circular grille with tangential slots on concentric rings" width="100%"></a>
       <p><strong>Slots that follow the circle</strong><br>Circular distribution, Tangential orientation, and a clean center opening.</p>
     </td>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/v1.0.0/radial-and-tangential.jpg"><img src="docs/assets/examples/v1.0.0/radial-and-tangential.jpg" alt="Two circular grilles comparing radial and tangential slots" width="100%"></a>
+      <a href="assets/examples/v1.0.0/radial-and-tangential.jpg"><img src="assets/examples/v1.0.0/radial-and-tangential.jpg" alt="Two circular grilles comparing radial and tangential slots" width="100%"></a>
       <p><strong>Choose the direction</strong><br>Radial on the left, Tangential on the right. Fixed orientation is available too.</p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/v1.0.0/point-scoped-perforation.jpg"><img src="docs/assets/examples/v1.0.0/point-scoped-perforation.jpg" alt="Green plate perforated only inside an off-center circular zone" width="100%"></a>
+      <a href="assets/examples/v1.0.0/point-scoped-perforation.jpg"><img src="assets/examples/v1.0.0/point-scoped-perforation.jpg" alt="Green plate perforated only inside an off-center circular zone" width="100%"></a>
       <p><strong>Start here. Stop at this radius.</strong><br>Pick a point and limit the spread without drawing a boundary profile.</p>
     </td>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/v1.0.0/profile-region.jpg"><img src="docs/assets/examples/v1.0.0/profile-region.jpg" alt="Blue plate with rounded Voronoi perforation confined to a sketch profile" width="100%"></a>
+      <a href="assets/examples/v1.0.0/profile-region.jpg"><img src="assets/examples/v1.0.0/profile-region.jpg" alt="Blue plate with rounded Voronoi perforation confined to a sketch profile" width="100%"></a>
       <p><strong>Your sketch is the boundary</strong><br>Perforate a profile directly on a solid face. No Split Face.</p>
     </td>
   </tr>
   <tr>
     <td colspan="2" valign="top">
-      <a href="docs/assets/examples/v1.0.0/parametric-spread.jpg"><img src="docs/assets/examples/v1.0.0/parametric-spread.jpg" alt="Two panels showing a parametric spread radius change from 16 to 26 millimeters" width="100%"></a>
+      <a href="assets/examples/v1.0.0/parametric-spread.jpg"><img src="assets/examples/v1.0.0/parametric-spread.jpg" alt="Two panels showing a parametric spread radius change from 16 to 26 millimeters" width="100%"></a>
       <p><strong>Change the parameter. Rebuild the pattern.</strong><br>Spread Radius 16 mm and 26 mm; the right-hand Feature recomputes after editing its model parameter.</p>
     </td>
   </tr>

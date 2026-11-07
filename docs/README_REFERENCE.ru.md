@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="perfora.png" alt="Перфора — богиня отверстий" width="200">
+  <img src="../perfora.png" alt="Перфора — богиня отверстий" width="200">
 </p>
 
 <h1 align="center">Perfora для Autodesk Fusion</h1>
@@ -8,10 +8,10 @@
 <p align="center">
   <a href="https://github.com/4FusionLab/Perfora/actions/workflows/ci.yml"><img src="https://github.com/4FusionLab/Perfora/actions/workflows/ci.yml/badge.svg" alt="Проверки и релизы"></a>
   <a href="https://github.com/4FusionLab/Perfora/releases"><img src="https://img.shields.io/github/v/release/4FusionLab/Perfora?color=2077bd" alt="Версия"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm--Noncommercial-blue" alt="Лицензия PolyForm Noncommercial 1.0.0"></a>
+  <a href="../LICENSE"><img src="https://img.shields.io/badge/license-PolyForm--Noncommercial-blue" alt="Лицензия PolyForm Noncommercial 1.0.0"></a>
 </p>
 
-<p align="center"><a href="https://github.com/4FusionLab/Perfora/releases/tag/v1.1.0"><strong>Скачать v1.1.0</strong></a> · <a href="README.md">English</a> · <a href="https://github.com/4FusionLab/Perfora/issues">Сообщить о проблеме</a></p>
+<p align="center"><a href="https://github.com/4FusionLab/Perfora/releases/tag/v1.1.0"><strong>Скачать v1.1.0</strong></a> · <a href="../README.md">English</a> · <a href="https://github.com/4FusionLab/Perfora/issues">Сообщить о проблеме</a></p>
 
 
 ## Задайте узор. Получите обычную модель Fusion.
@@ -33,47 +33,47 @@
 <table>
   <tr>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/honeycomb-panel.jpg"><img src="docs/assets/examples/honeycomb-panel.jpg" alt="Синяя прямоугольная решётка с шестигранной перфорацией и четырьмя крепёжными отверстиями" width="100%"></a>
+      <a href="assets/examples/honeycomb-panel.jpg"><img src="assets/examples/honeycomb-panel.jpg" alt="Синяя прямоугольная решётка с шестигранной перфорацией и четырьмя крепёжными отверстиями" width="100%"></a>
       <p><strong>Сотовая решётка</strong><br>Шестигранные ячейки, рамка и крепёжные отверстия.</p>
     </td>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/voronoi-panel.jpg"><img src="docs/assets/examples/voronoi-panel.jpg" alt="Зелёная прямоугольная панель со скруглённой перфорацией Вороного" width="100%"></a>
+      <a href="assets/examples/voronoi-panel.jpg"><img src="assets/examples/voronoi-panel.jpg" alt="Зелёная прямоугольная панель со скруглённой перфорацией Вороного" width="100%"></a>
       <p><strong>Вороной со скруглением</strong><br>Нерегулярный узор со скруглёнными углами и рамкой.</p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/slotted-disc.jpg"><img src="docs/assets/examples/slotted-disc.jpg" alt="Оранжевая круглая пластина с диагональными прорезями и центральным отверстием" width="100%"></a>
+      <a href="assets/examples/slotted-disc.jpg"><img src="assets/examples/slotted-disc.jpg" alt="Оранжевая круглая пластина с диагональными прорезями и центральным отверстием" width="100%"></a>
       <p><strong>Щели в круглой области</strong><br>Частичные прорези обрезаны по внешнему и внутреннему контурам.</p>
     </td>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/hole-shapes.jpg"><img src="docs/assets/examples/hole-shapes.jpg" alt="Шесть цветных панелей с круглыми, треугольными, звёздчатыми, эллиптическими, ромбическими и крестообразными отверстиями" width="100%"></a>
+      <a href="assets/examples/hole-shapes.jpg"><img src="assets/examples/hole-shapes.jpg" alt="Шесть цветных панелей с круглыми, треугольными, звёздчатыми, эллиптическими, ромбическими и крестообразными отверстиями" width="100%"></a>
       <p><strong>Разные формы отверстий</strong><br>Круги, треугольники, звёзды, эллипсы, ромбы и кресты.</p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/v1.0.0/circular-tangential.jpg"><img src="docs/assets/examples/v1.0.0/circular-tangential.jpg" alt="Gold circular grille with tangential slots on concentric rings" width="100%"></a>
+      <a href="assets/examples/v1.0.0/circular-tangential.jpg"><img src="assets/examples/v1.0.0/circular-tangential.jpg" alt="Gold circular grille with tangential slots on concentric rings" width="100%"></a>
       <p><strong>Слоты вдоль окружности</strong><br>Круговая раскладка, касательная ориентация и центральное отверстие.</p>
     </td>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/v1.0.0/radial-and-tangential.jpg"><img src="docs/assets/examples/v1.0.0/radial-and-tangential.jpg" alt="Two circular grilles comparing radial and tangential slots" width="100%"></a>
+      <a href="assets/examples/v1.0.0/radial-and-tangential.jpg"><img src="assets/examples/v1.0.0/radial-and-tangential.jpg" alt="Two circular grilles comparing radial and tangential slots" width="100%"></a>
       <p><strong>Выберите направление</strong><br>Слева Radial, справа Tangential. Доступна и фиксированная ориентация.</p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/v1.0.0/point-scoped-perforation.jpg"><img src="docs/assets/examples/v1.0.0/point-scoped-perforation.jpg" alt="Green plate perforated only inside an off-center circular zone" width="100%"></a>
+      <a href="assets/examples/v1.0.0/point-scoped-perforation.jpg"><img src="assets/examples/v1.0.0/point-scoped-perforation.jpg" alt="Green plate perforated only inside an off-center circular zone" width="100%"></a>
       <p><strong>Начните в точке. Ограничьте радиусом.</strong><br>Выберите точку и радиус заполнения без дополнительного профиля.</p>
     </td>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/v1.0.0/profile-region.jpg"><img src="docs/assets/examples/v1.0.0/profile-region.jpg" alt="Blue plate with rounded Voronoi perforation confined to a sketch profile" width="100%"></a>
+      <a href="assets/examples/v1.0.0/profile-region.jpg"><img src="assets/examples/v1.0.0/profile-region.jpg" alt="Blue plate with rounded Voronoi perforation confined to a sketch profile" width="100%"></a>
       <p><strong>Ваш эскиз — граница</strong><br>Перфорация по профилю прямо на грани тела. Без Split Face.</p>
     </td>
   </tr>
   <tr>
     <td colspan="2" valign="top">
-      <a href="docs/assets/examples/v1.0.0/parametric-spread.jpg"><img src="docs/assets/examples/v1.0.0/parametric-spread.jpg" alt="Two panels showing a parametric spread radius change from 16 to 26 millimeters" width="100%"></a>
+      <a href="assets/examples/v1.0.0/parametric-spread.jpg"><img src="assets/examples/v1.0.0/parametric-spread.jpg" alt="Two panels showing a parametric spread radius change from 16 to 26 millimeters" width="100%"></a>
       <p><strong>Измените параметр. Перестройте узор.</strong><br>Spread Radius 16 и 26 мм; правая Feature пересчитана после изменения параметра модели.</p>
     </td>
   </tr>
