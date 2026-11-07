@@ -6,6 +6,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: runtime-release-${{ github.workflow }}-${{ github.ref }}
+  queue: max
+
 permissions:
   contents: read
 
