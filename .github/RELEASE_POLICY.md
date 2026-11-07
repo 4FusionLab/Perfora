@@ -19,6 +19,13 @@ This repository follows the organization-wide release contract. The **GitVersion
 6. Avoid opportunistic releases on a routine PR merge. When required release notes or project-specific approval/evidence is absent, skip publication safely rather than inventing notes or issuing an unintended version.
 7. A broken release is corrected by a new patch version. Existing public tags, release notes and downloadable files remain immutable.
 
+## Explicit release trigger (organization-wide)
+
+- Product publication runs **only** after deliberately pushing an immutable version tag `vMAJOR.MINOR.PATCH` (stable) or `vMAJOR.MINOR.PATCH-IDENTIFIER` (prerelease) for a tested commit reachable from `main`. Routine pushes, PR merges, and manual CI runs never publish.
+- GitVersion.Tool **6.8.2** determines the numeric Fusion manifest version and ZIP filename. Release tags and GitHub Releases use the same version, with optional channel suffix.
+- Existing checks, SHA-256, prepared notes, platform acceptance and other release gates are retained. Invalid tag events fail safely without a release.
+- Never create or retarget a tag implicitly, overwrite published assets, or mark a prerelease Latest. Historical Perfora 0.x plain tags retain their experimental classification.
+
 ## Repository-specific publishing gate
 
-Publication is gated by passing Linux/macOS/Windows tests and reviewed `docs/releases/vX.Y.Z.md` notes. Its existing main-branch publisher remains enabled; absent notes mean no release. The 0.x series is prerelease.
+Publication requires passing Linux/macOS/Windows tests, GitVersion matching the pushed tag and reviewed `docs/releases/vX.Y.Z.md` notes. Stable tags (major >= 1) publish as Latest; prerelease tags and historical 0.x versions remain prerelease.
