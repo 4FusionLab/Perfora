@@ -3,6 +3,7 @@ name: Check and release
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -29,6 +30,16 @@ jobs:
           dotnet tool install GitVersion.Tool --tool-path "$RUNNER_TEMP/gitversion" --version 6.8.2
           version="$("$RUNNER_TEMP/gitversion/dotnet-gitversion" /showvariable MajorMinorPatch)"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            [[ "$GITHUB_REF_NAME" =~ ^v${version}(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ ]] || {
+              echo "Tag does not match GitVersion MajorMinorPatch: $version" >&2
+              exit 1
+            }
+            git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+              echo "Release tag must point to a commit reachable from main." >&2
+              exit 1
+            }
+          fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
   check:
     needs: version
@@ -63,7 +74,7 @@ jobs:
   release:
     name: Publish verified release
     needs: [version, check]
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
@@ -89,12 +100,11 @@ jobs:
           version="$RESOLVED_VERSION"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          if [[ ! -s "docs/releases/v$version.md" ]]; then
-            echo "Missing reviewed notes for v$version: release intentionally skipped."
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          fi
+          test -s "docs/releases/v$version.md" || {
+            echo "Explicit release requires reviewed notes for v$version." >&2
+            exit 1
+          }
+          echo "publish=true" >> "$GITHUB_OUTPUT"
       - name: Build versioned package for tested commit
         if: steps.version.outputs.publish == 'true'
         run: python install.py --zip --version "${{ steps.version.outputs.version }}"
@@ -106,15 +116,17 @@ jobs:
         run: |
           set -euo pipefail
           channel=stable
-          if [[ "${VERSION%%.*}" == 0 ]]; then channel=prerelease; fi
-          # Keep legacy 0.x numeric tags; GitHub records those as prereleases.
-          if [[ "$channel" == stable ]]; then
-            python scripts/release_contract.py --version "$VERSION" --tag "v$VERSION" --channel stable \
-              --manifest Perfora/Perfora.manifest --archive "dist/Perfora-$VERSION.zip" \
-              --notes "docs/releases/v$VERSION.md"
-          else
+          if [[ "$GITHUB_REF_NAME" != "v$VERSION" || "${VERSION%%.*}" == 0 ]]; then
+            channel=prerelease
+          fi
+          if [[ "$channel" == prerelease && "$GITHUB_REF_NAME" == "v$VERSION" ]]; then
+            # Preserve the historic experimental classification of plain v0.x tags.
             python -c "import json,zipfile; p='dist/Perfora-$VERSION.zip'; z=zipfile.ZipFile(p); assert json.loads(z.read('Perfora/Perfora.manifest'))['version']=='$VERSION'"
             (cd dist && sha256sum -c "Perfora-$VERSION.zip.sha256")
+          else
+            python scripts/release_contract.py --version "$VERSION" --tag "$GITHUB_REF_NAME" --channel "$channel" \
+              --manifest Perfora/Perfora.manifest --archive "dist/Perfora-$VERSION.zip" \
+              --notes "docs/releases/v$VERSION.md"
           fi
       - name: Publish ZIP, checksum, and release notes
         if: steps.version.outputs.publish == 'true'
