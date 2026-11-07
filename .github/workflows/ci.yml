@@ -42,11 +42,13 @@ jobs:
       - name: Detect runtime changes (shared platform)
         id: impact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: 4FusionLab/.github/.github/actions/runtime-changes@ad9d60ba4aabc494b4f2c85d6c566a50ca423751
+        uses: 4FusionLab/.github/.github/actions/runtime-changes@2e961620a068c3ad754f6e1be05fb6e4ac68e843
         with:
           before: ${{ github.event.before }}
           after: ${{ github.sha }}
           paths-file: .github/release-paths.txt
+          recover-unpublished: 'true'
+          token: ${{ github.token }}
 
   check:
     needs: version
