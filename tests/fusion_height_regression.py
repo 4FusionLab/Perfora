@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Run with runpy in Fusion, with the tested Perfora add-in registered/running.
 
 Uses disposable unsaved documents. Checks the Boolean children as well as the

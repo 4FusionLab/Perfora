@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Focused native UI acceptance for the 50 mm square and pointed cone.
 
 Launch via the Fusion Python console, click real OK/Cancel, then call finish().

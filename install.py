@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Install a self-contained local copy, preserving any prior installation."""
 import argparse
 from datetime import datetime

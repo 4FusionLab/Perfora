@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Run with runpy inside Fusion. Closes its separate unsaved document."""
 import importlib.util
 from importlib import import_module

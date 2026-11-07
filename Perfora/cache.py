@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """One immutable layout per slot, with bounded command-local region slots."""
 from dataclasses import dataclass
 from .geometry import generate

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Periodic cylindrical placement for straight radial tools; no Fusion imports.
 
 Tool dimensions live in a tangent plane, X around the cylinder and Y along its

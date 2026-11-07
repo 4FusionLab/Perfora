@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Offline fixtures only. Hole generation lives in the shared Perfora core."""
 import math
 from Perfora.geometry import Settings, Loop, Region, rectangle_region

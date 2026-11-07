@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Publish a verified stable or experimental release from the tested GitHub Actions commit."""
 import hashlib
 import json

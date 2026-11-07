@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Real Fusion regression for target-body self-dependency and legacy repair.
 
 Run with runpy while Perfora is loaded. Every case owns an unsaved document.

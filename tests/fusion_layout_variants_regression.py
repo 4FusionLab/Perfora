@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """PREPARED, NOT RUN. Run manually inside Fusion only after explicit CAD handoff.
 
 Requires the registered add-in from this checkout. Uses a separate unsaved

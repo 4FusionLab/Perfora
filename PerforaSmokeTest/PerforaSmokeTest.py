@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Run from Fusion > Scripts. Exercises real CAD operations without mocks."""
 import importlib.util
 import json

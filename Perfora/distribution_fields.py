@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Shared revision 2 fields, independent of Fusion. All lengths are cm.
 
 Unlike the shipped candidate rejection scheme, solve a whole field's spacing

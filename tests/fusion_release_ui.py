@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Interactive integration acceptance. Call finish only after real OK/Cancel.
 
 Inputs: kind='plane'/'cylinder'/'cone'/'freeform', regions=1/2,

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Release-channel and publication-failure contracts, without GitHub mutations."""
 import contextlib
 import hashlib

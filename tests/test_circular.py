@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Circular layout contracts: rings, true hole clearances and placement."""
 from dataclasses import replace
 import math

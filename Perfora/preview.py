@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Cached graphics preview; no persistent cell geometry or extrusion."""
 from time import perf_counter
 

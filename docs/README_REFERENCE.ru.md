@@ -8,7 +8,7 @@
 <p align="center">
   <a href="https://github.com/4FusionLab/Perfora/actions/workflows/ci.yml"><img src="https://github.com/4FusionLab/Perfora/actions/workflows/ci.yml/badge.svg" alt="Проверки и релизы"></a>
   <a href="https://github.com/4FusionLab/Perfora/releases"><img src="https://img.shields.io/github/v/release/4FusionLab/Perfora?color=2077bd" alt="Версия"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="Лицензия GPL-3.0"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm--Noncommercial-blue" alt="Лицензия PolyForm Noncommercial 1.0.0"></a>
 </p>
 
 <p align="center"><a href="https://github.com/4FusionLab/Perfora/releases/tag/v1.1.0"><strong>Скачать v1.1.0</strong></a> · <a href="README.md">English</a> · <a href="https://github.com/4FusionLab/Perfora/issues">Сообщить о проблеме</a></p>
@@ -293,7 +293,7 @@ python3 install.py --zip
 
 Перфора — богиня отверстий, хранительница аккуратных кромок и противница ручного повторения одного узора. Она принадлежит **авторской мифологии 4FusionLab** с шуточной отсылкой к Древней Греции.
 
-[GPL-3.0-only](LICENSE). Независимый проект **4FusionLab**, не связанный с Autodesk. Нативные значки операций загружаются из установки Fusion пользователя; графика Autodesk в дистрибутив не включена.
+[PolyForm Noncommercial 1.0.0](LICENSE). Независимый проект **4FusionLab**, не связанный с Autodesk. Нативные значки операций загружаются из установки Fusion пользователя; графика Autodesk в дистрибутив не включена.
 
 Большие шумовые поля адаптируют дискретизацию в пределах 8–16 отсчётов на Cell Size при прежнем лимите узлов. У ранее допустимых малых областей сетка сохраняется; физический масштаб и Web Thickness задаются явно.
 

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Dependency-free 2D layout. Lengths use Fusion internal units (centimeters)."""
 from dataclasses import dataclass
 from functools import cached_property

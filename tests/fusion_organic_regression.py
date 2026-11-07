@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Organic CAD acceptance using the actually registered add-in and disposable docs.
 
 Run via runpy.run_path with optional shapes/kinds/modes subsets. Outputs JSON,

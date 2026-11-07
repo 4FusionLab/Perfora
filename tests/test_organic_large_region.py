@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Large planar-source regression matching the Box side-face chart size."""
 import unittest
 from Perfora import geometry as g, organic

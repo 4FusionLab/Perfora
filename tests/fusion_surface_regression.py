@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Run via runpy in Fusion. All CAD lives in a separate unsaved document."""
 from dataclasses import replace
 import importlib.util

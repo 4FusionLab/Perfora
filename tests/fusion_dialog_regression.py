@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Execute in Fusion's Py console; exercises the real Session and native inputs.
 
 exec(open('/path/to/tests/fusion_dialog_regression.py').read())

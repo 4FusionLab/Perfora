@@ -8,7 +8,7 @@
 <p align="center">
   <a href="https://github.com/4FusionLab/Perfora/actions/workflows/ci.yml"><img src="https://github.com/4FusionLab/Perfora/actions/workflows/ci.yml/badge.svg" alt="Build and release checks"></a>
   <a href="https://github.com/4FusionLab/Perfora/releases"><img src="https://img.shields.io/github/v/release/4FusionLab/Perfora?color=2077bd" alt="Release"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="GPL-3.0 license"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm--Noncommercial-blue" alt="PolyForm Noncommercial 1.0.0 license"></a>
 </p>
 
 <p align="center"><a href="https://github.com/4FusionLab/Perfora/releases/tag/v1.1.0"><strong>Download v1.1.0</strong></a> · <a href="README.ru.md">Русский</a> · <a href="https://github.com/4FusionLab/Perfora/issues">Report a problem</a></p>
@@ -292,7 +292,7 @@ The build produces `dist/Perfora-1.1.0.zip` and its `.sha256` file. Version come
 
 Perfora is the goddess of holes, guardian of clean edges, and sworn enemy of repeating the same pattern by hand — from **4FusionLab's own mythology**, with a playful nod to ancient Greece.
 
-[GPL-3.0-only](LICENSE). An independent **4FusionLab** project, not affiliated with or endorsed by Autodesk. Native operation icons are resolved from the user's Fusion installation; Autodesk graphics are not bundled.
+[PolyForm Noncommercial 1.0.0](LICENSE). An independent **4FusionLab** project, not affiliated with or endorsed by Autodesk. Native operation icons are resolved from the user's Fusion installation; Autodesk graphics are not bundled.
 
 Large organic fields adapt their sampling within 8–16 samples per Cell Size and the fixed node budget. Previously accepted small regions retain their grid; physical Cell Size and Web Thickness stay explicit.
 

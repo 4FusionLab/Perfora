@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Analytic source fixtures; production sampling/generation are never copied."""
 import ast
 from dataclasses import replace

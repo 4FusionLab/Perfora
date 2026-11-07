@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Run with runpy.run_path in Fusion. Checks exact areas, solids and caching."""
 import importlib.util
 from importlib import import_module

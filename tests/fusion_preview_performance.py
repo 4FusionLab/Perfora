@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Run in Fusion's Py console. Real rendering/cache/CAD performance checks.
 
 Creates and closes one separate unsaved test document, leaving the user's

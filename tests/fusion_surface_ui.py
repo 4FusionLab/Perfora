@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Registered command acceptance. Click real OK/Cancel, then call finish().
 
 runpy.run_path(..., init_globals={'mode': 'fast'}) returns the finish function.

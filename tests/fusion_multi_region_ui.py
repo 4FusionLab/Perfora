@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Future interactive acceptance. Leaves the registered command open.
 
 Run with runpy and keep the returned namespace. result_mode is profiles,

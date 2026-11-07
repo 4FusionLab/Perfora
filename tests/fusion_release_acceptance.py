@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Stable acceptance in Fusion: real OK, native Undo/Redo, edit, F3D reopen.
 
 Run from the Python console via runpy with the registered add-in. Choose

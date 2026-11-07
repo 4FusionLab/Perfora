@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Future CAD acceptance: run with runpy ONLY after explicitly starting that stage.
 
 Requires the registered add-in from this exact checkout. Creates/closes one

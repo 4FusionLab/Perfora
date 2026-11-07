@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Local F3D round-trip for integrated parametric dependencies, never cloud save."""
 import json
 from pathlib import Path

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """Offline 2D timings only. Does not import adsk or contact Fusion."""
 import argparse
 import hashlib

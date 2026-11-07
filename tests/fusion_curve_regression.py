@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-only
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 """PREPARED, NOT EXECUTED. Run explicitly inside the agreed Fusion test session.
 
 Requires the registered add-in from this checkout. Creates/closes one separate
