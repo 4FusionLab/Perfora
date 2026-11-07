@@ -1,0 +1,8 @@
+branches:
+  main:
+    increment: Patch
+    prevent-increment:
+      of-merged-branch: false
+major-version-bump-message: '^(\w+)(\([^)]*\))?!:|BREAKING CHANGE:'
+minor-version-bump-message: '^feat(\([^)]*\))?:'
+patch-version-bump-message: '^(fix|perf)(\([^)]*\))?:'
