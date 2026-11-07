@@ -53,13 +53,49 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.14'
-      - name: Build tested commit
-        run: python install.py --zip
+      - name: Calculate GitVersion and require reviewed notes
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet tool install GitVersion.Tool --tool-path "$RUNNER_TEMP/gitversion" --version 6.8.2
+          version="$("$RUNNER_TEMP/gitversion/dotnet-gitversion" /showvariable MajorMinorPatch)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ ! -s "docs/releases/v$version.md" ]]; then
+            echo "Missing reviewed notes for v$version: release intentionally skipped."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build versioned package for tested commit
+        if: steps.version.outputs.publish == 'true'
+        run: python install.py --zip --version "${{ steps.version.outputs.version }}"
+      - name: Verify GitVersion, manifest, ZIP and SHA-256
+        if: steps.version.outputs.publish == 'true'
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          channel=stable
+          if [[ "${VERSION%%.*}" == 0 ]]; then channel=prerelease; fi
+          # Keep legacy 0.x numeric tags; GitHub records those as prereleases.
+          if [[ "$channel" == stable ]]; then
+            python scripts/release_contract.py --version "$VERSION" --tag "v$VERSION" --channel stable \
+              --manifest Perfora/Perfora.manifest --archive "dist/Perfora-$VERSION.zip" \
+              --notes "docs/releases/v$VERSION.md"
+          else
+            python -c "import json,zipfile; p='dist/Perfora-$VERSION.zip'; z=zipfile.ZipFile(p); assert json.loads(z.read('Perfora/Perfora.manifest'))['version']=='$VERSION'"
+            (cd dist && sha256sum -c "Perfora-$VERSION.zip.sha256")
+          fi
       - name: Publish ZIP, checksum, and release notes
-        run: python scripts/release.py
+        if: steps.version.outputs.publish == 'true'
+        run: python scripts/release.py --version "${{ steps.version.outputs.version }}"
         env:
           GH_TOKEN: ${{ github.token }}

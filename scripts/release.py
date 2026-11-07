@@ -15,10 +15,10 @@ def gh(*args, check=True):
     return subprocess.run(['gh', *args], cwd=ROOT, check=check, text=True, capture_output=True)
 
 
-def main():
+def main(version_override=None):
     repository = os.environ['GITHUB_REPOSITORY']
     commit = os.environ['GITHUB_SHA']
-    version = json.loads((ROOT / 'Perfora/Perfora.manifest').read_text(encoding='utf-8'))['version']
+    version = version_override or json.loads((ROOT / 'Perfora/Perfora.manifest').read_text(encoding='utf-8'))['version']
     if not re.fullmatch(r'\d+\.\d+\.\d+', version):
         raise SystemExit('Manifest version must be MAJOR.MINOR.PATCH.')
     stable = int(version.split('.')[0]) >= 1
@@ -68,4 +68,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--version', help='GitVersion MajorMinorPatch for the tested release')
+    main(parser.parse_args().version)

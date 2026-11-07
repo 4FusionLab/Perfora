@@ -4,6 +4,7 @@ import argparse
 from datetime import datetime
 import json
 import hashlib
+import re
 from pathlib import Path
 import shutil
 import sys
@@ -12,9 +13,11 @@ import zipfile
 ROOT = Path(__file__).resolve().parent
 
 
-def build_archive(root=ROOT):
+def build_archive(root=ROOT, version_override=None):
     """Build the same ZIP on every OS, with a checksum for release verification."""
-    version = json.loads((root / 'Perfora/Perfora.manifest').read_text(encoding='utf-8'))['version']
+    version = version_override or json.loads((root / 'Perfora/Perfora.manifest').read_text(encoding='utf-8'))['version']
+    if not re.fullmatch(r'\d+\.\d+\.\d+', version):
+        raise ValueError('Release version must be numeric MAJOR.MINOR.PATCH')
     target = root / ('dist/Perfora-' + version + '.zip')
     target.parent.mkdir(exist_ok=True)
     files = []
@@ -31,7 +34,12 @@ def build_archive(root=ROOT):
             info.create_system = 3
             info.external_attr = 0o100644 << 16
             info.compress_type = zipfile.ZIP_DEFLATED
-            archive.writestr(info, path.read_bytes(), compresslevel=9)
+            contents = path.read_bytes()
+            if version_override and path.relative_to(root).as_posix() == 'Perfora/Perfora.manifest':
+                manifest = json.loads(contents.decode('utf-8'))
+                manifest['version'] = version
+                contents = (json.dumps(manifest, ensure_ascii=False, indent=2) + '\n').encode('utf-8')
+            archive.writestr(info, contents, compresslevel=9)
     digest = hashlib.sha256(target.read_bytes()).hexdigest()
     target.with_suffix('.zip.sha256').write_text(digest + '  ' + target.name + '\n', encoding='utf-8')
     return target
@@ -73,11 +81,14 @@ def main():
     parser = argparse.ArgumentParser(description='Install Perfora for Autodesk Fusion')
     parser.add_argument('--api-root', type=Path, help='Fusion API directory')
     parser.add_argument('--zip', action='store_true', help='Build a portable ZIP without installing')
+    parser.add_argument('--version', help='GitVersion MajorMinorPatch for release ZIP')
     args = parser.parse_args()
     if args.zip:
-        target = build_archive()
+        target = build_archive(version_override=args.version)
         print(target)
         return
+    if args.version:
+        parser.error('--version is only valid with --zip')
     api_root = args.api_root or default_api_root()
     copy_directory(ROOT / 'Perfora', api_root / 'AddIns/Perfora')
     copy_directory(ROOT / 'PerforaSmokeTest', api_root / 'Scripts/PerforaSmokeTest')
