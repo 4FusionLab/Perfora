@@ -25,15 +25,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Calculate GitVersion 6.8.2
+      - name: Resolve GitVersion (shared platform)
         id: gitversion
-        shell: bash
-        run: |
-          set -euo pipefail
-          dotnet tool install GitVersion.Tool --tool-path "$RUNNER_TEMP/gitversion" --version 6.8.2
-          version="$("$RUNNER_TEMP/gitversion/dotnet-gitversion" /showvariable MajorMinorPatch)"
-          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+        uses: 4FusionLab/.github/.github/actions/resolve-version@ad9d60ba4aabc494b4f2c85d6c566a50ca423751
+
   changes:
     name: Check runtime changes
     runs-on: ubuntu-latest
@@ -44,14 +39,15 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Validate release path rules
-        run: python scripts/release_changes.py --self-test
-      - name: Detect shipped runtime changes
+      - name: Detect runtime changes (shared platform)
         id: impact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          BEFORE: ${{ github.event.before }}
-        run: python scripts/release_changes.py --before "$BEFORE" --after "$GITHUB_SHA" --github-output "$GITHUB_OUTPUT"
+        uses: 4FusionLab/.github/.github/actions/runtime-changes@ad9d60ba4aabc494b4f2c85d6c566a50ca423751
+        with:
+          before: ${{ github.event.before }}
+          after: ${{ github.sha }}
+          paths-file: .github/release-paths.txt
+
   check:
     needs: version
     name: Test (${{ matrix.os }})
@@ -101,7 +97,7 @@ jobs:
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.14'
-      - name: Prepare release notes and version
+      - name: Capture tested GitVersion identity
         id: version
         shell: bash
         env:
@@ -111,9 +107,13 @@ jobs:
           version="$RESOLVED_VERSION"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          python scripts/release_notes.py --product Perfora --version "$version" \
-            --output "$RUNNER_TEMP/release-notes.md" --candidate "docs/releases/v$version.md"
-          echo "notes=$RUNNER_TEMP/release-notes.md" >> "$GITHUB_OUTPUT"
+      - name: Generate release notes (shared platform)
+        uses: 4FusionLab/.github/.github/actions/release-notes@ad9d60ba4aabc494b4f2c85d6c566a50ca423751
+        with:
+          product: Perfora
+          version: ${{ steps.version.outputs.version }}
+          candidate: docs/releases/v${{ steps.version.outputs.version }}.md
+          output: ${{ runner.temp }}/release-notes.md
       - name: Build versioned package for tested commit
         run: python install.py --zip --version "${{ steps.version.outputs.version }}"
       - name: Verify GitVersion, manifest, ZIP and SHA-256
@@ -128,12 +128,20 @@ jobs:
           if [[ "$channel" == stable ]]; then
             python scripts/release_contract.py --version "$VERSION" --tag "v$VERSION" --channel stable \
               --manifest Perfora/Perfora.manifest --archive "dist/Perfora-$VERSION.zip" \
-              --notes "${{ steps.version.outputs.notes }}"
+              --notes "${{ runner.temp }}/release-notes.md"
           else
             python -c "import json,zipfile; p='dist/Perfora-$VERSION.zip'; z=zipfile.ZipFile(p); assert json.loads(z.read('Perfora/Perfora.manifest'))['version']=='$VERSION'"
             (cd dist && sha256sum -c "Perfora-$VERSION.zip.sha256")
           fi
+      - name: Verify ZIP, manifest and SHA-256 (shared platform)
+        uses: 4FusionLab/.github/.github/actions/verify-archive@ad9d60ba4aabc494b4f2c85d6c566a50ca423751
+        with:
+          product: Perfora
+          version: ${{ steps.version.outputs.version }}
+          archives: dist/Perfora-${{ steps.version.outputs.version }}.zip
+          manifest: Perfora/Perfora.manifest
+          notes: ${{ runner.temp }}/release-notes.md
       - name: Publish ZIP, checksum, and release notes
-        run: python scripts/release.py --version "${{ steps.version.outputs.version }}" --notes "${{ steps.version.outputs.notes }}"
+        run: python scripts/release.py --version "${{ steps.version.outputs.version }}" --notes "${{ runner.temp }}/release-notes.md"
         env:
           GH_TOKEN: ${{ github.token }}
