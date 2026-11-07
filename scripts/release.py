@@ -15,6 +15,15 @@ def gh(*args, check=True):
     return subprocess.run(['gh', *args], cwd=ROOT, check=check, text=True, capture_output=True)
 
 
+def resolve_existing_tag_commit(tag):
+    """Resolve an immutable tag to its target commit (including annotated tags)."""
+    result = subprocess.run(
+        ['git', 'rev-parse', '-q', '--verify', 'refs/tags/' + tag + '^{commit}'],
+        cwd=ROOT, check=False, text=True, capture_output=True,
+    )
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
 def main(version_override=None):
     repository = os.environ['GITHUB_REPOSITORY']
     commit = os.environ['GITHUB_SHA']
@@ -39,11 +48,16 @@ def main(version_override=None):
         release = json.loads(existing.stdout)
         if not release['isDraft']:
             print('Already published; keep existing release unchanged: ' + release['url'])
-            print('Bump the manifest version to publish another release.')
+            print('Prepare a new GitVersion version to publish another release.')
             return
         if release['targetCommitish'] != commit:
             raise SystemExit('Existing draft belongs to a different commit; refusing to overwrite it.')
-    else:
+    # GitHub ignores --target when the tag already exists. Never attach a new
+    # release to a historical tag pointing at a different commit.
+    tagged_commit = resolve_existing_tag_commit(tag)
+    if tagged_commit is not None and tagged_commit != commit:
+        raise SystemExit('Existing tag ' + tag + ' points to a different commit; refusing publication.')
+    if existing.returncode != 0:
         gh('release', 'create', tag, '--repo', repository, '--target', commit,
            '--draft', '--prerelease=' + str(prerelease).lower(), '--title', title,
            '--notes-file', str(notes))
