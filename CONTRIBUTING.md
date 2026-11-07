@@ -1,5 +1,7 @@
 # Contributing to Perfora
 
+[Русская версия](CONTRIBUTING.ru.md)
+
 Keep geometry independent of Fusion. `Perfora/geometry.py` contains layout and clearance logic; `model.py` and `clipping.py` adapt it to Fusion; `preview.py` renders previews; `Perfora.py` owns the command and dialog.
 
 Curved sources use `surface_geometry.py` for dependency-free placement/finite-tool separation and `surface.py` for a shared temporary preparation consumed by preview, fixed output and Feature. Renderer-owned native sheets never enter a final-build cache. `cylindrical.py` retains the legacy fixed-cylinder adapter for older API callers.
