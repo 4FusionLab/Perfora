@@ -1,0 +1,31 @@
+name: GitVersion validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Calculate semantic version
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install GitVersion
+        run: dotnet tool install GitVersion.Tool --tool-path "$RUNNER_TEMP/gitversion" --version 6.8.2
+      - name: Calculate and validate version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$("$RUNNER_TEMP/gitversion/dotnet-gitversion" /showvariable SemVer)"
+          test -n "$version"
+          echo "Calculated GitVersion SemVer: $version"
+          echo "### GitVersion: $version" >> "$GITHUB_STEP_SUMMARY"
