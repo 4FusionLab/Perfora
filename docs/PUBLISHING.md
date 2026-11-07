@@ -23,7 +23,7 @@ Pushes to `main` run compile, geometry, installation, and packaging checks on Li
 
 After all three OS jobs pass, the release job derives `MajorMinorPatch` using GitVersion and builds that tested commit only if matching release notes exist. The generated ZIP and embedded Fusion manifest use this numeric version. `scripts/release.py` derives the channel from the numeric version (legacy 0.x experimental), uploads ZIP and SHA-256, downloads both to verify their bytes, then publishes with the correct prerelease/Latest flags. Only that job has `contents: write`; it uses the built-in GitHub Actions token. No personal token is stored in the project.
 
-An existing published version is immutable. Retrying a failed upload is allowed only for a draft belonging to the same exact commit. A draft targeting another commit stops publication for inspection. Never move a published tag or replace its assets to repair a code defect; publish a new patch version.
+An existing published version is immutable. Retrying a failed upload is allowed only for a draft belonging to the same exact commit. A draft targeting another commit stops publication for inspection. Before creating a release, the job also refuses to reuse a Git tag already pointing to a different commit. Never move a published tag or replace its assets to repair a code defect; publish a new patch version.
 
 ## Verify publication
 
