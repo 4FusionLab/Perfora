@@ -1,5 +1,7 @@
 # Perfora 1.0 benchmarks
 
+[Русская версия](BENCHMARKS.ru.md)
+
 Measured on 24 October 2026, macOS arm64, Fusion 2706.1.14 (macOS 27.0.1). These results compare the frozen pre-optimization development snapshot with the optimized geometry shipped in 1.0. Both snapshots already contain Circular, Start Point, Spread Radius, and Tangential placement. **The baseline is not the published 0.2.0 release.** Source fingerprints and raw samples are in [v1.0.0.json](benchmarks/v1.0.0.json).
 
 ## Pure Python geometry generation
