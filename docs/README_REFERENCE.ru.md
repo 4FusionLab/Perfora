@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="perfora.png" alt="Перфора — богиня отверстий" width="200">
+  <img src="../perfora.png" alt="Перфора — богиня отверстий" width="200">
 </p>
 
 <h1 align="center">Perfora для Autodesk Fusion</h1>
@@ -8,23 +8,23 @@
 <p align="center">
   <a href="https://github.com/4FusionLab/Perfora/actions/workflows/ci.yml"><img src="https://github.com/4FusionLab/Perfora/actions/workflows/ci.yml/badge.svg" alt="Проверки и релизы"></a>
   <a href="https://github.com/4FusionLab/Perfora/releases"><img src="https://img.shields.io/github/v/release/4FusionLab/Perfora?color=2077bd" alt="Версия"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm--Noncommercial-blue" alt="Лицензия PolyForm Noncommercial 1.0.0"></a>
+  <a href="../LICENSE"><img src="https://img.shields.io/badge/license-PolyForm--Noncommercial-blue" alt="Лицензия PolyForm Noncommercial 1.0.0"></a>
 </p>
 
-<p align="center"><a href="https://github.com/4FusionLab/Perfora/releases/tag/v1.1.0"><strong>Скачать v1.1.0</strong></a> · <a href="README.md">English</a> · <a href="https://github.com/4FusionLab/Perfora/issues">Сообщить о проблеме</a></p>
+<p align="center"><a href="https://github.com/4FusionLab/Perfora/releases/tag/v1.1.0"><strong>Скачать v1.1.0</strong></a> · <a href="../README.md">English</a> · <a href="https://github.com/4FusionLab/Perfora/issues">Сообщить о проблеме</a></p>
 
 
 ## Задайте узор. Получите обычную модель Fusion.
 
-Визуальный стенд общего ядра: [офлайн-тест Distribution](studies/README.md) показывает 11 семейств через общее геометрическое ядро. Новые нативные команды используют ревизию 2 доработанных Distribution, включая частичные отверстия и Follow Pattern. Существующие Feature сохраняют свою ревизию; старый Running Bond доступен при редактировании.
+Визуальный стенд общего ядра: [офлайн-тест Distribution](../studies/README.md) показывает 11 семейств через общее геометрическое ядро. Новые нативные команды используют ревизию 2 доработанных Distribution, включая частичные отверстия и Follow Pattern. Существующие Feature сохраняют свою ревизию; старый Running Bond доступен при редактировании.
 
-[Pattern playground](demo/README.md) — браузерное демо и стенд быстрых визуальных проверок. Он исполняет те же исходники Python-геометрии, что и Fusion: 11 семейств Distribution, 19 форм отверстий, ссылки с параметрами. Сборка: `python3 scripts/build_web_demo.py`; после запуска HTTP-сервера откройте `/demo/`. Страница подготовлена к статическому хостингу; сборка ничего не публикует.
+[Pattern playground](../demo/README.ru.md) — браузерное демо и стенд быстрых визуальных проверок. Он исполняет те же исходники Python-геометрии, что и Fusion: 11 семейств Distribution, 19 форм отверстий, ссылки с параметрами. Сборка: `python3 scripts/build_web_demo.py`; после запуска HTTP-сервера откройте `/demo/`. Страница подготовлена к статическому хостингу; сборка ничего не публикует.
 
 Выберите плоскую грань, замкнутый профиль эскиза или конструкционную плоскость. Настройте форму отверстий, перемычки и отступ от края, затем проверьте предпросмотр. Perfora создаст обычные профили эскиза, штатную операцию Extrude или параметрическую фичу Perfora в таймлайне.
 
 Чтобы перфорировать часть существующей грани, нарисуйте на ней замкнутый эскиз, завершите его и выберите закрашенную область профиля в **Profiles**. Split Face не требуется. Для **Cut** или **Intersect** тело опорной грани автоматически выбирается в **Objects**; перед подтверждением проверьте направление и протяжённость. Для профилей на конструкционных плоскостях Objects по-прежнему задаются явно.
 
-**Perfora 1.1.0: шесть шумовых полей, 11 Distribution, криволинейные грани, несколько областей и исправленный пересчёт Feature.** [Что нового →](docs/releases/v1.1.0.md)
+**Perfora 1.1.0: шесть шумовых полей, 11 Distribution, криволинейные грани, несколько областей и исправленный пересчёт Feature.** [Что нового →](releases/v1.1.0.ru.md)
 
 **Криволинейные грани:** цилиндрические, конические и регулярные гладкие грани свободной формы используют общие Sketch/Extrude/Feature, включая Voronoi и обрезку по границе. Поведение и ограничения описаны ниже.
 
@@ -33,47 +33,47 @@
 <table>
   <tr>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/honeycomb-panel.jpg"><img src="docs/assets/examples/honeycomb-panel.jpg" alt="Синяя прямоугольная решётка с шестигранной перфорацией и четырьмя крепёжными отверстиями" width="100%"></a>
+      <a href="assets/examples/honeycomb-panel.jpg"><img src="assets/examples/honeycomb-panel.jpg" alt="Синяя прямоугольная решётка с шестигранной перфорацией и четырьмя крепёжными отверстиями" width="100%"></a>
       <p><strong>Сотовая решётка</strong><br>Шестигранные ячейки, рамка и крепёжные отверстия.</p>
     </td>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/voronoi-panel.jpg"><img src="docs/assets/examples/voronoi-panel.jpg" alt="Зелёная прямоугольная панель со скруглённой перфорацией Вороного" width="100%"></a>
+      <a href="assets/examples/voronoi-panel.jpg"><img src="assets/examples/voronoi-panel.jpg" alt="Зелёная прямоугольная панель со скруглённой перфорацией Вороного" width="100%"></a>
       <p><strong>Вороной со скруглением</strong><br>Нерегулярный узор со скруглёнными углами и рамкой.</p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/slotted-disc.jpg"><img src="docs/assets/examples/slotted-disc.jpg" alt="Оранжевая круглая пластина с диагональными прорезями и центральным отверстием" width="100%"></a>
+      <a href="assets/examples/slotted-disc.jpg"><img src="assets/examples/slotted-disc.jpg" alt="Оранжевая круглая пластина с диагональными прорезями и центральным отверстием" width="100%"></a>
       <p><strong>Щели в круглой области</strong><br>Частичные прорези обрезаны по внешнему и внутреннему контурам.</p>
     </td>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/hole-shapes.jpg"><img src="docs/assets/examples/hole-shapes.jpg" alt="Шесть цветных панелей с круглыми, треугольными, звёздчатыми, эллиптическими, ромбическими и крестообразными отверстиями" width="100%"></a>
+      <a href="assets/examples/hole-shapes.jpg"><img src="assets/examples/hole-shapes.jpg" alt="Шесть цветных панелей с круглыми, треугольными, звёздчатыми, эллиптическими, ромбическими и крестообразными отверстиями" width="100%"></a>
       <p><strong>Разные формы отверстий</strong><br>Круги, треугольники, звёзды, эллипсы, ромбы и кресты.</p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/v1.0.0/circular-tangential.jpg"><img src="docs/assets/examples/v1.0.0/circular-tangential.jpg" alt="Gold circular grille with tangential slots on concentric rings" width="100%"></a>
+      <a href="assets/examples/v1.0.0/circular-tangential.jpg"><img src="assets/examples/v1.0.0/circular-tangential.jpg" alt="Gold circular grille with tangential slots on concentric rings" width="100%"></a>
       <p><strong>Слоты вдоль окружности</strong><br>Круговая раскладка, касательная ориентация и центральное отверстие.</p>
     </td>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/v1.0.0/radial-and-tangential.jpg"><img src="docs/assets/examples/v1.0.0/radial-and-tangential.jpg" alt="Two circular grilles comparing radial and tangential slots" width="100%"></a>
+      <a href="assets/examples/v1.0.0/radial-and-tangential.jpg"><img src="assets/examples/v1.0.0/radial-and-tangential.jpg" alt="Two circular grilles comparing radial and tangential slots" width="100%"></a>
       <p><strong>Выберите направление</strong><br>Слева Radial, справа Tangential. Доступна и фиксированная ориентация.</p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/v1.0.0/point-scoped-perforation.jpg"><img src="docs/assets/examples/v1.0.0/point-scoped-perforation.jpg" alt="Green plate perforated only inside an off-center circular zone" width="100%"></a>
+      <a href="assets/examples/v1.0.0/point-scoped-perforation.jpg"><img src="assets/examples/v1.0.0/point-scoped-perforation.jpg" alt="Green plate perforated only inside an off-center circular zone" width="100%"></a>
       <p><strong>Начните в точке. Ограничьте радиусом.</strong><br>Выберите точку и радиус заполнения без дополнительного профиля.</p>
     </td>
     <td width="50%" valign="top">
-      <a href="docs/assets/examples/v1.0.0/profile-region.jpg"><img src="docs/assets/examples/v1.0.0/profile-region.jpg" alt="Blue plate with rounded Voronoi perforation confined to a sketch profile" width="100%"></a>
+      <a href="assets/examples/v1.0.0/profile-region.jpg"><img src="assets/examples/v1.0.0/profile-region.jpg" alt="Blue plate with rounded Voronoi perforation confined to a sketch profile" width="100%"></a>
       <p><strong>Ваш эскиз — граница</strong><br>Перфорация по профилю прямо на грани тела. Без Split Face.</p>
     </td>
   </tr>
   <tr>
     <td colspan="2" valign="top">
-      <a href="docs/assets/examples/v1.0.0/parametric-spread.jpg"><img src="docs/assets/examples/v1.0.0/parametric-spread.jpg" alt="Two panels showing a parametric spread radius change from 16 to 26 millimeters" width="100%"></a>
+      <a href="assets/examples/v1.0.0/parametric-spread.jpg"><img src="assets/examples/v1.0.0/parametric-spread.jpg" alt="Two panels showing a parametric spread radius change from 16 to 26 millimeters" width="100%"></a>
       <p><strong>Измените параметр. Перестройте узор.</strong><br>Spread Radius 16 и 26 мм; правая Feature пересчитана после изменения параметра модели.</p>
     </td>
   </tr>
@@ -82,7 +82,7 @@
 <details>
 <summary>Посмотреть двенадцать регулярных форм отверстий</summary>
 
-![Двенадцать регулярных форм отверстий](docs/assets/hole-shapes.svg)
+![Двенадцать регулярных форм отверстий](assets/hole-shapes.svg)
 
 </details>
 
@@ -95,7 +95,7 @@
 | Протяжённость | One Side, Two Sides, Symmetric; расстояние, насквозь, до объекта в поддерживаемых режимах |
 | Предпросмотр | Быстрые кэшированные контуры для настройки; точный CAD-результат для проверки выдавливания |
 
-[Размеры отверстий и особенности геометрии](docs/PERFORATIONS.md). Интерфейс на английском с привычными названиями операций Fusion. Сторонние пакеты Python не нужны.
+[Размеры отверстий и особенности геометрии](PERFORATIONS.ru.md). Интерфейс на английском с привычными названиями операций Fusion. Сторонние пакеты Python не нужны.
 
 У всех числовых полей есть начальные значения. Если оставить поле пустым, примерно через секунду оно вернётся к своему дефолту; при этом можно сразу набрать новое значение после очистки. Явный 0 сохраняется, непустые ошибочные выражения не заменяются. Поддерживаются единицы, вычисления и параметры текущего документа Fusion; для целочисленных значений сохраняются ограничения диапазона.
 
@@ -123,7 +123,7 @@ Cell Spacing задаёт номинальный шаг исходных точ�
 
 Эти формы определяют собственное ограниченное поле; Distribution и Hole Angle скрыты. Pattern Angle поворачивает поле в осях эскиза. На кривой грани 0° следует окружному направлению развёрнутой карты, а 90° — осевому направлению или меридиану, в том числе для волокон. Все шесть подключены к Sketch, Extrude, Feature, Fast/Full Preview, Trim to Boundary и отступам вокруг внутренних вырезов на плоскости, цилиндре, конусе и регулярной свободной поверхности. Несколько областей по-прежнему выбираются только одного типа. На кривых это конечные прямые инструменты с консервативной защитой перемычки по глубине и у шва; высокая кривизна и вершина конуса могут разрежать рисунок.
 
-Островки материала соединяются до выделения контуров; длинные прорези получают мостики. Конфликтующие мелкие фрагменты пропускаются ради перемычки между готовыми контурами. При нулевом краевом отступе фрагменты отверстий, отрезающие материал, сохраняются сплошными. Бюджеты дискретизации и контуров ограничивают стоимость CAD и дают понятную ошибку. [Алгоритмы, поля, поведение поверхностей и проверки →](docs/ORGANIC_PATTERNS.md)
+Островки материала соединяются до выделения контуров; длинные прорези получают мостики. Конфликтующие мелкие фрагменты пропускаются ради перемычки между готовыми контурами. При нулевом краевом отступе фрагменты отверстий, отрезающие материал, сохраняются сплошными. Бюджеты дискретизации и контуров ограничивают стоимость CAD и дают понятную ошибку. [Алгоритмы, поля, поведение поверхностей и проверки →](ORGANIC_PATTERNS.ru.md)
 
 ## Несколько областей
 
@@ -133,7 +133,7 @@ Cell Spacing задаёт номинальный шаг исходных точ�
 
 Повторные ссылки исключаются. Перекрытие заполненных областей по площади отклоняется до создания результата. Соседние области остаются отдельными, каждая сохраняет свой Edge Offset и внутренние вырезы. Все источники должны относиться к одному экземпляру компонента. Cut/Intersect сопоставляет грань или профиль на грани с её опорным телом, которое должно присутствовать в Objects. Профили без опорного тела требуют ровно один Object. Intersect допускает одну область на Object; неиспользуемые и неоднозначные Objects отклоняются. Feature Join использует то же явное сопоставление; штатный Extrude Join сохраняет автоматический выбор соприкасающихся тел средствами Fusion. New Component при нескольких областях отклоняется: используйте New Body или один источник. Прежние одиночные операции сохраняются.
 
-Feature хранит зависимости всех источников и сопоставление Objects; состав источников, операция и Objects фиксированы при Edit Feature. Старые одиночные Feature остаются читаемыми и редактируемыми. Full Preview/OK заново читает исходную геометрию и использует ту же привязку раскладки, что Fast Preview. Ошибка удаляет весь новый результат; при неудачном пересчёте код пытается восстановить каждое изменённое базовое тело. **Текущие результаты CAD/UI и локального F3D приведены в [отчёте интеграции](docs/RELEASE_INTEGRATION.md).** [Привязка и сценарии приёмки](docs/MULTI_REGION.md).
+Feature хранит зависимости всех источников и сопоставление Objects; состав источников, операция и Objects фиксированы при Edit Feature. Старые одиночные Feature остаются читаемыми и редактируемыми. Full Preview/OK заново читает исходную геометрию и использует ту же привязку раскладки, что Fast Preview. Ошибка удаляет весь новый результат; при неудачном пересчёте код пытается восстановить каждое изменённое базовое тело. **Текущие результаты CAD/UI и локального F3D приведены в [отчёте интеграции](RELEASE_INTEGRATION.md).** [Привязка и сценарии приёмки](MULTI_REGION.md).
 
 ## Параметрический режим Feature
 Исправление пересчёта: пересчёт Feature фиксирует ссылки Objects до Boolean и использует upstream-грани, чтобы избежать зависимости от собственного результата. Edit Feature OK обновляет старые ссылки Objects; после Cancel таймлайн восстанавливается по завершении команды. Проверено в Fusion 2706.1.14 на macOS: все шесть шумов и Voronoi на копиях выбранной грани Box, настоящие Edit Feature OK/Cancel и Undo/Redo.
@@ -164,26 +164,26 @@ Spread Radius удалён из диалога. Новая раскладка з
 
 ## Одиннадцать Distribution
 
-**Проверено в Fusion на macOS; точный объём приёмки — в [отчёте интеграции](docs/RELEASE_INTEGRATION.md).** Восемь новых вариантов — **Along Path, Contour, Fan, Phyllotaxis, Poisson Disk, Wave, Chevron и Between Curves** — дополняют Staggered, Rectangular и Circular: всего 11 Distribution для 12 повторяемых форм. Шумы и Voronoi задают собственное распределение. Running Bond доступен только при редактировании старых Feature.
+**Проверено в Fusion на macOS; точный объём приёмки — в [отчёте интеграции](RELEASE_INTEGRATION.md).** Восемь новых вариантов — **Along Path, Contour, Fan, Phyllotaxis, Poisson Disk, Wave, Chevron и Between Curves** — дополняют Staggered, Rectangular и Circular: всего 11 Distribution для 12 повторяемых форм. Шумы и Voronoi задают собственное распределение. Running Bond доступен только при редактировании старых Feature.
 
-Подключены нативные поля, общие пути Fast/Full Preview и Sketch/Extrude/Feature, хранение параметров, зависимости направляющих и Edit Feature. Результаты Python- и CAD/UI-проверок на macOS записаны в [отчёте интеграции](docs/RELEASE_INTEGRATION.md).
+Подключены нативные поля, общие пути Fast/Full Preview и Sketch/Extrude/Feature, хранение параметров, зависимости направляющих и Edit Feature. Результаты Python- и CAD/UI-проверок на macOS записаны в [отчёте интеграции](RELEASE_INTEGRATION.md).
 
 Along Spacing и Row Spacing при 0 выбирают автоматический шаг по описанному габариту отверстия; меньший заданный шаг повышается до безопасного минимума. Пространственный индекс соседей пропускает кандидатов, нарушающих Web Thickness, в том числе у центра веера, замыкания контуров и вершины шеврона. Упаковка консервативна и учитывает повёрнутые формы. Phyllotaxis имеет Density Ratio и Spread Radius; Poisson Disk — Seed/New Pattern; Wave — выборку по длине, амплитуду/длину волны/фазу/фазу соседних рядов; Running Bond — накопительный сдвиг, включая `1 / 3` и `1 / 4`.
 
 Contour использует приближённые уровни внутреннего расстояния, явный Contour Tolerance и бюджет дискретизации; это не точный CAD-offset, детали меньше разрешения могут исчезнуть. Between Curves пока требует две отдельные открытые плоские кривые/ребра в компоненте Profiles, сопоставляет нормированную длину и концы, отклоняет пересечения, схлопывание, складки, замкнутые, неплоские и межкомпонентные направляющие. Произвольные сложные сплайновые полосы и цепочки не заявлены. Для Contour/Between Curves Start Point и сдвиги двигают только положительную зону Spread Radius; Pattern Angle скрыт.
 
-Новые Feature содержат дополнительные параметры модели. У старых узлов отсутствующие поля при редактировании сохраняются числовыми снимками; для новых model parameters и зависимостей выражений пересоздайте Feature. [Ограничения, точки интеграции и CAD/UI-приёмка →](docs/LAYOUT_VARIANTS.md)
+Новые Feature содержат дополнительные параметры модели. У старых узлов отсутствующие поля при редактировании сохраняются числовыми снимками; для новых model parameters и зависимостей выражений пересоздайте Feature. [Ограничения, точки интеграции и CAD/UI-приёмка →](LAYOUT_VARIANTS.md)
 ## Вдоль кривой
 
 Ветка `codex/curve-layout` добавляет **Distribution → Along Path** для всех 12 повторяемых форм: выберите одну линию, дугу, окружность или сплайн в плоскости и компоненте Profiles. **Path Spacing** измеряет шаг по длине кривой; **Start Offset**, **End Offset**, **Position** и **Reverse Path** задают положение отверстий. Ориентация **Fixed** или **Tangent** дополняется **Hole Angle**. Замкнутый путь не дублирует отверстие на шве. На крутых поворотах, сближающихся участках и шве перемычка проверяется по консервативным описанным окружностям; конфликт выдаёт ошибку вместо скрытого пропуска отверстий.
 
 Код интегрирован с Fast/Full Preview, существующей обрезкой, внутренними вырезами и Edge Offset, Sketch, Extrude и Feature. Feature хранит зависимость от живого пути и новые параметры модели; Edit Feature позволяет заменить путь или распределение. Старые узлы сохраняют существующие распределения; для Along Path потребуется пересоздание узла, поскольку добавить в старый узел новые нативные параметры нельзя. Цепочки, неплоские пути, пути из другого компонента и эллиптические пути не поддерживаются. Start Point, Spread Radius, Pattern Angle и X/Y Offset в этом распределении неактивны; Voronoi использует своё распределение.
 
-Нативные CAD-сценарии, настоящий диалог и локальное F3D проверены в общей релизной ветке; текущая приёмка записана в [отчёте интеграции](docs/RELEASE_INTEGRATION.md). [Поведение, обоснование API, допуски, ограничения и CAD-приёмка →](docs/CURVE_LAYOUT.md)
+Нативные CAD-сценарии, настоящий диалог и локальное F3D проверены в общей релизной ветке; текущая приёмка записана в [отчёте интеграции](RELEASE_INTEGRATION.md). [Поведение, обоснование API, допуски, ограничения и CAD-приёмка →](CURVE_LAYOUT.md)
 
 ## Производительность
 
-В парных замерах Fast Preview в Fusion: **3,424 → 0,262 с** для 45 эллиптических отверстий и **1,148 → 0,104 с** для 253 шестигранников в круглой области. Это измерения на macOS, а не универсальная гарантия ускорения. [Данные, сценарии и методика →](docs/BENCHMARKS.md)
+В парных замерах Fast Preview в Fusion: **3,424 → 0,262 с** для 45 эллиптических отверстий и **1,148 → 0,104 с** для 253 шестигранников в круглой области. Это измерения на macOS, а не универсальная гарантия ускорения. [Данные, сценарии и методика →](BENCHMARKS.ru.md)
 
 Fast Preview и окончательное создание используют подготовленную раскладку текущей команды. Изменение выдавливания по-прежнему передаёт актуальные параметры в результат. Изменения исходной геометрии, плоскости, точки, радиуса или раскладки обновляют соответствующие данные. Для обрезанных отверстий операции, нужные только панели, выполняются при выборе Perforated Panel. Маленькие простые сетки сохраняют прямую проверку зазоров.
 
@@ -275,7 +275,7 @@ Voronoi сохраняет собственное распределение д�
 
 Несколько областей поддерживают Sketch, Extrude и один параметрический узел Feature. Плоские копланарные области используют общую фазу; криволинейные области — собственные локальные нормали. Все области готовятся до первого изменения тела. Для соседних кривых областей консервативная проверка конечных инструментов отклоняет конфликт, сохраняя размер отверстий. Intersect требует отдельное целевое тело для каждой области. New Component доступен для одиночной области.
 
-Включено в **1.1.0**. Фактическая приёмка и ограничения: [RELEASE_INTEGRATION.md](docs/RELEASE_INTEGRATION.md) и [шумы и пересчёт](docs/ORGANIC_PATTERNS.md).
+Включено в **1.1.0**. Фактическая приёмка и ограничения: [RELEASE_INTEGRATION.md](RELEASE_INTEGRATION.md) и [шумы и пересчёт](ORGANIC_PATTERNS.ru.md).
 
 
 ## Разработка
@@ -287,13 +287,13 @@ python3 install.py --zip
 
 Результат сборки — `dist/Perfora-1.1.0.zip` и файл `.sha256`. Версия берётся из manifest дополнения. CI проверяет геометрию и установку на macOS, Windows и Linux, затем публикует проверенные версии 1.x как стабильные релизы с отметкой Latest. Ранние версии 0.x остаются prerelease. CAD-проверки выполняются отдельно в Fusion.
 
-[Участие в разработке и CAD-проверки](CONTRIBUTING.md) · [Изменения](CHANGELOG.md) · [Выпуск релизов](docs/PUBLISHING.md)
+[Участие в разработке и CAD-проверки](../CONTRIBUTING.ru.md) · [Изменения](../CHANGELOG.ru.md) · [Выпуск релизов](PUBLISHING.ru.md)
 
 ## Немного мифологии мастерской
 
 Перфора — богиня отверстий, хранительница аккуратных кромок и противница ручного повторения одного узора. Она принадлежит **авторской мифологии 4FusionLab** с шуточной отсылкой к Древней Греции.
 
-[PolyForm Noncommercial 1.0.0](LICENSE). Независимый проект **4FusionLab**, не связанный с Autodesk. Нативные значки операций загружаются из установки Fusion пользователя; графика Autodesk в дистрибутив не включена.
+[PolyForm Noncommercial 1.0.0](../LICENSE). Независимый проект **4FusionLab**, не связанный с Autodesk. Нативные значки операций загружаются из установки Fusion пользователя; графика Autodesk в дистрибутив не включена.
 
 Большие шумовые поля адаптируют дискретизацию в пределах 8–16 отсчётов на Cell Size при прежнем лимите узлов. У ранее допустимых малых областей сетка сохраняется; физический масштаб и Web Thickness задаются явно.
 

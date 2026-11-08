@@ -1,5 +1,7 @@
 # Changelog
 
+[Русская версия](CHANGELOG.ru.md)
+
 ## 1.1.0 — 2026-10-25
 
 - Add six Noise fields: Smooth Noise, Reaction Diffusion, Directional Fibers, Topographic, Gyroid Field and Blue Noise. Move Voronoi to Noise, last in the list; keep 12 repeating shapes in Pattern.

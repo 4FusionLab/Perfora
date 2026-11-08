@@ -1,5 +1,7 @@
 # Releasing Perfora
 
+[Русская версия](PUBLISHING.ru.md)
+
 Releases are built by [Check and release](https://github.com/4FusionLab/Perfora/actions/workflows/ci.yml).
 
 ## Prepare a version
@@ -19,9 +21,9 @@ The maintainer chooses the release channel. Validation records describe the plat
 
 ## Automated publication
 
-Pushes to `main` run compile, geometry, installation, and packaging checks on Linux, macOS, and Windows. Release publication is skipped if nonempty, reviewed `docs/releases/vX.Y.Z.md` notes are missing for the GitVersion-calculated version. Pull requests run the same checks without release permissions.
+Pushes to `main` run compile, geometry, installation, and packaging checks on Linux, macOS, and Windows. Publication requires eligible runtime changes since the last published release (or the original push range if no ZIP release exists). A documentation-only push may retry an earlier missed runtime release; it does not create a release on its own. Pull requests run the same checks without release permissions.
 
-The version job derives `MajorMinorPatch` using GitVersion once. All three OS jobs build versioned ZIPs with this identity, and the release job consumes the same identity after successful checks. Publication proceeds only if matching release notes exist. The generated ZIP and embedded Fusion manifest use this numeric version. `scripts/release.py` derives the channel from the numeric version (legacy 0.x experimental), uploads ZIP and SHA-256, downloads both to verify their bytes, then publishes with the correct prerelease/Latest flags. Only that job has `contents: write`; it uses the built-in GitHub Actions token. No personal token is stored in the project.
+The version job derives `MajorMinorPatch` using GitVersion once. All three OS jobs build versioned ZIPs with this identity, and the release job consumes the same identity after successful checks. Reviewed version-specific release notes are used when present; otherwise the shared action generates notes from Git history. The generated ZIP and embedded Fusion manifest use this numeric version. `scripts/release.py` derives the channel from the numeric version (legacy 0.x experimental), uploads ZIP and SHA-256, downloads both to verify their bytes, then publishes with the correct prerelease/Latest flags. Only that job has `contents: write`; it uses the built-in GitHub Actions token. No personal token is stored in the project.
 
 An existing published version is immutable. Retrying a failed upload is allowed only for a draft belonging to the same exact commit. A draft targeting another commit stops publication for inspection. Before creating a release, the job also refuses to reuse a Git tag already pointing to a different commit. Never move a published tag or replace its assets to repair a code defect; publish a new patch version.
 
